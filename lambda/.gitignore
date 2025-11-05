@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# serverless
+.serverless/
+
+# env
+.env
+.env.local
+
+# logs
+*.log
+
+# build
+dist/
+build/

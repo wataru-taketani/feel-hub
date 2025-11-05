@@ -1,0 +1,55 @@
+service: feel-hub-lambda
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-northeast-1  # 東京リージョン
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512  # MB
+  timeout: 900  # 15分（最大値）
+  environment:
+    SUPABASE_URL: ${env:SUPABASE_URL}
+    SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}
+    ENCRYPTION_KEY: ${env:ENCRYPTION_KEY}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: 'arn:aws:logs:*:*:*'
+
+functions:
+  scrapeLesson:
+    handler: scraper/index.handler
+    description: FEELCYCLEサイトからレッスン情報をスクレイピング
+    events:
+      # 毎日午前6時に実行（JST = UTC+9なので21:00 UTC）
+      - schedule:
+          rate: cron(0 21 * * ? *)
+          description: 毎日レッスン情報を取得
+          enabled: false  # 初回は手動で有効化
+
+  checkCancellation:
+    handler: scraper/checkCancellation.handler
+    description: キャンセル待ちレッスンの空き枠をチェック
+    events:
+      # 毎分実行（Phase 3で有効化）
+      - schedule:
+          rate: rate(1 minute)
+          description: キャンセル待ちチェック
+          enabled: false  # Phase 3で有効化
+
+plugins:
+  - serverless-offline
+
+package:
+  patterns:
+    - '!node_modules/**'
+    - '!.git/**'
+    - '!.serverless/**'
+    - '!README.md'
