@@ -68,16 +68,17 @@ npm run logs
 ### 1. scrapeLesson
 
 - **説明**: FEELCYCLEサイトからレッスン情報をスクレイピング
-- **実行**: 毎日午前6時（JST）
+- **実行**: 毎日午前6時（JST）= 21:00 UTC
 - **タイムアウト**: 15分
-- **メモリ**: 512MB
+- **メモリ**: 1024MB（Puppeteer用に増量）
+- **初期状態**: 無効（`enabled: false`）
 
 ### 2. checkCancellation
 
 - **説明**: キャンセル待ちレッスンの空き枠をチェック
 - **実行**: 毎分（Phase 3で有効化）
 - **タイムアウト**: 15分
-- **メモリ**: 512MB
+- **メモリ**: 1024MB
 
 ## コスト見積もり
 
@@ -104,9 +105,34 @@ npm install -g serverless@4
 
 Lambdaでは`@sparticuz/chromium`を使用しています。ローカルテストでエラーが出る場合は、通常のPuppeteerを使用してください。
 
+## 技術スタック
+
+- **Runtime**: Node.js 20.x
+- **Framework**: Serverless Framework v4
+- **言語**: TypeScript（serverless-plugin-typescriptで自動コンパイル）
+- **スクレイピング**: Puppeteer + @sparticuz/chromium（Lambda最適化）
+- **データベース**: Supabase（PostgreSQL）
+
 ## Phase別実装状況
 
 - **Phase 1**: ✅ 完了（Lambda設定とテンプレート）
-- **Phase 2**: レッスンスクレイピング実装予定
-- **Phase 3**: キャンセル待ち通知実装予定
-- **Phase 4**: 自動予約実装予定
+- **Phase 2**: ✅ 完了（レッスンUI表示）
+- **Phase 3**: 🚧 実装中（Puppeteerスクレイピング構造完成、DOM解析待ち）
+- **Phase 4**: キャンセル待ち通知実装予定
+- **Phase 5**: 自動予約実装予定
+
+## ⚠️ 重要事項
+
+### 初回デプロイ後の確認
+
+1. **EventBridgeスケジュールの有効化**
+   - デプロイ直後はスケジュール無効（`enabled: false`）
+   - ログを確認して正常動作を確認後、手動で有効化
+
+2. **Puppeteerの動作確認**
+   - Lambda環境では@sparticuz/chromiumを使用
+   - 最初のコールドスタート時は起動に時間がかかる可能性あり
+
+3. **RLS（Row Level Security）について**
+   - Lambda側は`service_role`キーを使用してRLSをバイパス
+   - すべてのユーザーのレッスンデータを更新可能

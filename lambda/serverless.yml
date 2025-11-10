@@ -7,7 +7,7 @@ provider:
   runtime: nodejs20.x
   region: ap-northeast-1  # 東京リージョン
   stage: ${opt:stage, 'dev'}
-  memorySize: 512  # MB
+  memorySize: 1024  # MB (Puppeteer用に増量)
   timeout: 900  # 15分（最大値）
   environment:
     SUPABASE_URL: ${env:SUPABASE_URL}
@@ -45,6 +45,7 @@ functions:
           enabled: false  # Phase 3で有効化
 
 plugins:
+  - serverless-plugin-typescript
   - serverless-offline
 
 package:
