@@ -45,7 +45,6 @@ functions:
           enabled: false  # Phase 3で有効化
 
 plugins:
-  - serverless-plugin-typescript
   - serverless-offline
 
 package:
