@@ -48,8 +48,8 @@ plugins:
   - serverless-offline
 
 package:
+  individually: true
   patterns:
-    - '!node_modules/**'
     - '!.git/**'
     - '!.serverless/**'
     - '!README.md'
