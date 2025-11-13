@@ -4,9 +4,10 @@
   "description": "AWS Lambda functions for Feel Hub",
   "main": "index.js",
   "scripts": {
-    "deploy": "serverless deploy",
-    "deploy:dev": "serverless deploy --stage dev",
-    "deploy:prod": "serverless deploy --stage prod",
+    "build": "tsc",
+    "deploy": "npm run build && serverless deploy",
+    "deploy:dev": "npm run build && serverless deploy --stage dev",
+    "deploy:prod": "npm run build && serverless deploy --stage prod",
     "invoke:scrape": "serverless invoke local --function scrapeLesson",
     "logs": "serverless logs -f scrapeLesson --tail"
   },

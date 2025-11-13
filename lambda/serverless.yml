@@ -23,9 +23,12 @@ provider:
             - logs:PutLogEvents
           Resource: 'arn:aws:logs:*:*:*'
 
+build:
+  esbuild: false
+
 functions:
   scrapeLesson:
-    handler: scraper/index.handler
+    handler: dist/scraper/index.handler
     description: FEELCYCLEサイトからレッスン情報をスクレイピング
     events:
       # 毎日午前6時に実行（JST = UTC+9なので21:00 UTC）
@@ -35,7 +38,7 @@ functions:
           enabled: false  # 初回は手動で有効化
 
   checkCancellation:
-    handler: scraper/checkCancellation.handler
+    handler: dist/scraper/checkCancellation.handler
     description: キャンセル待ちレッスンの空き枠をチェック
     events:
       # 毎分実行（Phase 3で有効化）
@@ -48,8 +51,12 @@ plugins:
   - serverless-offline
 
 package:
-  individually: true
+  individually: false
   patterns:
+    - 'dist/**'
+    - 'node_modules/**'
     - '!.git/**'
     - '!.serverless/**'
     - '!README.md'
+    - '!scraper/**'
+    - '!tsconfig.json'
