@@ -3,7 +3,16 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['www.feelcycle.com', 'm.feelcycle.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.feelcycle.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'm.feelcycle.com',
+      },
+    ],
   },
 };
 

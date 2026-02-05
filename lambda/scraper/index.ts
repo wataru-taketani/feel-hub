@@ -1,12 +1,11 @@
 import { Handler } from 'aws-lambda';
 import { createClient } from '@supabase/supabase-js';
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+import playwright from 'playwright-aws-lambda';
 
 /**
  * FEELCYCLEレッスン情報スクレイピング Lambda関数
  *
- * AWS Lambda環境でPuppeteerを使用してスクレイピング
+ * AWS Lambda環境でPlaywrightを使用してスクレイピング
  */
 
 interface LessonData {
@@ -28,8 +27,6 @@ export const handler: Handler = async (event, context) => {
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-
-  let browser = null;
 
   try {
     // FEELCYCLEサイトのスクレイピング
@@ -74,28 +71,26 @@ async function scrapeLessons(): Promise<LessonData[]> {
   let browser = null;
 
   try {
-    console.log('Starting Puppeteer browser...');
+    console.log('Starting Playwright browser...');
 
-    // Lambda環境用のChromium設定
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath('/tmp'),
-      headless: chromium.headless,
+    // Lambda環境用のChromium起動（playwright-aws-lambdaが自動で最適化）
+    browser = await playwright.launchChromium({
+      headless: true,
     });
 
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      // モバイルUser-Agent設定
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+    });
 
-    // モバイルUser-Agent設定
-    await page.setUserAgent(
-      'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-    );
+    const page = await context.newPage();
 
     console.log('Navigating to FEELCYCLE reserve page...');
 
     // FEELCYCLEの予約ページにアクセス
     await page.goto('https://m.feelcycle.com/reserve', {
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle',
       timeout: 30000,
     });
 
@@ -128,7 +123,7 @@ async function scrapeLessons(): Promise<LessonData[]> {
     // 暫定: モックデータを返す（実際のDOM解析後に置き換え）
     const mockLessons: LessonData[] = [
       {
-        date: '2025-11-09',
+        date: '2026-02-06',
         time: '10:00',
         programName: 'BB1 Beginner',
         instructor: '山田 太郎',
@@ -139,7 +134,7 @@ async function scrapeLessons(): Promise<LessonData[]> {
         url: 'https://m.feelcycle.com/reserve',
       },
       {
-        date: '2025-11-09',
+        date: '2026-02-06',
         time: '14:00',
         programName: 'BSL Body Shape Lower',
         instructor: '佐藤 花子',

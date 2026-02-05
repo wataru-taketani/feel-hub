@@ -13,16 +13,16 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "cheerio": "^1.0.0",
     "axios": "^1.7.0",
-    "puppeteer-core": "^22.0.0",
-    "@sparticuz/chromium": "^123.0.0"
+    "cheerio": "^1.0.0",
+    "playwright-aws-lambda": "^0.11.0",
+    "playwright-core": "^1.58.1"
   },
   "devDependencies": {
-    "@types/node": "^20",
     "@types/aws-lambda": "^8.10.0",
-    "typescript": "^5",
+    "@types/node": "^20",
     "serverless": "^4.0.0",
-    "serverless-offline": "^14.0.0"
+    "serverless-offline": "^14.0.0",
+    "typescript": "^5"
   }
 }
