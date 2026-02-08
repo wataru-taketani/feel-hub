@@ -1,1 +1,0 @@
-{"statusCode":500,"body":"{\"message\":\"Scraping failed\",\"error\":\"ENOENT: no such file or directory, open '/tmp/chromium.br'\"}"}
