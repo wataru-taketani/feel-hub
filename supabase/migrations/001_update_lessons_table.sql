@@ -1,0 +1,11 @@
+-- Migration: lessonsテーブルにstart_time / end_time カラム追加
+-- 現在は既存スキーマ(time列)でデータ投入済み
+-- 将来的にスキーマ変更する場合に使用
+--
+-- 実行方法: Supabase ダッシュボード > SQL Editor で実行
+
+-- time → start_time にリネーム + end_time 追加
+-- ALTER TABLE lessons RENAME COLUMN time TO start_time;
+-- ALTER TABLE lessons ADD COLUMN end_time TIME;
+-- UPDATE lessons SET end_time = start_time + INTERVAL '45 minutes';
+-- ALTER TABLE lessons ALTER COLUMN end_time SET NOT NULL;

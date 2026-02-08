@@ -7,8 +7,8 @@ provider:
   runtime: nodejs20.x
   region: ap-northeast-1  # 東京リージョン
   stage: ${opt:stage, 'dev'}
-  memorySize: 1024  # MB (Puppeteer用に増量)
-  timeout: 900  # 15分（最大値）
+  memorySize: 128  # MB (APIフェッチのみ、Puppeteer不要)
+  timeout: 30  # 秒（API取得+DB保存で十分）
   environment:
     SUPABASE_URL: ${env:SUPABASE_URL}
     SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}
@@ -31,11 +31,12 @@ functions:
     handler: dist/scraper/index.handler
     description: FEELCYCLEサイトからレッスン情報をスクレイピング
     events:
-      # 毎日午前6時に実行（JST = UTC+9なので21:00 UTC）
+      # JST 6:00-23:50 に10分間隔で実行（JST 0:00-5:59 は停止）
+      # JST 6:00-23:59 = UTC 21:00-14:59
       - schedule:
-          rate: cron(0 21 * * ? *)
-          description: 毎日レッスン情報を取得
-          enabled: false  # 初回は手動で有効化
+          rate: cron(0/10 21-23,0-14 * * ? *)
+          description: 10分間隔でレッスン情報を取得（深夜除外）
+          enabled: true
 
   checkCancellation:
     handler: dist/scraper/checkCancellation.handler

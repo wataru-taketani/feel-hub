@@ -12,11 +12,7 @@
     "logs": "serverless logs -f scrapeLesson --tail"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "axios": "^1.7.0",
-    "cheerio": "^1.0.0",
-    "playwright-aws-lambda": "^0.11.0",
-    "playwright-core": "^1.58.1"
+    "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.0",
