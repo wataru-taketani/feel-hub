@@ -26,6 +26,7 @@ export async function GET() {
       homeStore: data.home_store,
       membershipType: data.membership_type,
       joinedAt: data.joined_at,
+      lineUserId: data.line_user_id || null,
     } : null,
   });
 }
@@ -44,6 +45,7 @@ export async function PATCH(request: NextRequest) {
   if (body.joinedAt !== undefined) updates.joined_at = body.joinedAt;
   if (body.displayName !== undefined) updates.display_name = body.displayName;
   if (body.homeStore !== undefined) updates.home_store = body.homeStore;
+  if (body.lineUserId !== undefined) updates.line_user_id = body.lineUserId;
 
   const { error } = await supabase
     .from('user_profiles')
