@@ -7,7 +7,7 @@ FEELCYCLEライフをもっと快適にするWebサービス
 Feel HubはFEELCYCLE（https://www.feelcycle.com/）の利用をサポートする非公式ツールです。
 人気レッスンのキャンセル待ち通知、自動予約、受講履歴分析などの機能を提供します。
 
-## 主な機能（開発予定）
+## 主な機能
 
 ### Phase 1: Webサービスの基盤構築 ✅
 - [x] Next.js 15 + TypeScript + Tailwind CSSのセットアップ
@@ -17,21 +17,25 @@ Feel HubはFEELCYCLE（https://www.feelcycle.com/）の利用をサポートす�
 - [x] データベーススキーマ定義
 - [x] プロジェクト構造の構築
 
-### Phase 2: レッスン情報取得
-- [ ] FEELCYCLEサイトのスクレイピング機能
-- [ ] レッスンデータのDB保存
-- [ ] レッスン一覧表示
+### Phase 2: レッスン情報取得 ✅
+- [x] FEELCYCLE内部APIからレッスン取得（Lambda + EventBridge 10分毎）
+- [x] レッスンデータのDB保存（Supabase upsert）
+- [x] レッスン一覧カレンダーUI（スタジオ別・プログラム検索・ピン固定）
 
-### Phase 3: キャンセル待ち機能
-- [ ] キャンセル待ちリスト登録UI
-- [ ] 定期スクレイピング（AWS Lambda + EventBridge）
-- [ ] 空き枠検知とLINE通知
+### Phase 3: キャンセル待ち・LINE通知 ✅
+- [x] 空き通知（waitlist）登録UI + レッスン詳細モーダル
+- [x] キャンセル検知Lambda（毎分実行・ウォッチ対象API直接取得）
+- [x] LINE Messaging APIプッシュ通知
+- [x] LINE Login OAuth連携（自動LINE User ID取得）
 
-### Phase 4: 公式サイトログイン連携
-- [ ] FEELCYCLE認証情報の暗号化保存
-- [ ] マイページ情報取得
-- [ ] 自動予約機能
-- [ ] 受講履歴分析
+### Phase 4: 公式サイトログイン連携 ✅
+- [x] FEELCYCLE認証情報の暗号化保存（AES暗号化 → Supabase）
+- [x] マイページ情報取得（予約・チケット・会員情報）
+- [x] 受講履歴の同期・月別表示
+- [x] ダッシュボード（予約一覧・サブスク残・チケット期限・空き通知）
+
+### Phase 5: 自動予約（予定）
+- [ ] FEELCYCLE APIを使った自動予約機能
 
 ## 技術スタック
 
@@ -52,10 +56,9 @@ Feel HubはFEELCYCLE（https://www.feelcycle.com/）の利用をサポートす�
 - **@supabase/ssr** (Next.js 15 App Router対応)
 
 ### その他
-- **Cheerio** (軽量HTML パーサー) / **Puppeteer** (ブラウザ自動化)
-- **@sparticuz/chromium** (Lambda用Chromium)
 - **crypto-js** (FEELCYCLE認証情報の暗号化)
-- **LINE Messaging API** (キャンセル通知)
+- **LINE Messaging API** (空き通知プッシュ)
+- **LINE Login** (OAuth連携)
 
 ## セットアップ
 
@@ -84,8 +87,10 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 # Encryption
 ENCRYPTION_KEY=your_random_32_character_string
 
-# LINE (Phase 3以降)
-LINE_NOTIFY_TOKEN=your_line_notify_token
+# LINE
+LINE_LOGIN_CHANNEL_ID=your_line_login_channel_id
+LINE_LOGIN_CHANNEL_SECRET=your_line_login_channel_secret
+LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token
 ```
 
 ### インストールと起動
