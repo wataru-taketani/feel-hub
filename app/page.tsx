@@ -1,71 +1,283 @@
-import Link from "next/link";
+'use client';
 
-export default function Home() {
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle } from 'lucide-react';
+import type { ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
+
+interface DashboardData {
+  reservations: ReservationInfo[];
+  memberSummary: {
+    displayName: string;
+    membershipType: string;
+    totalAttendance: number;
+  };
+  monthlySubscription: {
+    used: number;
+    limit: number | null;
+    currentMonth: string;
+  };
+  tickets: TicketInfo[];
+}
+
+function formatDateWithDay(dateStr: string): string {
+  const d = new Date(dateStr);
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  return `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
+}
+
+function daysUntil(dateStr: string): number {
+  const target = new Date(dateStr);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// --- ログイン済みダッシュボード ---
+function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/dashboard')
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json();
+          throw new Error(body.error || 'データの取得に失敗しました');
+        }
+        return res.json();
+      })
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40 w-full" />
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    const isSession = error.includes('セッション') || error.includes('再ログイン') || error.includes('未認証');
+    return (
+      <div className="max-w-2xl mx-auto p-4">
+        <Card>
+          <CardContent className="pt-6 text-center space-y-3">
+            <p className="font-medium">{isSession ? 'セッションが切れました' : 'エラー'}</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+            {isSession && (
+              <Button asChild><Link href="/login">再ログイン</Link></Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // 今日以降の予約のみ（時系列順）
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = data.reservations
+    .filter(r => r.date >= today)
+    .sort((a, b) => `${a.date}_${a.startTime}`.localeCompare(`${b.date}_${b.startTime}`))
+    .slice(0, 5);
+
+  // チケットの期限チェック（14日以内に期限切れ）
+  const hasExpiringTickets = data.tickets.some(t =>
+    t.details.some(d => {
+      const days = daysUntil(d.expiresAt);
+      return days >= 0 && days <= 14;
+    })
+  );
+
+  const sub = data.monthlySubscription;
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
-      <main className="text-center px-4">
-        <h1 className="text-5xl font-bold text-primary-700 mb-4">
-          Feel Hub
-        </h1>
-        <p className="text-xl text-gray-700 mb-8">
-          FEELCYCLEライフをもっと快適に
-        </p>
+    <div className="max-w-2xl mx-auto p-4 space-y-4">
+      <h1 className="text-xl font-bold">
+        {data.memberSummary.displayName || 'ダッシュボード'}
+      </h1>
 
-        <div className="space-y-4">
-          <p className="text-gray-600 max-w-md mx-auto">
-            人気レッスンのキャンセル待ち通知、自動予約、受講履歴分析など、<br />
-            FEELCYCLEをもっと楽しむための機能を提供します
-          </p>
+      {/* 次の予約 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            次の予約
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {upcoming.length === 0 ? (
+            <p className="text-sm text-muted-foreground">予約はありません</p>
+          ) : (
+            <div className="space-y-3">
+              {upcoming.map((r, i) => (
+                <div key={i} className="border rounded-lg p-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">
+                      {formatDateWithDay(r.date)} {r.startTime}〜{r.endTime}
+                    </span>
+                    <Badge variant="outline">#{r.sheetNo}</Badge>
+                  </div>
+                  <div className="text-sm">
+                    <span
+                      className="inline-block px-1.5 py-0.5 rounded text-xs font-medium mr-1"
+                      style={r.bgColor ? { backgroundColor: r.bgColor, color: r.textColor || '#fff' } : {}}
+                    >
+                      {r.programName}
+                    </span>
+                    <span className="text-muted-foreground">{r.instructor}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
+                    {r.studio}
+                    {r.cancelWaitTotal > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        キャン待ち {r.cancelWaitPosition}/{r.cancelWaitTotal}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-          <div className="flex gap-4 justify-center mt-8">
-            <Link
-              href="/login"
-              className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold"
-            >
-              ログイン
-            </Link>
-            <Link
-              href="/lessons"
-              className="px-6 py-3 bg-white text-primary-600 border-2 border-primary-600 rounded-lg hover:bg-primary-50 transition-colors font-semibold"
-            >
-              レッスン一覧を見る
-            </Link>
-          </div>
-        </div>
-
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-primary-700 mb-2">
-              キャンセル待ち通知
-            </h3>
-            <p className="text-gray-600 text-sm">
-              満席レッスンに空きが出たら即座にLINE通知
+      {/* サブスク残 + チケット */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">今月の受講</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {sub.limit != null ? (
+              <>
+                <div className="text-2xl font-bold">
+                  残 {sub.limit - sub.used}<span className="text-sm font-normal text-muted-foreground">/{sub.limit}回</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  サブスク利用: {sub.used}回
+                </p>
+              </>
+            ) : (
+              <div className="text-2xl font-bold">
+                {sub.used}<span className="text-sm font-normal text-muted-foreground">回</span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              累計: {data.memberSummary.totalAttendance}回
             </p>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-primary-700 mb-2">
-              自動予約
-            </h3>
-            <p className="text-gray-600 text-sm">
-              空き枠を検知したら自動で予約を完了
-            </p>
-          </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-1">
+              <Ticket className="h-4 w-4" />
+              チケット
+              {hasExpiringTickets && (
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.tickets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">なし</p>
+            ) : (
+              <div className="space-y-2">
+                {data.tickets.map((t, i) => (
+                  <div key={i}>
+                    <p className="text-sm font-medium">{t.name} <span className="text-muted-foreground">{t.totalCount}枚</span></p>
+                    {t.details.map((d, j) => {
+                      const days = daysUntil(d.expiresAt);
+                      const isExpiring = days >= 0 && days <= 14;
+                      return (
+                        <p key={j} className={`text-xs ${isExpiring ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
+                          {d.expiresAt}まで {d.count}枚{isExpiring ? ` (あと${days}日)` : ''}
+                        </p>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-primary-700 mb-2">
-              受講履歴分析
-            </h3>
-            <p className="text-gray-600 text-sm">
-              プログラムやインストラクターの統計データを可視化
-            </p>
-          </div>
-        </div>
-      </main>
-
-      <footer className="mt-16 text-gray-500 text-sm">
-        <p>Feel Hub - FEELCYCLEの非公式サポートツール</p>
-      </footer>
+      {/* クイックリンク */}
+      <div className="grid grid-cols-3 gap-3">
+        <Button variant="outline" className="h-auto py-3 justify-start" asChild>
+          <Link href="/lessons">
+            <CalendarDays className="h-4 w-4 mr-2" />
+            レッスン一覧
+          </Link>
+        </Button>
+        <Button variant="outline" className="h-auto py-3 justify-start" asChild>
+          <Link href="/mypage">
+            <User className="h-4 w-4 mr-2" />
+            マイページ
+          </Link>
+        </Button>
+        <Button variant="outline" className="h-auto py-3 justify-start" asChild>
+          <Link href="/history">
+            <BookOpen className="h-4 w-4 mr-2" />
+            受講履歴
+          </Link>
+        </Button>
+      </div>
     </div>
   );
+}
+
+// --- 未ログインランディング ---
+function Landing() {
+  return (
+    <div className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center px-4">
+      <h1 className="text-4xl font-bold mb-3">Feel Hub</h1>
+      <p className="text-muted-foreground mb-8">FEELCYCLEライフをもっと快適に</p>
+
+      <div className="flex flex-col gap-3 w-full max-w-xs">
+        <Button size="lg" asChild>
+          <Link href="/login">ログイン</Link>
+        </Button>
+        <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
+          <Link href="/lessons">ログインせずに使う</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// --- メイン ---
+export default function Home() {
+  const { user, loading } = useAuthContext();
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  return user ? <Dashboard /> : <Landing />;
 }

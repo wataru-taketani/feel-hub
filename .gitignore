@@ -32,3 +32,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scraping dump files
+*.html
+lessons_*.json
+lambda/output.json
+
+# supabase temp
+supabase/.temp/

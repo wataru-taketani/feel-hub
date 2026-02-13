@@ -1,130 +1,89 @@
 import { NextResponse } from 'next/server';
-import type { Lesson } from '@/types';
+import { createClient } from '@supabase/supabase-js';
+
+// サーバーサイドAPI用: service role keyでRLSバイパス
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 /**
- * レッスン一覧取得API
+ * 全未来レッスン一括取得API
  *
  * GET /api/lessons
- *
- * Phase 2: モックデータを返す
- * Phase 3: Supabaseから実際のデータを取得
  */
 export async function GET() {
   try {
-    // モックデータ（Phase 2用）
-    const mockLessons: Lesson[] = [
-      {
-        id: '1',
-        date: '2025-11-09',
-        time: '10:00',
-        programName: 'BB1 Beginner',
-        instructor: '山田 太郎',
-        studio: '渋谷',
-        availableSlots: 5,
-        totalSlots: 20,
-        isFull: false,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-      {
-        id: '2',
-        date: '2025-11-09',
-        time: '11:30',
-        programName: 'BB2 Shape',
-        instructor: '佐藤 花子',
-        studio: '渋谷',
-        availableSlots: 0,
-        totalSlots: 20,
-        isFull: true,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-      {
-        id: '3',
-        date: '2025-11-09',
-        time: '14:00',
-        programName: 'HH1 Hip Hop',
-        instructor: '鈴木 次郎',
-        studio: '新宿',
-        availableSlots: 12,
-        totalSlots: 20,
-        isFull: false,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-      {
-        id: '4',
-        date: '2025-11-09',
-        time: '18:00',
-        programName: 'BSL Body Shape Lower',
-        instructor: '田中 美咲',
-        studio: '渋谷',
-        availableSlots: 2,
-        totalSlots: 20,
-        isFull: false,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-      {
-        id: '5',
-        date: '2025-11-09',
-        time: '19:30',
-        programName: 'BSW Body Shape Waist',
-        instructor: '山田 太郎',
-        studio: '新宿',
-        availableSlots: 0,
-        totalSlots: 20,
-        isFull: true,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-      {
-        id: '6',
-        date: '2025-11-10',
-        time: '09:00',
-        programName: 'BB1 Beginner',
-        instructor: '高橋 愛',
-        studio: '渋谷',
-        availableSlots: 8,
-        totalSlots: 20,
-        isFull: false,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-      {
-        id: '7',
-        date: '2025-11-10',
-        time: '12:00',
-        programName: 'BSB Body Shape Back',
-        instructor: '伊藤 健',
-        studio: '新宿',
-        availableSlots: 15,
-        totalSlots: 20,
-        isFull: false,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-      {
-        id: '8',
-        date: '2025-11-10',
-        time: '20:00',
-        programName: 'BB3 Advance',
-        instructor: '佐藤 花子',
-        studio: '渋谷',
-        availableSlots: 0,
-        totalSlots: 20,
-        isFull: true,
-        url: 'https://m.feelcycle.com/reserve',
-      },
-    ];
+    // 全件取得（1000件ずつページネーション）
+    const allData: Record<string, unknown>[] = [];
+    const PAGE_SIZE = 1000;
+    let from = 0;
+
+    while (true) {
+      const query = supabase
+        .from('lessons')
+        .select('*')
+        .order('date', { ascending: true })
+        .order('time', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Supabase query error:', error);
+        return NextResponse.json(
+          { success: false, error: 'データの取得に失敗しました' },
+          { status: 500 }
+        );
+      }
+
+      if (!data || data.length === 0) break;
+      allData.push(...data);
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+
+    // 現在時刻（UTC epoch）
+    const nowMs = Date.now();
+
+    // snake_case → camelCase 変換 + isPast算出 → 過去除外
+    const lessons = allData
+      .map((row) => {
+        const time = row.time as string;
+        const endTimeRaw = row.end_time as string;
+        const startTime = time?.substring(0, 5) || '';
+        const endTime = endTimeRaw?.substring(0, 5) || '';
+
+        const lessonStart = new Date(`${row.date}T${startTime}:00+09:00`);
+        const isPast = lessonStart.getTime() < nowMs;
+
+        return {
+          id: row.id,
+          date: row.date,
+          startTime,
+          endTime,
+          programName: row.program_name,
+          instructor: row.instructor,
+          studio: row.studio,
+          isFull: row.is_full,
+          isPast,
+          availableSlots: row.available_slots ?? 0,
+          ticketType: row.ticket_type ?? null,
+          colorCode: row.color_code ?? '',
+          textColor: row.text_color ?? '#FFFFFF',
+        };
+      })
+      .filter((l) => !l.isPast);
 
     return NextResponse.json({
       success: true,
-      data: mockLessons,
-      count: mockLessons.length,
+      data: lessons,
+      count: lessons.length,
     });
-
   } catch (error) {
     console.error('Error fetching lessons:', error);
-
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch lessons',
-      },
+      { success: false, error: 'Failed to fetch lessons' },
       { status: 500 }
     );
   }

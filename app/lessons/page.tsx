@@ -1,155 +1,216 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import type { Lesson } from "@/types";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { Loader2 } from "lucide-react";
+import type { Lesson, FilterPreset } from "@/types";
+import { matchesProgram } from "@/lib/lessonUtils";
+import { useBookmarks } from "@/hooks/useBookmarks";
+import { useFilterPresets } from "@/hooks/useFilterPresets";
+import { useAuthContext } from "@/contexts/AuthContext";
+import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
+import CalendarView from "@/components/lessons/CalendarView";
+
+const DEFAULT_FILTERS: FilterState = {
+  studios: [],
+  programSearch: "",
+  instructors: [],
+  ticketFilter: "ALL",
+  bookmarkOnly: false,
+};
 
 export default function LessonsPage() {
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
+  const { user } = useAuthContext();
+  const { toggle, isBookmarked } = useBookmarks();
+  const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
+
+  const initialPresetApplied = useRef(false);
+
+  // ログイン済みの場合、予約情報を取得（/api/dashboard経由）
+  const [reservedKeys, setReservedKeys] = useState<Set<string>>(new Set());
   useEffect(() => {
-    fetchLessons();
+    if (!user) return;
+    fetch('/api/dashboard')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data?.reservations) return;
+        const keys = new Set<string>(
+          data.reservations.map((r: { date: string; startTime: string; programName: string; instructor: string }) =>
+            `${r.date}_${r.startTime}_${r.programName}_${r.instructor}`
+          )
+        );
+        setReservedKeys(keys);
+      })
+      .catch((e) => console.warn('Failed to fetch reservations:', e));
+  }, [user]);
+
+  const isReserved = useCallback(
+    (lesson: Lesson) => reservedKeys.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
+    [reservedKeys]
+  );
+
+  // 全未来レッスンを初回のみ一括取得
+  useEffect(() => {
+    const fetchAllLessons = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch("/api/lessons");
+        const data = await response.json();
+
+        if (data.success) {
+          setAllLessons(data.data);
+        } else {
+          setError("レッスン情報の取得に失敗しました");
+        }
+      } catch {
+        setError("レッスン情報の取得中にエラーが発生しました");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllLessons();
   }, []);
 
-  const fetchLessons = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/lessons');
-      const data = await response.json();
+  // デフォルトプリセット初期適用（presetsロード後、1回のみ）
+  useEffect(() => {
+    if (!presetsLoaded || initialPresetApplied.current) return;
+    initialPresetApplied.current = true;
 
-      if (data.success) {
-        setLessons(data.data);
-      } else {
-        setError('レッスン情報の取得に失敗しました');
-      }
-    } catch (err) {
-      setError('レッスン情報の取得中にエラーが発生しました');
-      console.error(err);
-    } finally {
-      setLoading(false);
+    const defaultPreset = presets.find((p) => p.isDefault);
+    if (defaultPreset) {
+      setFilters({ ...defaultPreset.filters, bookmarkOnly: false });
     }
-  };
+  }, [presetsLoaded, presets]);
+
+  // 全インストラクターを全レッスンから抽出（Wイントラはカンマ区切りで分割）
+  const allInstructors = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of allLessons) {
+      if (!l.instructor) continue;
+      for (const name of l.instructor.split(", ")) {
+        set.add(name);
+      }
+    }
+    return [...set].sort();
+  }, [allLessons]);
+
+  // クライアントサイドフィルタ（スタジオ含む）
+  const filteredLessons = useMemo(() => {
+    return allLessons.filter((lesson) => {
+      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio)) return false;
+      if (!matchesProgram(lesson.programName, filters.programSearch)) return false;
+      if (filters.instructors.length > 0) {
+        const lessonIRs = lesson.instructor.split(", ");
+        if (!filters.instructors.some((ir) => lessonIRs.includes(ir))) return false;
+      }
+      if (filters.ticketFilter === "NORMAL" && lesson.ticketType !== null) return false;
+      if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
+      if (filters.bookmarkOnly && !isBookmarked(lesson)) return false;
+      return true;
+    });
+  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, filters.bookmarkOnly, isBookmarked]);
+
+  // プリセット読み込み
+  const handleLoadPreset = useCallback(
+    (preset: FilterPreset) => {
+      setFilters({
+        ...preset.filters,
+        bookmarkOnly: false,
+      });
+    },
+    []
+  );
+
+  // プリセット保存
+  const handleSavePreset = useCallback(
+    (name: string) => {
+      savePreset({
+        id: crypto.randomUUID(),
+        name,
+        filters: {
+          studios: filters.studios,
+          programSearch: filters.programSearch,
+          instructors: filters.instructors,
+          ticketFilter: filters.ticketFilter,
+        },
+      });
+    },
+    [filters, savePreset]
+  );
+
+  // プリセット更新
+  const handleUpdatePreset = useCallback(
+    (id: string) => {
+      updatePreset(id, {
+        studios: filters.studios,
+        programSearch: filters.programSearch,
+        instructors: filters.instructors,
+        ticketFilter: filters.ticketFilter,
+      });
+    },
+    [filters, updatePreset]
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-primary-700">Feel Hub</h1>
-            <nav className="flex gap-4">
-              <Link href="/" className="text-gray-600 hover:text-primary-700">
-                トップ
-              </Link>
-              <Link href="/login" className="text-gray-600 hover:text-primary-700">
-                ログイン
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">レッスン一覧</h2>
-          <p className="text-gray-600">
-            FEELCYCLEのレッスン情報（モックデータ表示中）
-          </p>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-[1400px] mx-auto px-4 py-4 sm:px-6">
+        {/* タイトル + 件数 */}
+        <div className="flex items-baseline gap-3 mb-3">
+          <h2 className="text-lg font-bold text-foreground">レッスン一覧</h2>
+          {!loading && (
+            <span className="text-sm text-muted-foreground">
+              {filteredLessons.length} 件
+              {filteredLessons.length !== allLessons.length && ` / ${allLessons.length} 件中`}
+            </span>
+          )}
         </div>
 
-        {/* Loading State */}
+        {/* フィルタバー */}
+        <div className="mb-4">
+          <FilterBar
+            filters={filters}
+            onChange={setFilters}
+            allInstructors={allInstructors}
+            presets={presets}
+            onLoadPreset={handleLoadPreset}
+            onSavePreset={handleSavePreset}
+            onUpdatePreset={handleUpdatePreset}
+            onDeletePreset={removePreset}
+            onSetDefaultPreset={setDefaultPreset}
+          />
+        </div>
+
+        {/* Loading */}
         {loading && (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">レッスン情報を読み込み中...</p>
+          <div className="rounded-lg border bg-card shadow-sm p-12 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+            <p className="mt-3 text-sm text-muted-foreground">レッスン情報を読み込み中...</p>
           </div>
         )}
 
-        {/* Error State */}
+        {/* Error */}
         {error && !loading && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive text-sm">
             {error}
           </div>
         )}
 
-        {/* Lessons List */}
-        {!loading && !error && lessons.length > 0 && (
-          <div className="space-y-4">
-            {lessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-semibold text-gray-900">
-                        {lesson.programName}
-                      </h3>
-                      {lesson.isFull ? (
-                        <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded">
-                          満席
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded">
-                          空きあり
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                      <div>
-                        <p className="font-medium text-gray-700">日時</p>
-                        <p>{lesson.date} {lesson.time}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-700">スタジオ</p>
-                        <p>{lesson.studio}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-700">インストラクター</p>
-                        <p>{lesson.instructor}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-700">空き状況</p>
-                        <p>
-                          {lesson.availableSlots} / {lesson.totalSlots} 枠
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="ml-4">
-                    {lesson.isFull ? (
-                      <button
-                        className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-semibold"
-                      >
-                        キャンセル待ち
-                      </button>
-                    ) : (
-                      <button
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-semibold"
-                      >
-                        予約する
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* カレンダー */}
+        {!loading && !error && (
+          <CalendarView
+            lessons={filteredLessons}
+            isBookmarked={isBookmarked}
+            onToggleBookmark={toggle}
+            isReserved={isReserved}
+          />
         )}
-
-        {/* Empty State */}
-        {!loading && !error && lessons.length === 0 && (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-600">レッスン情報がありません</p>
-          </div>
-        )}
-      </main>
+      </div>
     </div>
   );
 }
