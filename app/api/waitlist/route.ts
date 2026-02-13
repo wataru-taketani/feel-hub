@@ -9,11 +9,14 @@ export async function GET() {
     return NextResponse.json({ error: '未認証' }, { status: 401 });
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const { data, error } = await supabase
     .from('waitlist')
     .select('*, lessons(*)')
     .eq('user_id', user.id)
-    .eq('notified', false)
+    .gte('lessons.date', today)
+    .not('lessons', 'is', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -25,6 +28,7 @@ export async function GET() {
     return {
       id: row.id,
       lessonId: row.lesson_id,
+      notified: row.notified,
       createdAt: row.created_at,
       lesson: lesson ? {
         id: lesson.id,
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('waitlist')
     .upsert(
-      { user_id: user.id, lesson_id: lessonId },
+      { user_id: user.id, lesson_id: lessonId, notified: false },
       { onConflict: 'user_id,lesson_id' }
     )
     .select()

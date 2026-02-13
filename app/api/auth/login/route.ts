@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     // 3. FEELCYCLEセッションを暗号化して保存
     const sessionEncrypted = encrypt(JSON.stringify(fcSession));
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     await supabaseAdmin
       .from('feelcycle_sessions')

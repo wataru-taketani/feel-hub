@@ -7,7 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle } from 'lucide-react';
+import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle, Bell, BellOff, RotateCcw, X } from 'lucide-react';
+import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { useWaitlist } from '@/hooks/useWaitlist';
+import type { WaitlistItem } from '@/hooks/useWaitlist';
 import type { ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
 
 interface DashboardData {
@@ -39,11 +42,136 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+// --- 空き通知セクション ---
+function WaitlistSection({
+  entries,
+  onResume,
+  onRemove,
+}: {
+  entries: WaitlistItem[];
+  onResume: (lessonId: string) => void;
+  onRemove: (lessonId: string) => void;
+}) {
+  const watchingCount = entries.filter((e) => !e.notified).length;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Bell className="h-4 w-4" />
+          空き通知
+          {watchingCount > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {watchingCount}件監視中
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {entries.length === 0 ? (
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p>空き通知はありません</p>
+            <Button variant="link" className="p-0 h-auto text-sm" asChild>
+              <Link href="/lessons">レッスン一覧で登録</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {entries.map((entry) => (
+              <WaitlistCard
+                key={entry.id}
+                entry={entry}
+                onResume={onResume}
+                onRemove={onRemove}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function WaitlistCard({
+  entry,
+  onResume,
+  onRemove,
+}: {
+  entry: WaitlistItem;
+  onResume: (lessonId: string) => void;
+  onRemove: (lessonId: string) => void;
+}) {
+  const lesson = entry.lesson;
+  if (!lesson) return null;
+
+  return (
+    <div
+      className={`border rounded-lg p-3 space-y-1 ${
+        entry.notified ? 'opacity-60' : ''
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          {entry.notified ? (
+            <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <Bell className="h-4 w-4 shrink-0 text-orange-500" />
+          )}
+          <span
+            className="inline-block px-1.5 py-0.5 rounded text-xs font-medium truncate"
+            style={
+              lesson.colorCode
+                ? { backgroundColor: lesson.colorCode, color: lesson.textColor || '#fff' }
+                : {}
+            }
+          >
+            {lesson.programName}
+          </span>
+          <span className="text-xs text-muted-foreground truncate">
+            {lesson.studio}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          {entry.notified ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => onResume(entry.lessonId)}
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              再開
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-muted-foreground"
+            onClick={() => onRemove(entry.lessonId)}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground pl-6">
+        <span>
+          {formatDateWithDay(lesson.date)} {lesson.startTime}〜{lesson.endTime}
+        </span>
+        <span>/ {lesson.instructor}</span>
+      </div>
+      {entry.notified && (
+        <div className="text-xs text-muted-foreground pl-6">通知済み</div>
+      )}
+    </div>
+  );
+}
+
 // --- ログイン済みダッシュボード ---
 function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { waitlistEntries, resumeWaitlist, removeFromWaitlist } = useWaitlist();
 
   useEffect(() => {
     fetch('/api/dashboard')
@@ -55,7 +183,14 @@ function Dashboard() {
         return res.json();
       })
       .then(setData)
-      .catch((e) => setError(e.message))
+      .catch((e) => {
+        const msg = e.message;
+        const isSessionError = msg.includes('セッション') || msg.includes('再ログイン') || msg.includes('未認証');
+        if (isSessionError) {
+          createSupabaseClient().auth.signOut();
+        }
+        setError(msg);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -159,6 +294,13 @@ function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* 空き通知 */}
+      <WaitlistSection
+        entries={waitlistEntries}
+        onResume={resumeWaitlist}
+        onRemove={removeFromWaitlist}
+      />
 
       {/* サブスク残 + チケット */}
       <div className="grid grid-cols-2 gap-4">
