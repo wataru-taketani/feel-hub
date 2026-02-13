@@ -34,12 +34,22 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 認証が必要なルートの保護（オプション）
-  // if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-  //   const url = request.nextUrl.clone();
-  //   url.pathname = '/login';
-  //   return NextResponse.redirect(url);
-  // }
+  // 認証が必要なルートの保護
+  const protectedPaths = ['/mypage', '/history', '/settings'];
+  const isProtected = protectedPaths.some((p) => request.nextUrl.pathname.startsWith(p));
+
+  if (!user && isProtected) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  // ログイン済みで /login にアクセスした場合は /mypage にリダイレクト
+  if (user && request.nextUrl.pathname === '/login') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/mypage';
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }
