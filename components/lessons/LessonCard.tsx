@@ -11,26 +11,27 @@ interface LessonCardProps {
   lesson: Lesson;
   isBookmarked: boolean;
   onToggleBookmark: (lesson: Lesson) => void;
+  isReserved?: boolean;
 }
 
-export default function LessonCard({ lesson, isBookmarked, onToggleBookmark }: LessonCardProps) {
+export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isReserved }: LessonCardProps) {
   const { startTime, endTime, programName, instructor, studio, isFull, isPast, availableSlots, ticketType, colorCode, textColor } = lesson;
 
-  const grayed = isFull && !isPast;
+  const grayed = isFull && !isPast && !isReserved;
 
   return (
     <div
       className={cn(
         'group relative h-[88px] px-2.5 py-1.5 border-b border-border last:border-b-0 transition-colors',
         isPast && 'opacity-35',
-        grayed ? 'bg-muted' : 'hover:bg-accent/50'
+        grayed ? 'bg-muted' : isReserved ? 'ring-2 ring-inset ring-red-500 bg-[#f6dcdc]' : 'hover:bg-accent/50'
       )}
     >
       {/* ブックマーク（右上） */}
       <Button
         variant="ghost"
         size="icon"
-        className="absolute top-0.5 right-0.5 h-6 w-6 opacity-50 group-hover:opacity-100 transition-opacity"
+        className={cn('absolute top-0.5 right-0.5 h-6 w-6 transition-opacity z-10', isReserved ? 'opacity-80' : 'opacity-50 group-hover:opacity-100')}
         onClick={(e) => {
           e.stopPropagation();
           onToggleBookmark(lesson);
@@ -40,7 +41,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark }: L
         <Star className={cn('h-3.5 w-3.5', isBookmarked ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground')} />
       </Button>
 
-      {/* 時間（等幅で揃える） */}
+      {/* 時間 */}
       <div className={cn('text-[11px] font-medium tracking-wide tabular-nums', grayed ? 'text-muted-foreground/70' : 'text-muted-foreground')}>
         {startTime}–{endTime}
       </div>
@@ -67,7 +68,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark }: L
         <span className={cn('text-[10px] font-semibold truncate', grayed ? 'text-muted-foreground/50' : 'text-foreground/60')}>
           {formatStudio(studio)}
           {ticketType && (
-            <Badge variant="outline" className={cn('text-[10px] px-1 py-0 h-4 ml-1 inline-flex align-middle', grayed && 'opacity-50')}>
+            <Badge variant="outline" className={cn('text-[10px] px-1 py-0 h-4 ml-1 inline-flex align-middle bg-white/80', grayed && 'opacity-50')}>
               {ticketType === 'PLATINUM' ? 'PT' : ticketType === 'GOLD' ? 'GD' : ticketType === 'SILVER' ? 'SV' : 'WH'}
             </Badge>
           )}

@@ -29,6 +29,7 @@ interface FilterBarProps {
   onSavePreset: (name: string) => void;
   onUpdatePreset: (id: string) => void;
   onDeletePreset: (id: string) => void;
+  onSetDefaultPreset: (id: string | null) => void;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -44,21 +45,23 @@ export default function FilterBar({
   onSavePreset,
   onUpdatePreset,
   onDeletePreset,
+  onSetDefaultPreset,
 }: FilterBarProps) {
   const [open, setOpen] = useState(false);
   const update = (partial: Partial<FilterState>) => onChange({ ...filters, ...partial });
 
   const reset = () =>
     onChange({
-      studios: filters.studios,
+      studios: [],
       programSearch: '',
       instructors: [],
       ticketFilter: 'ALL',
       bookmarkOnly: false,
     });
 
-  // フィルタ件数（スタジオ・ブックマーク除外）
+  // フィルタ件数（ブックマーク除外）
   const activeCount =
+    (filters.studios.length > 0 ? 1 : 0) +
     (filters.programSearch ? 1 : 0) +
     (filters.instructors.length > 0 ? 1 : 0) +
     (filters.ticketFilter !== 'ALL' ? 1 : 0);
@@ -207,6 +210,7 @@ export default function FilterBar({
                 onSave={onSavePreset}
                 onUpdate={onUpdatePreset}
                 onDelete={onDeletePreset}
+                onSetDefault={onSetDefaultPreset}
               />
             </div>
           </div>

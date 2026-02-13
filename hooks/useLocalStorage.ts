@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useEffect } from 'react';
 
-export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((prev: T) => T)) => void] {
+export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((prev: T) => T)) => void, boolean] {
   const [storedValue, setStoredValue] = useState<T>(initialValue);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // クライアントサイドでのみlocalStorageから読み込み
   useEffect(() => {
@@ -15,6 +16,7 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
     } catch (error) {
       console.warn(`Error reading localStorage key "${key}":`, error);
     }
+    setIsLoaded(true);
   }, [key]);
 
   const setValue = useCallback(
@@ -32,5 +34,5 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
     [key]
   );
 
-  return [storedValue, setValue];
+  return [storedValue, setValue, isLoaded];
 }

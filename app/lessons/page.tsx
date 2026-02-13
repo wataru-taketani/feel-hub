@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import type { Lesson, FilterPreset } from "@/types";
 import { matchesProgram } from "@/lib/lessonUtils";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useFilterPresets } from "@/hooks/useFilterPresets";
+import { useAuthContext } from "@/contexts/AuthContext";
 import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
 
 const DEFAULT_FILTERS: FilterState = {
-  studios: ["渋谷"],
+  studios: [],
   programSearch: "",
   instructors: [],
   ticketFilter: "ALL",
@@ -19,36 +19,51 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 export default function LessonsPage() {
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
+  const { user } = useAuthContext();
   const { toggle, isBookmarked } = useBookmarks();
-  const { presets, save: savePreset, update: updatePreset, remove: removePreset } = useFilterPresets();
+  const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
 
-  // スタジオが変わったらAPI再fetch
+  const initialPresetApplied = useRef(false);
+
+  // ログイン済みの場合、予約情報を取得（/api/dashboard経由）
+  const [reservedKeys, setReservedKeys] = useState<Set<string>>(new Set());
   useEffect(() => {
-    if (filters.studios.length === 0) {
-      setLessons([]);
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
+    fetch('/api/dashboard')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data?.reservations) return;
+        const keys = new Set<string>(
+          data.reservations.map((r: { date: string; startTime: string; programName: string; instructor: string }) =>
+            `${r.date}_${r.startTime}_${r.programName}_${r.instructor}`
+          )
+        );
+        setReservedKeys(keys);
+      })
+      .catch((e) => console.warn('Failed to fetch reservations:', e));
+  }, [user]);
 
-    const fetchLessons = async () => {
+  const isReserved = useCallback(
+    (lesson: Lesson) => reservedKeys.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
+    [reservedKeys]
+  );
+
+  // 全未来レッスンを初回のみ一括取得
+  useEffect(() => {
+    const fetchAllLessons = async () => {
       try {
         setLoading(true);
         setError(null);
-        const params = new URLSearchParams();
-        for (const s of filters.studios) {
-          params.append("studio", s);
-        }
-
-        const response = await fetch(`/api/lessons?${params.toString()}`);
+        const response = await fetch("/api/lessons");
         const data = await response.json();
 
         if (data.success) {
-          setLessons(data.data);
+          setAllLessons(data.data);
         } else {
           setError("レッスン情報の取得に失敗しました");
         }
@@ -59,26 +74,47 @@ export default function LessonsPage() {
       }
     };
 
-    fetchLessons();
-  }, [filters.studios]);
+    fetchAllLessons();
+  }, []);
 
-  // 全IR一覧（取得済みデータから抽出）
+  // デフォルトプリセット初期適用（presetsロード後、1回のみ）
+  useEffect(() => {
+    if (!presetsLoaded || initialPresetApplied.current) return;
+    initialPresetApplied.current = true;
+
+    const defaultPreset = presets.find((p) => p.isDefault);
+    if (defaultPreset) {
+      setFilters({ ...defaultPreset.filters, bookmarkOnly: false });
+    }
+  }, [presetsLoaded, presets]);
+
+  // 全インストラクターを全レッスンから抽出（Wイントラはカンマ区切りで分割）
   const allInstructors = useMemo(() => {
-    const set = new Set(lessons.map((l) => l.instructor));
+    const set = new Set<string>();
+    for (const l of allLessons) {
+      if (!l.instructor) continue;
+      for (const name of l.instructor.split(", ")) {
+        set.add(name);
+      }
+    }
     return [...set].sort();
-  }, [lessons]);
+  }, [allLessons]);
 
-  // クライアントサイドフィルタ
+  // クライアントサイドフィルタ（スタジオ含む）
   const filteredLessons = useMemo(() => {
-    return lessons.filter((lesson) => {
+    return allLessons.filter((lesson) => {
+      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio)) return false;
       if (!matchesProgram(lesson.programName, filters.programSearch)) return false;
-      if (filters.instructors.length > 0 && !filters.instructors.includes(lesson.instructor)) return false;
+      if (filters.instructors.length > 0) {
+        const lessonIRs = lesson.instructor.split(", ");
+        if (!filters.instructors.some((ir) => lessonIRs.includes(ir))) return false;
+      }
       if (filters.ticketFilter === "NORMAL" && lesson.ticketType !== null) return false;
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
       if (filters.bookmarkOnly && !isBookmarked(lesson)) return false;
       return true;
     });
-  }, [lessons, filters.programSearch, filters.instructors, filters.ticketFilter, filters.bookmarkOnly, isBookmarked]);
+  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, filters.bookmarkOnly, isBookmarked]);
 
   // プリセット読み込み
   const handleLoadPreset = useCallback(
@@ -123,29 +159,14 @@ export default function LessonsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="max-w-[1400px] mx-auto px-4 py-3 sm:px-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold text-foreground">Feel Hub</h1>
-            <nav className="flex gap-4">
-              <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                トップ
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-[1400px] mx-auto px-4 py-4 sm:px-6">
+      <div className="max-w-[1400px] mx-auto px-4 py-4 sm:px-6">
         {/* タイトル + 件数 */}
         <div className="flex items-baseline gap-3 mb-3">
           <h2 className="text-lg font-bold text-foreground">レッスン一覧</h2>
           {!loading && (
             <span className="text-sm text-muted-foreground">
               {filteredLessons.length} 件
-              {filteredLessons.length !== lessons.length && ` / ${lessons.length} 件中`}
+              {filteredLessons.length !== allLessons.length && ` / ${allLessons.length} 件中`}
             </span>
           )}
         </div>
@@ -161,6 +182,7 @@ export default function LessonsPage() {
             onSavePreset={handleSavePreset}
             onUpdatePreset={handleUpdatePreset}
             onDeletePreset={removePreset}
+            onSetDefaultPreset={setDefaultPreset}
           />
         </div>
 
@@ -179,22 +201,16 @@ export default function LessonsPage() {
           </div>
         )}
 
-        {/* スタジオ未選択 */}
-        {!loading && !error && filters.studios.length === 0 && (
-          <div className="rounded-lg border bg-card shadow-sm p-12 text-center">
-            <p className="text-muted-foreground">スタジオを選択してください</p>
-          </div>
-        )}
-
         {/* カレンダー */}
-        {!loading && !error && filters.studios.length > 0 && (
+        {!loading && !error && (
           <CalendarView
             lessons={filteredLessons}
             isBookmarked={isBookmarked}
             onToggleBookmark={toggle}
+            isReserved={isReserved}
           />
         )}
-      </main>
+      </div>
     </div>
   );
 }

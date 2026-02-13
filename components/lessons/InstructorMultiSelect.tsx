@@ -32,18 +32,20 @@ export default function InstructorMultiSelect({ instructors, selected, onChange 
           {selected.length === 0 ? (
             <span className="text-muted-foreground">IR選択</span>
           ) : (
-            <span className="flex items-center gap-1">
-              <Badge variant="secondary" className="rounded-sm px-1 h-5 text-[10px]">
-                {selected.length}名
-              </Badge>
-            </span>
+            <Badge variant="secondary" className="rounded-sm px-1 h-5 text-[10px]">
+              {selected.length}名
+            </Badge>
           )}
           <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
         </Button>
       </PopoverTrigger>
 
       <PopoverContent className="w-64 p-0" align="start">
-        <Command>
+        <Command
+          filter={(value, search) =>
+            value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+          }
+        >
           <CommandInput placeholder="IR名で検索..." />
 
           {selected.length > 0 && (

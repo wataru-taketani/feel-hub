@@ -26,6 +26,7 @@ export interface Lesson {
 export interface FilterPreset {
   id: string;
   name: string;
+  isDefault?: boolean;
   filters: {
     studios: string[];
     programSearch: string;
@@ -55,40 +56,51 @@ export interface WaitlistEntry {
   autoReserve: boolean; // 自動予約するかどうか
 }
 
-// ユーザー情報
-export interface User {
+// ユーザープロフィール
+export interface UserProfile {
   id: string;
-  email: string;
-  createdAt: string;
+  displayName: string | null;
+  homeStore: string | null;
+  membershipType: string | null;
+  joinedAt: string | null;
 }
 
-// FEELCYCLE認証情報（暗号化して保存）
-export interface FeelcycleCredentials {
+// 受講履歴レコード
+export interface AttendanceRecord {
   id: string;
-  userId: string;
-  email: string; // 暗号化済み
-  password: string; // 暗号化済み
-  lineNotifyToken?: string; // LINE通知トークン
-  updatedAt: string;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+  storeName: string;
+  instructorName: string;
+  programName: string;
+  sheetNo: string | null;
+  ticketName: string | null;
+  playlistUrl: string | null;
+  cancelFlg: number;
 }
 
-// 受講履歴
-export interface AttendanceHistory {
-  id: string;
-  userId: string;
-  lessonDate: string;
+// 予約情報
+export interface Reservation {
+  date: string;
+  startTime: string;
+  endTime: string;
   programName: string;
   instructor: string;
   studio: string;
-  createdAt: string;
+  sheetNo: string;
+  ticketName: string;
+  bgColor: string;
+  textColor: string;
+  playlistUrl: string;
+  cancelWaitTotal: number;
+  cancelWaitPosition: number;
+  paymentMethod: number;
 }
 
-// プラン情報
-export interface MembershipPlan {
-  id: string;
-  userId: string;
-  planName: string; // 例: "マンスリー15"
-  monthlyLimit: number; // 月間受講可能数
-  currentMonth: string; // YYYY-MM
-  usedCount: number; // 当月の受講数
+// チケット情報
+export interface TicketInfo {
+  name: string;
+  totalCount: number;
+  details: { expiresAt: string; count: number }[];
 }

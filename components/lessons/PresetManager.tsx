@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, RefreshCw } from 'lucide-react';
+import { Plus, X, RefreshCw, Star } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { FilterPreset } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,9 +15,10 @@ interface PresetManagerProps {
   onSave: (name: string) => void;
   onUpdate: (id: string) => void;
   onDelete: (id: string) => void;
+  onSetDefault: (id: string | null) => void;
 }
 
-export default function PresetManager({ presets, onLoad, onSave, onUpdate, onDelete }: PresetManagerProps) {
+export default function PresetManager({ presets, onLoad, onSave, onUpdate, onDelete, onSetDefault }: PresetManagerProps) {
   const [showInput, setShowInput] = useState(false);
   const [name, setName] = useState('');
 
@@ -38,6 +40,24 @@ export default function PresetManager({ presets, onLoad, onSave, onUpdate, onDel
           onClick={() => onLoad(p)}
         >
           {p.name}
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSetDefault(p.isDefault ? null : p.id);
+                  }}
+                  className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+                >
+                  <Star className={cn('h-2.5 w-2.5', p.isDefault ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground')} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {p.isDefault ? 'デフォルト解除' : '起動時に自動適用'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
