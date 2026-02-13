@@ -13,6 +13,7 @@ provider:
     SUPABASE_URL: ${env:SUPABASE_URL}
     SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}
     ENCRYPTION_KEY: ${env:ENCRYPTION_KEY}
+    LINE_CHANNEL_ACCESS_TOKEN: ${env:LINE_CHANNEL_ACCESS_TOKEN}
   iam:
     role:
       statements:
@@ -46,7 +47,7 @@ functions:
       - schedule:
           rate: rate(1 minute)
           description: キャンセル待ちチェック
-          enabled: false  # Phase 3で有効化
+          enabled: true
 
 plugins:
   - serverless-offline

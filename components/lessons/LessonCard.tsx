@@ -3,7 +3,7 @@
 import type { Lesson } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Star } from 'lucide-react';
+import { Star, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatStudio } from '@/lib/lessonUtils';
 
@@ -12,9 +12,11 @@ interface LessonCardProps {
   isBookmarked: boolean;
   onToggleBookmark: (lesson: Lesson) => void;
   isReserved?: boolean;
+  isOnWaitlist?: boolean;
+  onTapLesson?: (lesson: Lesson) => void;
 }
 
-export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isReserved }: LessonCardProps) {
+export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isReserved, isOnWaitlist, onTapLesson }: LessonCardProps) {
   const { startTime, endTime, programName, instructor, studio, isFull, isPast, availableSlots, ticketType, colorCode, textColor } = lesson;
 
   const grayed = isFull && !isPast && !isReserved;
@@ -24,8 +26,10 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       className={cn(
         'group relative h-[88px] px-2.5 py-1.5 border-b border-border last:border-b-0 transition-colors',
         isPast && 'opacity-35',
-        grayed ? 'bg-muted' : isReserved ? 'ring-2 ring-inset ring-red-500 bg-[#f6dcdc]' : 'hover:bg-accent/50'
+        grayed ? 'bg-muted' : isReserved ? 'ring-2 ring-inset ring-red-500 bg-[#f6dcdc]' : 'hover:bg-accent/50',
+        onTapLesson && 'cursor-pointer'
       )}
+      onClick={() => onTapLesson?.(lesson)}
     >
       {/* ブックマーク（右上） */}
       <Button
@@ -40,6 +44,11 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       >
         <Star className={cn('h-3.5 w-3.5', isBookmarked ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground')} />
       </Button>
+
+      {/* ウェイトリスト登録済みベル */}
+      {isOnWaitlist && (
+        <Bell className="absolute top-1 right-7 h-3 w-3 text-orange-500 fill-orange-500 z-10" />
+      )}
 
       {/* 時間 */}
       <div className={cn('text-[11px] font-medium tracking-wide tabular-nums', grayed ? 'text-muted-foreground/70' : 'text-muted-foreground')}>

@@ -53,7 +53,12 @@ export interface WaitlistEntry {
   lessonId: string;
   createdAt: string;
   notified: boolean;
-  autoReserve: boolean; // 自動予約するかどうか
+  autoReserve: boolean;
+}
+
+// キャンセル待ち登録（レッスン詳細付き）
+export interface WaitlistEntryWithLesson extends WaitlistEntry {
+  lesson: Lesson;
 }
 
 // ユーザープロフィール

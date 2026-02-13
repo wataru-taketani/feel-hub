@@ -14,11 +14,13 @@ interface CalendarViewProps {
   isBookmarked: (lesson: Lesson) => boolean;
   onToggleBookmark: (lesson: Lesson) => void;
   isReserved?: (lesson: Lesson) => boolean;
+  isOnWaitlist?: (lessonId: string) => boolean;
+  onTapLesson?: (lesson: Lesson) => void;
 }
 
 const COL_WIDTH = 'shrink-0 w-[calc(100%/3)] sm:w-[calc(100%/5)] lg:w-[calc(100%/7)] min-w-[150px]';
 
-export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, isReserved }: CalendarViewProps) {
+export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, isReserved, isOnWaitlist, onTapLesson }: CalendarViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const reservedRef = useRef<HTMLDivElement>(null);
@@ -172,6 +174,8 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
                         isBookmarked={isBookmarked(lesson)}
                         onToggleBookmark={onToggleBookmark}
                         isReserved
+                        isOnWaitlist={isOnWaitlist?.(lesson.id) ?? false}
+                        onTapLesson={onTapLesson}
                       />
                     ))}
                   </div>
@@ -201,6 +205,8 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
                 onToggleBookmark={onToggleBookmark}
                 isReserved={pinReserved ? undefined : isReserved}
                 isToday={date === today}
+                isOnWaitlist={isOnWaitlist}
+                onTapLesson={onTapLesson}
               />
             );
           })}

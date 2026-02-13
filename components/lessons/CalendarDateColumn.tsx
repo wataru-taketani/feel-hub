@@ -11,9 +11,11 @@ interface CalendarDateColumnProps {
   onToggleBookmark: (lesson: Lesson) => void;
   isReserved?: (lesson: Lesson) => boolean;
   isToday: boolean;
+  isOnWaitlist?: (lessonId: string) => boolean;
+  onTapLesson?: (lesson: Lesson) => void;
 }
 
-export default function CalendarDateColumn({ date, lessons, isBookmarked, onToggleBookmark, isReserved }: CalendarDateColumnProps) {
+export default function CalendarDateColumn({ date, lessons, isBookmarked, onToggleBookmark, isReserved, isOnWaitlist, onTapLesson }: CalendarDateColumnProps) {
   // 予約済みレッスンを先頭に（同グループ内は元の時間順を維持）
   const sortedLessons = useMemo(() => {
     if (!isReserved) return lessons;
@@ -34,6 +36,8 @@ export default function CalendarDateColumn({ date, lessons, isBookmarked, onTogg
             isBookmarked={isBookmarked(lesson)}
             onToggleBookmark={onToggleBookmark}
             isReserved={isReserved?.(lesson) ?? false}
+            isOnWaitlist={isOnWaitlist?.(lesson.id) ?? false}
+            onTapLesson={onTapLesson}
           />
         ))
       ) : (

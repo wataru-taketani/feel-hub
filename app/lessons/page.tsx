@@ -6,9 +6,11 @@ import type { Lesson, FilterPreset } from "@/types";
 import { matchesProgram } from "@/lib/lessonUtils";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useFilterPresets } from "@/hooks/useFilterPresets";
+import { useWaitlist } from "@/hooks/useWaitlist";
 import { useAuthContext } from "@/contexts/AuthContext";
 import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
+import LessonDetailModal from "@/components/lessons/LessonDetailModal";
 
 const DEFAULT_FILTERS: FilterState = {
   studios: [],
@@ -27,8 +29,30 @@ export default function LessonsPage() {
   const { user } = useAuthContext();
   const { toggle, isBookmarked } = useBookmarks();
   const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
+  const { isOnWaitlist, addToWaitlist, removeFromWaitlist } = useWaitlist();
 
   const initialPresetApplied = useRef(false);
+
+  // モーダル状態
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [hasLineUserId, setHasLineUserId] = useState(false);
+
+  // LINE連携状態を取得
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/profile')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.profile?.lineUserId) setHasLineUserId(true);
+      })
+      .catch(() => {});
+  }, [user]);
+
+  const handleTapLesson = useCallback((lesson: Lesson) => {
+    setSelectedLesson(lesson);
+    setModalOpen(true);
+  }, []);
 
   // ログイン済みの場合、予約情報を取得（/api/dashboard経由）
   const [reservedKeys, setReservedKeys] = useState<Set<string>>(new Set());
@@ -208,8 +232,22 @@ export default function LessonsPage() {
             isBookmarked={isBookmarked}
             onToggleBookmark={toggle}
             isReserved={isReserved}
+            isOnWaitlist={isOnWaitlist}
+            onTapLesson={handleTapLesson}
           />
         )}
+        {/* レッスン詳細モーダル */}
+        <LessonDetailModal
+          lesson={selectedLesson}
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          isLoggedIn={!!user}
+          hasLineUserId={hasLineUserId}
+          isOnWaitlist={selectedLesson ? isOnWaitlist(selectedLesson.id) : false}
+          isReserved={selectedLesson ? isReserved(selectedLesson) : false}
+          onAddWaitlist={addToWaitlist}
+          onRemoveWaitlist={removeFromWaitlist}
+        />
       </div>
     </div>
   );
