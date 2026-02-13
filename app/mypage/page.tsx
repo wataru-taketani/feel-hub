@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays, LogIn, MapPin, Ticket, User, Loader2, Save, RefreshCw } from 'lucide-react';
+import { CalendarDays, LogIn, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell, LinkIcon, Unlink } from 'lucide-react';
 import type { MypageInfo, ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
 import type { AttendanceRecord } from '@/types';
 
@@ -43,6 +44,17 @@ export default function MypagePage() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
+
+  // LINE連携
+  const searchParams = useSearchParams();
+  const [lineUserId, setLineUserId] = useState<string | null>(null);
+  const [lineUnlinking, setLineUnlinking] = useState(false);
+  const [lineMessage, setLineMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(() => {
+    const lineParam = searchParams.get('line');
+    if (lineParam === 'linked') return { type: 'success', text: 'LINE連携が完了しました' };
+    if (lineParam === 'error') return { type: 'error', text: 'LINE連携に失敗しました' };
+    return null;
+  });
 
   const handleRelogin = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -78,7 +90,7 @@ export default function MypagePage() {
       })
       .finally(() => setLoading(false));
 
-    // プロフィール（入会年月）を取得
+    // プロフィール（入会年月 + LINE User ID）を取得
     fetch('/api/profile')
       .then((res) => res.json())
       .then((d) => {
@@ -87,6 +99,7 @@ export default function MypagePage() {
           setJoinedYear(y);
           setJoinedMonth(m);
         }
+        setLineUserId(d.profile?.lineUserId || null);
       })
       .catch(() => {});
 
@@ -145,6 +158,26 @@ export default function MypagePage() {
       setSaveMessage({ type: 'error', text: '保存に失敗しました' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // LINE連携解除
+  const handleUnlinkLine = async () => {
+    setLineUnlinking(true);
+    setLineMessage(null);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineUserId: null }),
+      });
+      if (!res.ok) throw new Error();
+      setLineUserId(null);
+      setLineMessage({ type: 'success', text: 'LINE連携を解除しました' });
+    } catch {
+      setLineMessage({ type: 'error', text: '連携解除に失敗しました' });
+    } finally {
+      setLineUnlinking(false);
     }
   };
 
@@ -366,6 +399,60 @@ export default function MypagePage() {
                 )}
                 保存
               </Button>
+            </CardContent>
+          </Card>
+          {/* LINE通知設定 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Bell className="h-5 w-5" />
+                LINE通知設定
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                満席レッスンに空きが出たときにLINEで通知を受け取れます。
+                レッスン一覧で満席レッスンをタップして「空き通知」を登録してください。
+              </p>
+              {lineMessage && (
+                <p className={`text-sm ${lineMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {lineMessage.text}
+                </p>
+              )}
+              {lineUserId ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      {lineUserId.slice(0, 5)}...{lineUserId.slice(-4)}
+                    </Badge>
+                    <span className="text-xs text-[#06C755] font-medium">連携済み</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUnlinkLine}
+                    disabled={lineUnlinking}
+                  >
+                    {lineUnlinking ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Unlink className="mr-2 h-4 w-4" />
+                    )}
+                    連携解除
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  asChild
+                  className="bg-[#06C755] hover:bg-[#05b04c] text-white"
+                >
+                  <a href="/api/auth/line">
+                    <LinkIcon className="mr-2 h-4 w-4" />
+                    LINEと連携
+                  </a>
+                </Button>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
