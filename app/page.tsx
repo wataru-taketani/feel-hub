@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle, Bell, BellOff, RotateCcw, X } from 'lucide-react';
+import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
 import type { ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
@@ -41,7 +42,7 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-// --- 空き通知セクション ---
+// --- キャンセル待ちセクション ---
 function WaitlistSection({
   entries,
   onResume,
@@ -58,7 +59,7 @@ function WaitlistSection({
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Bell className="h-4 w-4" />
-          空き通知
+          キャンセル待ち
           {watchingCount > 0 && (
             <Badge variant="secondary" className="text-xs">
               {watchingCount}件監視中
@@ -69,7 +70,7 @@ function WaitlistSection({
       <CardContent>
         {entries.length === 0 ? (
           <div className="text-sm text-muted-foreground space-y-2">
-            <p>空き通知はありません</p>
+            <p>キャンセル待ちはありません</p>
             <Button variant="link" className="p-0 h-auto text-sm" asChild>
               <Link href="/lessons">レッスン一覧で登録</Link>
             </Button>
@@ -100,37 +101,17 @@ function WaitlistCard({
   onResume: (lessonId: string) => void;
   onRemove: (lessonId: string) => void;
 }) {
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const lesson = entry.lesson;
   if (!lesson) return null;
 
   return (
-    <div
-      className={`border rounded-lg p-3 space-y-1 ${
-        entry.notified ? 'opacity-60' : ''
-      }`}
-    >
+    <div className="border rounded-lg p-3 space-y-1">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          {entry.notified ? (
-            <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <Bell className="h-4 w-4 shrink-0 text-orange-500" />
-          )}
-          <span
-            className="inline-block px-1.5 py-0.5 rounded text-xs font-medium truncate"
-            style={
-              lesson.colorCode
-                ? { backgroundColor: lesson.colorCode, color: lesson.textColor || '#fff' }
-                : {}
-            }
-          >
-            {lesson.programName}
-          </span>
-          <span className="text-xs text-muted-foreground truncate">
-            {lesson.studio}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0 ml-2">
+        <span className="font-medium text-sm">
+          {formatDateWithDay(lesson.date)} {lesson.startTime}〜{lesson.endTime}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
           {entry.notified ? (
             <Button
               variant="ghost"
@@ -141,26 +122,58 @@ function WaitlistCard({
               <RotateCcw className="h-3 w-3 mr-1" />
               再開
             </Button>
-          ) : null}
+          ) : (
+            <Badge variant="secondary" className="text-xs">
+              <Bell className="h-3 w-3 mr-1" />
+              監視中
+            </Badge>
+          )}
           <Button
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs text-muted-foreground"
-            onClick={() => onRemove(entry.lessonId)}
+            onClick={() => setShowRemoveDialog(true)}
           >
             <X className="h-3 w-3" />
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground pl-6">
-        <span>
-          {formatDateWithDay(lesson.date)} {lesson.startTime}〜{lesson.endTime}
+      <div className="text-sm">
+        <span
+          className="inline-block px-1.5 py-0.5 rounded text-xs font-medium mr-1"
+          style={
+            lesson.colorCode
+              ? { backgroundColor: lesson.colorCode, color: lesson.textColor || '#fff' }
+              : {}
+          }
+        >
+          {lesson.programName}
         </span>
-        <span>/ {lesson.instructor}</span>
+        <span className="text-muted-foreground">{lesson.instructor}</span>
       </div>
-      {entry.notified && (
-        <div className="text-xs text-muted-foreground pl-6">通知済み</div>
-      )}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <MapPin className="h-3 w-3" />
+        {lesson.studio}
+      </div>
+
+      <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>キャンセル待ち解除</DialogTitle>
+            <DialogDescription>
+              {lesson.programName}（{formatDateWithDay(lesson.date)} {lesson.startTime}）のキャンセル待ちを解除しますか？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowRemoveDialog(false)}>
+              戻る
+            </Button>
+            <Button variant="destructive" className="flex-1" onClick={() => { setShowRemoveDialog(false); onRemove(entry.lessonId); }}>
+              解除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -170,7 +183,6 @@ function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [fcNotLinked, setFcNotLinked] = useState(false);
   const { waitlistEntries, resumeWaitlist, removeFromWaitlist } = useWaitlist();
 
   useEffect(() => {
@@ -193,7 +205,8 @@ function Dashboard() {
       .then(setData)
       .catch((e) => {
         if (e.message === 'FC_NOT_LINKED') {
-          setFcNotLinked(true);
+          window.location.href = '/mypage';
+          return;
         } else {
           setError(e.message);
         }
@@ -214,21 +227,6 @@ function Dashboard() {
     );
   }
 
-  if (fcNotLinked) {
-    return (
-      <div className="max-w-2xl mx-auto p-4">
-        <Card>
-          <CardContent className="pt-6 text-center space-y-3">
-            <p className="font-medium">FEELCYCLEアカウント未連携</p>
-            <p className="text-sm text-muted-foreground">
-              マイページからFEELCYCLEアカウントを連携すると、予約状況や受講履歴を確認できます。
-            </p>
-            <Button asChild><Link href="/mypage">マイページで連携する</Link></Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -273,7 +271,7 @@ function Dashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
-            次の予約
+            予約状況
           </CardTitle>
         </CardHeader>
         <CardContent>
