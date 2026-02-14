@@ -1,18 +1,17 @@
 'use client';
 
 import { Suspense, useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays, LogIn, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell, LinkIcon, Unlink } from 'lucide-react';
+import { CalendarDays, LinkIcon, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell } from 'lucide-react';
 import type { MypageInfo, ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
-import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import type { AttendanceRecord } from '@/types';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
@@ -41,6 +40,13 @@ function MypageContent() {
   const [data, setData] = useState<MypageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fcNotLinked, setFcNotLinked] = useState(false);
+
+  // FEELCYCLE連携フォーム
+  const [fcEmail, setFcEmail] = useState('');
+  const [fcPassword, setFcPassword] = useState('');
+  const [fcLinking, setFcLinking] = useState(false);
+  const [fcLinkError, setFcLinkError] = useState<string | null>(null);
 
   // 入会年月設定
   const [joinedYear, setJoinedYear] = useState('');
@@ -60,74 +66,86 @@ function MypageContent() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
 
-  // LINE連携
-  const searchParams = useSearchParams();
-  const [lineUserId, setLineUserId] = useState<string | null>(null);
-  const [lineUnlinking, setLineUnlinking] = useState(false);
-  const [lineMessage, setLineMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(() => {
-    const lineParam = searchParams.get('line');
-    if (lineParam === 'linked') return { type: 'success', text: 'LINE連携が完了しました' };
-    if (lineParam === 'error') return { type: 'error', text: 'LINE連携に失敗しました' };
-    return null;
-  });
+  // マイページデータ取得（自動再認証対応）
+  const fetchMypage = useCallback(async (retried = false): Promise<MypageData> => {
+    const res = await fetch('/api/mypage');
+    const body = await res.json();
 
-  const handleRelogin = useCallback(() => {
-    window.location.href = '/login';
-  }, []);
-
-  // マイページデータ取得
-  useEffect(() => {
-    const cached = sessionStorage.getItem('feelhub_mypage_cache');
-    if (cached) {
-      try {
-        const mypageInfo = JSON.parse(cached);
-        setData({ mypage: mypageInfo, reservations: [], tickets: [] });
-        setLoading(false);
-      } catch { /* ignore */ }
-      sessionStorage.removeItem('feelhub_mypage_cache');
+    if (!res.ok) {
+      // セッション期限切れ → 自動再認証を試みる
+      if (body.code === 'FC_SESSION_EXPIRED' && !retried) {
+        const reauthRes = await fetch('/api/auth/feelcycle-reauth', { method: 'POST' });
+        if (reauthRes.ok) {
+          return fetchMypage(true);
+        }
+        // 再認証失敗 → 再連携が必要
+        throw new Error('FC_NOT_LINKED');
+      }
+      if (body.code === 'FC_NOT_LINKED') {
+        throw new Error('FC_NOT_LINKED');
+      }
+      throw new Error(body.error || 'データの取得に失敗しました');
     }
 
-    fetch('/api/mypage')
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json();
-          throw new Error(body.error || 'データの取得に失敗しました');
-        }
-        return res.json();
-      })
-      .then((d) => {
-        setData(d);
-        setError(null);
-      })
-      .catch((e) => {
-        const msg = e.message;
-        const isSessionError = msg.includes('セッション') || msg.includes('再ログイン') || msg.includes('未認証');
-        if (isSessionError) {
-          createSupabaseClient().auth.signOut();
-        }
-        if (!cached) setError(msg);
-      })
-      .finally(() => setLoading(false));
+    return body;
+  }, []);
 
-    // プロフィール（入会年月 + LINE User ID）を取得
-    fetch('/api/profile')
-      .then((res) => res.json())
-      .then((d) => {
-        if (d.profile?.joinedAt) {
-          const [y, m] = d.profile.joinedAt.split('-');
+  useEffect(() => {
+    const profileFetch = fetch('/api/profile').then((res) => res.json()).catch(() => null);
+    const programsFetch = fetch('/api/programs').then((res) => res.json()).catch(() => ({}));
+
+    Promise.all([fetchMypage(), profileFetch, programsFetch])
+      .then(([mypageData, profileData, programsData]) => {
+        setData(mypageData);
+        setError(null);
+        setFcNotLinked(false);
+
+        if (profileData?.profile?.joinedAt) {
+          const [y, m] = profileData.profile.joinedAt.split('-');
           setJoinedYear(y);
           setJoinedMonth(m);
         }
-        setLineUserId(d.profile?.lineUserId || null);
-      })
-      .catch(() => {});
 
-    // プログラム色マップ取得
-    fetch('/api/programs')
-      .then(res => res.json())
-      .then(setProgramColors)
-      .catch(() => {});
-  }, []);
+        setProgramColors(programsData);
+      })
+      .catch((e) => {
+        if (e.message === 'FC_NOT_LINKED') {
+          setFcNotLinked(true);
+        } else {
+          setError(e.message);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [fetchMypage]);
+
+  // FEELCYCLE連携
+  const handleFcLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFcLinking(true);
+    setFcLinkError(null);
+
+    try {
+      const res = await fetch('/api/auth/feelcycle-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: fcEmail, password: fcPassword }),
+      });
+
+      const body = await res.json();
+
+      if (!res.ok) {
+        setFcLinkError(body.error || '連携に失敗しました');
+        return;
+      }
+
+      // 連携成功 → ページリロードで最新データ取得
+      window.location.reload();
+    } catch {
+      setFcLinkError('通信エラーが発生しました');
+    } finally {
+      setFcLinking(false);
+    }
+  };
 
   // 履歴取得
   const fetchHistory = useCallback(async (month: string) => {
@@ -180,26 +198,6 @@ function MypageContent() {
     }
   };
 
-  // LINE連携解除
-  const handleUnlinkLine = async () => {
-    setLineUnlinking(true);
-    setLineMessage(null);
-    try {
-      const res = await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineUserId: null }),
-      });
-      if (!res.ok) throw new Error();
-      setLineUserId(null);
-      setLineMessage({ type: 'success', text: 'LINE連携を解除しました' });
-    } catch {
-      setLineMessage({ type: 'error', text: '連携解除に失敗しました' });
-    } finally {
-      setLineUnlinking(false);
-    }
-  };
-
   // 履歴同期
   const handleSync = async () => {
     setSyncing(true);
@@ -248,22 +246,82 @@ function MypageContent() {
     );
   }
 
+  // FEELCYCLE未連携 → 連携フォーム表示
+  if (fcNotLinked) {
+    return (
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <h1 className="text-2xl font-bold">マイページ</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LinkIcon className="h-5 w-5" />
+              FEELCYCLE連携
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              FEELCYCLEのアカウントと連携すると、会員情報・予約・受講履歴を確認できます。
+            </p>
+            <form onSubmit={handleFcLink} className="space-y-4">
+              {fcLinkError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md border border-red-200">
+                  {fcLinkError}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="fc-email">FEELCYCLEメールアドレス</Label>
+                <Input
+                  id="fc-email"
+                  type="email"
+                  value={fcEmail}
+                  onChange={(e) => setFcEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  disabled={fcLinking}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fc-password">FEELCYCLEパスワード</Label>
+                <Input
+                  id="fc-password"
+                  type="password"
+                  value={fcPassword}
+                  onChange={(e) => setFcPassword(e.target.value)}
+                  placeholder="FEELCYCLEのパスワード"
+                  required
+                  disabled={fcLinking}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={fcLinking}>
+                {fcLinking ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    連携中...
+                  </>
+                ) : (
+                  <>
+                    <LinkIcon className="mr-2 h-4 w-4" />
+                    FEELCYCLEと連携
+                  </>
+                )}
+              </Button>
+            </form>
+            <p className="mt-4 text-xs text-center text-muted-foreground">
+              認証情報は暗号化して保存され、セッション更新に使用されます。
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (error) {
-    const isSessionError = error.includes('セッション') || error.includes('再ログイン') || error.includes('未認証');
     return (
       <div className="max-w-2xl mx-auto p-4">
         <Card>
           <CardContent className="pt-6 flex flex-col items-center gap-4 text-center">
-            <div className="rounded-full bg-muted p-3">
-              <LogIn className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="font-medium">{isSessionError ? 'セッションが切れました' : 'エラーが発生しました'}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {isSessionError ? 'FEELCYCLEに再ログインしてください' : error}
-              </p>
-            </div>
-            <Button onClick={handleRelogin}>再ログイン</Button>
+            <p className="font-medium">エラーが発生しました</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
           </CardContent>
         </Card>
       </div>
@@ -420,58 +478,23 @@ function MypageContent() {
               </Button>
             </CardContent>
           </Card>
+
           {/* LINE通知設定 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Bell className="h-5 w-5" />
-                LINE通知設定
+                LINE通知
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent>
               <p className="text-xs text-muted-foreground">
                 満席レッスンに空きが出たときにLINEで通知を受け取れます。
                 レッスン一覧で満席レッスンをタップして「空き通知」を登録してください。
               </p>
-              {lineMessage && (
-                <p className={`text-sm ${lineMessage.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                  {lineMessage.text}
-                </p>
-              )}
-              {lineUserId ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      {lineUserId.slice(0, 5)}...{lineUserId.slice(-4)}
-                    </Badge>
-                    <span className="text-xs text-[#06C755] font-medium">連携済み</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleUnlinkLine}
-                    disabled={lineUnlinking}
-                  >
-                    {lineUnlinking ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Unlink className="mr-2 h-4 w-4" />
-                    )}
-                    連携解除
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  size="sm"
-                  asChild
-                  className="bg-[#06C755] hover:bg-[#05b04c] text-white"
-                >
-                  <a href="/api/auth/line">
-                    <LinkIcon className="mr-2 h-4 w-4" />
-                    LINEと連携
-                  </a>
-                </Button>
-              )}
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-[#06C755] font-medium">LINE連携済み</span>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

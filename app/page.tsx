@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle, Bell, BellOff, RotateCcw, X } from 'lucide-react';
-import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
 import type { ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
@@ -171,25 +170,33 @@ function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fcNotLinked, setFcNotLinked] = useState(false);
   const { waitlistEntries, resumeWaitlist, removeFromWaitlist } = useWaitlist();
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json();
-          throw new Error(body.error || 'データの取得に失敗しました');
+    async function fetchDashboard(retried = false): Promise<DashboardData> {
+      const res = await fetch('/api/dashboard');
+      const body = await res.json();
+      if (!res.ok) {
+        if (body.code === 'FC_SESSION_EXPIRED' && !retried) {
+          const reauthRes = await fetch('/api/auth/feelcycle-reauth', { method: 'POST' });
+          if (reauthRes.ok) return fetchDashboard(true);
+          throw new Error('FC_NOT_LINKED');
         }
-        return res.json();
-      })
+        if (body.code === 'FC_NOT_LINKED') throw new Error('FC_NOT_LINKED');
+        throw new Error(body.error || 'データの取得に失敗しました');
+      }
+      return body;
+    }
+
+    fetchDashboard()
       .then(setData)
       .catch((e) => {
-        const msg = e.message;
-        const isSessionError = msg.includes('セッション') || msg.includes('再ログイン') || msg.includes('未認証');
-        if (isSessionError) {
-          createSupabaseClient().auth.signOut();
+        if (e.message === 'FC_NOT_LINKED') {
+          setFcNotLinked(true);
+        } else {
+          setError(e.message);
         }
-        setError(msg);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -207,17 +214,29 @@ function Dashboard() {
     );
   }
 
-  if (error) {
-    const isSession = error.includes('セッション') || error.includes('再ログイン') || error.includes('未認証');
+  if (fcNotLinked) {
     return (
       <div className="max-w-2xl mx-auto p-4">
         <Card>
           <CardContent className="pt-6 text-center space-y-3">
-            <p className="font-medium">{isSession ? 'セッションが切れました' : 'エラー'}</p>
+            <p className="font-medium">FEELCYCLEアカウント未連携</p>
+            <p className="text-sm text-muted-foreground">
+              マイページからFEELCYCLEアカウントを連携すると、予約状況や受講履歴を確認できます。
+            </p>
+            <Button asChild><Link href="/mypage">マイページで連携する</Link></Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto p-4">
+        <Card>
+          <CardContent className="pt-6 text-center space-y-3">
+            <p className="font-medium">エラー</p>
             <p className="text-sm text-muted-foreground">{error}</p>
-            {isSession && (
-              <Button asChild><Link href="/login">再ログイン</Link></Button>
-            )}
           </CardContent>
         </Card>
       </div>

@@ -26,11 +26,11 @@ export async function GET() {
     .single();
 
   if (!sessionRow) {
-    return NextResponse.json({ error: 'セッションが見つかりません。再ログインしてください。' }, { status: 401 });
+    return NextResponse.json({ error: 'FEELCYCLE未連携', code: 'FC_NOT_LINKED' }, { status: 404 });
   }
 
   if (new Date(sessionRow.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'セッションが期限切れです。再ログインしてください。' }, { status: 401 });
+    return NextResponse.json({ error: 'セッションが期限切れです', code: 'FC_SESSION_EXPIRED' }, { status: 401 });
   }
 
   let fcSession: FeelcycleSession;
@@ -40,24 +40,25 @@ export async function GET() {
     return NextResponse.json({ error: 'セッションの復号に失敗しました' }, { status: 500 });
   }
 
-  // マイページ情報を取得（必須）
-  let mypageData;
-  try {
-    mypageData = await getMypageWithReservations(fcSession);
-  } catch (e) {
-    if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
-      return NextResponse.json({ error: 'FEELCYCLEセッションが期限切れです。再ログインしてください。' }, { status: 401 });
+  // マイページ情報 + チケット情報を並列取得
+  const [mypageResult, ticketsResult] = await Promise.allSettled([
+    getMypageWithReservations(fcSession),
+    getTickets(fcSession),
+  ]);
+
+  if (mypageResult.status === 'rejected') {
+    const msg = mypageResult.reason instanceof Error ? mypageResult.reason.message : String(mypageResult.reason);
+    if (msg === 'SESSION_EXPIRED') {
+      return NextResponse.json({ error: 'FEELCYCLEセッションが期限切れです', code: 'FC_SESSION_EXPIRED' }, { status: 401 });
     }
-    console.error('Mypage API error:', e);
+    console.error('Mypage API error:', mypageResult.reason);
     return NextResponse.json({ error: 'マイページ情報の取得に失敗しました' }, { status: 500 });
   }
 
-  // チケット情報を取得（失敗しても続行）
-  let tickets: Awaited<ReturnType<typeof getTickets>> = [];
-  try {
-    tickets = await getTickets(fcSession);
-  } catch (e) {
-    console.warn('Ticket fetch failed (non-fatal):', e instanceof Error ? e.message : e);
+  const mypageData = mypageResult.value;
+  const tickets = ticketsResult.status === 'fulfilled' ? ticketsResult.value : [];
+  if (ticketsResult.status === 'rejected') {
+    console.warn('Ticket fetch failed (non-fatal):', ticketsResult.reason instanceof Error ? ticketsResult.reason.message : ticketsResult.reason);
   }
 
   return NextResponse.json({

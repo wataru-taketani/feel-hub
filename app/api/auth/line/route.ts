@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   const state = randomBytes(32).toString('hex');
   const origin = request.nextUrl.origin;
   const redirectUri = `${origin}/api/auth/line/callback`;
+  const redirectTo = request.nextUrl.searchParams.get('redirect_to') || '';
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -25,8 +26,11 @@ export async function GET(request: NextRequest) {
 
   const authUrl = `https://access.line.me/oauth2/v2.1/authorize?${params}`;
 
+  // Store state + optional redirect_to in cookie (separated by ":")
+  const cookieValue = redirectTo ? `${state}:${redirectTo}` : state;
+
   const response = NextResponse.redirect(authUrl);
-  response.cookies.set('line_oauth_state', state, {
+  response.cookies.set('line_oauth_state', cookieValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

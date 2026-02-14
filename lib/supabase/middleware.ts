@@ -44,10 +44,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ログイン済みで /login にアクセスした場合は /mypage にリダイレクト
+  // ログイン済みで /login にアクセスした場合は / にリダイレクト
   if (user && request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone();
-    url.pathname = '/mypage';
+    url.pathname = '/';
     return NextResponse.redirect(url);
   }
 
