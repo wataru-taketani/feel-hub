@@ -217,9 +217,12 @@ export async function getMypage(session: FeelcycleSession): Promise<MypageInfo> 
 
 function parseMypageData(data: Record<string, unknown>): MypageInfo {
   const longPlanRaw = data.long_plan as Record<string, unknown> | null;
+  // store は配列 (例: ["銀座（GNZ）"])
+  const storeRaw = data.store;
+  const homeStore = Array.isArray(storeRaw) ? String(storeRaw[0] || '') : String(storeRaw || '');
   return {
     displayName: String(data.member_name || ''),
-    homeStore: String(data.store_name || ''),
+    homeStore,
     membershipType: String(data.member_type || data.memtype_name || ''),
     totalAttendance: Number(data.total_attendance_num || 0),
     reservationCount: Number(data.reservation_num || 0),

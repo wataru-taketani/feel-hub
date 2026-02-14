@@ -134,25 +134,67 @@ export async function GET(request: NextRequest) {
 
     if (existingProfile) {
       // 5a. Existing user — sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      let { error: signInError } = await supabase.auth.signInWithPassword({
         email: dummyEmail,
         password: derivedPw,
       });
 
+      // Auth user with dummy email doesn't exist yet (migrating from old FC email auth)
       if (signInError) {
-        console.error('Supabase sign in error:', signInError);
-        return NextResponse.redirect(`${origin}/login?error=auth_failed`);
-      }
+        const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+          email: dummyEmail,
+          password: derivedPw,
+          email_confirm: true,
+        });
 
-      // Update LINE profile info
-      await supabaseAdmin
-        .from('user_profiles')
-        .update({
-          line_display_name: lineDisplayName,
-          line_picture_url: linePictureUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingProfile.id);
+        if (createError) {
+          console.error('Migration user creation error:', createError);
+          return NextResponse.redirect(`${origin}/login?error=create_failed`);
+        }
+
+        const result = await supabase.auth.signInWithPassword({
+          email: dummyEmail,
+          password: derivedPw,
+        });
+        signInError = result.error;
+
+        if (signInError) {
+          console.error('Supabase sign in error after migration:', signInError);
+          return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+        }
+
+        // Migrate profile to new auth user
+        const { data: { user: newUser } } = await supabase.auth.getUser();
+        if (newUser && newUser.id !== existingProfile.id) {
+          // Move related data to new user id
+          const oldId = existingProfile.id;
+          const newId = newUser.id;
+          await supabaseAdmin.from('feelcycle_sessions').update({ user_id: newId }).eq('user_id', oldId);
+          await supabaseAdmin.from('feelcycle_credentials').update({ user_id: newId }).eq('user_id', oldId);
+          await supabaseAdmin.from('attendance_history').update({ user_id: newId }).eq('user_id', oldId);
+          await supabaseAdmin.from('waitlist').update({ user_id: newId }).eq('user_id', oldId);
+          await supabaseAdmin.from('user_profiles').delete().eq('id', oldId);
+          await supabaseAdmin.from('user_profiles').upsert({
+            id: newId,
+            line_user_id: lineUserId,
+            line_display_name: lineDisplayName,
+            line_picture_url: linePictureUrl,
+            updated_at: new Date().toISOString(),
+          });
+          // Delete old auth user
+          await supabaseAdmin.auth.admin.deleteUser(oldId);
+        }
+      } else {
+        // Update LINE profile info
+        await supabaseAdmin
+          .from('user_profiles')
+          .update({
+            line_display_name: lineDisplayName,
+            line_picture_url: linePictureUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingProfile.id);
+      }
     } else {
       // 5b. New user — create + sign in
       const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({

@@ -22,7 +22,7 @@ function LoginContent() {
         <CardContent className="space-y-4">
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md border border-red-200">
-              ログインに失敗しました。もう一度お試しください。
+              ログインに失敗しました（{error}）
             </div>
           )}
 

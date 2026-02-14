@@ -79,6 +79,10 @@ export async function GET() {
       success: true,
       data: lessons,
       count: lessons.length,
+    }, {
+      headers: {
+        'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
+      },
     });
   } catch (error) {
     console.error('Error fetching lessons:', error);

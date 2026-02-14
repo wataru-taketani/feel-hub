@@ -38,38 +38,29 @@ export default function LessonsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [hasLineUserId, setHasLineUserId] = useState(false);
 
-  // LINE連携状態を取得
-  useEffect(() => {
-    if (!user) return;
-    fetch('/api/profile')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.profile?.lineUserId) setHasLineUserId(true);
-      })
-      .catch(() => {});
-  }, [user]);
-
   const handleTapLesson = useCallback((lesson: Lesson) => {
     setSelectedLesson(lesson);
     setModalOpen(true);
   }, []);
 
-  // ログイン済みの場合、予約情報を取得（/api/dashboard経由）
+  // ログイン済み: profile + dashboard を並列取得
   const [reservedKeys, setReservedKeys] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!user) return;
-    fetch('/api/dashboard')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (!data?.reservations) return;
+    Promise.all([
+      fetch('/api/profile').then(res => res.ok ? res.json() : null).catch(() => null),
+      fetch('/api/dashboard').then(res => res.ok ? res.json() : null).catch(() => null),
+    ]).then(([profileData, dashboardData]) => {
+      if (profileData?.profile?.lineUserId) setHasLineUserId(true);
+      if (dashboardData?.reservations) {
         const keys = new Set<string>(
-          data.reservations.map((r: { date: string; startTime: string; programName: string; instructor: string }) =>
+          dashboardData.reservations.map((r: { date: string; startTime: string; programName: string; instructor: string }) =>
             `${r.date}_${r.startTime}_${r.programName}_${r.instructor}`
           )
         );
         setReservedKeys(keys);
-      })
-      .catch((e) => console.warn('Failed to fetch reservations:', e));
+      }
+    });
   }, [user]);
 
   const isReserved = useCallback(

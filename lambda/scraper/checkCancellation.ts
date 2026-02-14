@@ -117,20 +117,18 @@ export const handler: Handler = async (event, context) => {
   );
 
   try {
-    // 1. 未通知のウェイトリストエントリを取得（レッスン情報 + LINE ID 付き）
+    // 1. 未通知のウェイトリストエントリを取得（レッスン情報付き）
     const { data: waitlist, error: waitlistError } = await supabase
       .from('waitlist')
-      .select('*, lessons(*), user_profiles(line_user_id)')
+      .select('*, lessons(*)')
       .eq('notified', false);
 
     if (waitlistError) {
       throw waitlistError;
     }
 
-    const entries = (waitlist || []) as unknown as WaitlistRow[];
-    console.log(`Found ${entries.length} waitlist entries to check`);
-
-    if (entries.length === 0) {
+    if (!waitlist || waitlist.length === 0) {
+      console.log('No waitlist entries to check');
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -141,6 +139,28 @@ export const handler: Handler = async (event, context) => {
         }),
       };
     }
+
+    // user_profiles から line_user_id を別クエリで取得
+    const userIds = [...new Set(waitlist.map((w: { user_id: string }) => w.user_id))];
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('id, line_user_id')
+      .in('id', userIds);
+
+    const lineUserIdMap = new Map<string, string | null>();
+    for (const p of profiles || []) {
+      lineUserIdMap.set(p.id, p.line_user_id);
+    }
+
+    // entries に user_profiles 情報をマージ
+    const entries: WaitlistRow[] = waitlist.map((w: Record<string, unknown>) => ({
+      ...w,
+      user_profiles: lineUserIdMap.has(w.user_id as string)
+        ? { line_user_id: lineUserIdMap.get(w.user_id as string) ?? null }
+        : null,
+    })) as WaitlistRow[];
+
+    console.log(`Found ${entries.length} waitlist entries to check`);
 
     // 2. storeId+date のユニークペアを抽出
     const targets = new Map<string, { storeId: number; date: string }>();
@@ -299,7 +319,15 @@ async function sendLineNotification(
     return false;
   }
 
-  const message = `【空き通知】\n${lesson.program_name}\n${lesson.date} ${lesson.time}–${lesson.end_time}\nIR: ${lesson.instructor}\nスタジオ: ${lesson.studio}\n残席: ${lesson.available_slots}`;
+  // HH:MM:SS → HH:MM
+  const startTime = lesson.time.slice(0, 5);
+  const endTime = lesson.end_time.slice(0, 5);
+  // YYYY-MM-DD → M/D(曜日)
+  const d = new Date(lesson.date);
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const dateStr = `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
+
+  const message = `【キャンセル待ち通知】\n${lesson.program_name}\n${dateStr} ${startTime}〜${endTime}\n${lesson.instructor}\n${lesson.studio}\n\nhttps://m.feelcycle.com/reserve`;
 
   try {
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
