@@ -52,18 +52,19 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
 
   const dates = useMemo(() => [...dateMap.keys()].sort(), [dateMap]);
 
-  // 予約済みレッスンを日付ごとに抽出
-  const reservedMap = useMemo(() => {
-    if (!isReserved) return new Map<string, Lesson[]>();
+  // 固定行に表示するレッスン（予約済み + ブックマーク済みをマージ）
+  const pinnedMap = useMemo(() => {
     const map = new Map<string, Lesson[]>();
     for (const [date, dateLessons] of dateMap) {
-      const reserved = dateLessons.filter(l => isReserved(l));
-      if (reserved.length > 0) map.set(date, reserved);
+      const pinned = dateLessons.filter(l =>
+        isReserved?.(l) || (bookmarkOnly && isBookmarked(l))
+      );
+      if (pinned.length > 0) map.set(date, pinned);
     }
     return map;
-  }, [dateMap, isReserved]);
+  }, [dateMap, isReserved, bookmarkOnly, isBookmarked]);
 
-  const hasReserved = reservedMap.size > 0;
+  const hasPinnable = pinnedMap.size > 0;
 
   // 今日の列にスクロール
   const scrollToToday = useCallback(() => {
@@ -118,7 +119,7 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
       {/* ツールバー（1行に統合） */}
       <div className="flex items-center gap-1">
         {toolbarLeft}
-        {hasReserved && (
+        {hasPinnable && (
           <Button
             variant={pinReserved ? 'default' : 'outline'}
             size="sm"
@@ -173,21 +174,21 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
           </div>
         </div>
 
-        {/* 予約済みレッスン固定行（sticky・ピン有効時のみ） */}
-        {hasReserved && pinReserved && (
+        {/* 固定行（sticky・ピン有効時：予約済み＋ブックマーク） */}
+        {hasPinnable && pinReserved && (
           <div className="sticky top-[82px] z-[15] border-x border-border overflow-hidden bg-card">
             <div ref={reservedRef} className="flex overflow-hidden">
               {dates.map((date) => {
-                const reserved = reservedMap.get(date);
+                const pinned = pinnedMap.get(date);
                 return (
                   <div key={date} className={cn(COL_WIDTH, 'border-r border-border last:border-r-0')}>
-                    {reserved?.map((lesson) => (
+                    {pinned?.map((lesson) => (
                       <LessonCard
                         key={lesson.id}
                         lesson={lesson}
                         isBookmarked={isBookmarked(lesson)}
                         onToggleBookmark={onToggleBookmark}
-                        isReserved
+                        isReserved={isReserved?.(lesson) ?? false}
                         sheetNo={getSheetNo?.(lesson) || null}
                         isOnWaitlist={isOnWaitlist?.(lesson.id) ?? false}
                         onTapLesson={onTapLesson}
@@ -208,8 +209,12 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
         >
           {dates.map((date) => {
             let dateLessons = dateMap.get(date) || [];
-            if (isReserved && pinReserved) {
-              dateLessons = dateLessons.filter(l => !isReserved(l));
+            // 固定行に表示済みのレッスンを除外
+            if (pinReserved) {
+              const pinnedIds = new Set(pinnedMap.get(date)?.map(l => l.id));
+              if (pinnedIds?.size) {
+                dateLessons = dateLessons.filter(l => !pinnedIds.has(l.id));
+              }
             }
             const displayLessons = bookmarkOnly
               ? dateLessons.filter(l => isBookmarked(l))
