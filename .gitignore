@@ -40,3 +40,6 @@ lambda/output.json
 
 # supabase temp
 supabase/.temp/
+
+# scratchpad (dev experiments)
+/scratchpad/
