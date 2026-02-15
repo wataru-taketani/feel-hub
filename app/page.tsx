@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X } from 'lucide-react';
+import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
@@ -109,7 +109,7 @@ function WaitlistCard({
     <div className="border rounded-lg p-3 space-y-1">
       <div className="flex items-center justify-between">
         <span className="font-medium text-sm">
-          {formatDateWithDay(lesson.date)} {lesson.startTime}〜{lesson.endTime}
+          {formatDateWithDay(lesson.date)} {lesson.startTime.slice(0, 5)}〜{lesson.endTime.slice(0, 5)}
         </span>
         <div className="flex items-center gap-1 shrink-0">
           {entry.notified ? (
@@ -122,6 +122,11 @@ function WaitlistCard({
               <RotateCcw className="h-3 w-3 mr-1" />
               再開
             </Button>
+          ) : entry.autoReserve ? (
+            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
+              <Zap className="h-3 w-3 mr-1" />
+              自動予約
+            </Badge>
           ) : (
             <Badge variant="secondary" className="text-xs">
               <Bell className="h-3 w-3 mr-1" />
