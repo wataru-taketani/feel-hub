@@ -18,11 +18,17 @@ interface CalendarViewProps {
   isOnWaitlist?: (lessonId: string) => boolean;
   onTapLesson?: (lesson: Lesson) => void;
   bookmarkOnly?: boolean;
+  /** ナビ行の左側に追加するコンテンツ */
+  toolbarLeft?: React.ReactNode;
+  /** ナビ行の右側に追加するコンテンツ */
+  toolbarRight?: React.ReactNode;
+  /** ナビ行とカレンダーの間に挿入するコンテンツ */
+  middleContent?: React.ReactNode;
 }
 
 const COL_WIDTH = 'shrink-0 w-[calc(100%/3)] sm:w-[calc(100%/5)] lg:w-[calc(100%/7)] min-w-[150px]';
 
-export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, bookmarkOnly }: CalendarViewProps) {
+export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, bookmarkOnly, toolbarLeft, toolbarRight, middleContent }: CalendarViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const reservedRef = useRef<HTMLDivElement>(null);
@@ -109,19 +115,21 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
 
   return (
     <div className="space-y-2">
-      {/* ナビゲーションボタン */}
-      <div className="flex items-center justify-end gap-1">
+      {/* ツールバー（1行に統合） */}
+      <div className="flex items-center gap-1">
+        {toolbarLeft}
         {hasReserved && (
           <Button
             variant={pinReserved ? 'default' : 'outline'}
             size="sm"
-            className="h-8 text-xs px-3 mr-auto"
+            className="h-8 text-xs px-3"
             onClick={() => setPinReserved(v => !v)}
           >
             {pinReserved ? <Pin className="h-3.5 w-3.5 mr-1" /> : <PinOff className="h-3.5 w-3.5 mr-1" />}
             予約固定
           </Button>
         )}
+        <div className="flex-1" />
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(-1)}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -132,7 +140,11 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(1)}>
           <ChevronRight className="h-4 w-4" />
         </Button>
+        {toolbarRight}
       </div>
+
+      {/* フィルタパネル（外部から挿入） */}
+      {middleContent}
 
       {/* カレンダーグループ */}
       <div>

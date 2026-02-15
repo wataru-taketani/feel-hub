@@ -30,6 +30,11 @@ interface FilterBarProps {
   onUpdatePreset: (id: string) => void;
   onDeletePreset: (id: string) => void;
   onSetDefaultPreset: (id: string | null) => void;
+  /** ツールバー行を非表示（親で統合描画する場合） */
+  hideToolbar?: boolean;
+  /** 外部制御のopen state */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -46,8 +51,13 @@ export default function FilterBar({
   onUpdatePreset,
   onDeletePreset,
   onSetDefaultPreset,
+  hideToolbar,
+  open: controlledOpen,
+  onOpenChange,
 }: FilterBarProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const update = (partial: Partial<FilterState>) => onChange({ ...filters, ...partial });
 
   const reset = () =>
@@ -71,47 +81,49 @@ export default function FilterBar({
   return (
     <div className="space-y-2">
       {/* ── 常時表示ヘッダー ── */}
-      <div className="flex items-center gap-2">
-        {/* ブックマーク */}
-        <Button
-          variant={filters.bookmarkOnly ? 'default' : 'outline'}
-          size="sm"
-          className={cn(
-            'h-8 text-xs gap-1.5 px-3',
-            filters.bookmarkOnly && 'bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500'
-          )}
-          onClick={() => update({ bookmarkOnly: !filters.bookmarkOnly })}
-        >
-          <Star className={cn('h-3.5 w-3.5', filters.bookmarkOnly && 'fill-white')} />
-          ブックマーク
-        </Button>
-
-        <div className="flex-1" />
-
-        {/* フィルタ展開トグル */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 text-xs gap-1.5 px-3"
-          onClick={() => setOpen(!open)}
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          絞り込み
-          {activeCount > 0 && (
-            <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
-              {activeCount}
-            </Badge>
-          )}
-          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
-        </Button>
-
-        {/* リセット */}
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 px-2 text-muted-foreground" onClick={reset}>
-            <RotateCcw className="h-3.5 w-3.5" />
+      {!hideToolbar && (
+        <div className="flex items-center gap-2">
+          {/* ブックマーク */}
+          <Button
+            variant={filters.bookmarkOnly ? 'default' : 'outline'}
+            size="sm"
+            className={cn(
+              'h-8 text-xs gap-1.5 px-3',
+              filters.bookmarkOnly && 'bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500'
+            )}
+            onClick={() => update({ bookmarkOnly: !filters.bookmarkOnly })}
+          >
+            <Star className={cn('h-3.5 w-3.5', filters.bookmarkOnly && 'fill-white')} />
+            ブックマーク
           </Button>
-        )}
-      </div>
+
+          <div className="flex-1" />
+
+          {/* フィルタ展開トグル */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5 px-3"
+            onClick={() => setOpen(!open)}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            絞り込み
+            {activeCount > 0 && (
+              <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
+                {activeCount}
+              </Badge>
+            )}
+            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+          </Button>
+
+          {/* リセット */}
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 px-2 text-muted-foreground" onClick={reset}>
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* ── 選択チップ（常時表示） ── */}
       {(filters.studios.length > 0 || filters.instructors.length > 0) && (

@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star, SlidersHorizontal, ChevronDown, RotateCcw } from "lucide-react";
 import type { Lesson, FilterPreset } from "@/types";
 import { matchesProgram } from "@/lib/lessonUtils";
+import { cn } from "@/lib/utils";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useFilterPresets } from "@/hooks/useFilterPresets";
 import { useWaitlist } from "@/hooks/useWaitlist";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
 import LessonDetailModal from "@/components/lessons/LessonDetailModal";
@@ -182,6 +185,77 @@ export default function LessonsPage() {
     [filters, updatePreset]
   );
 
+  // フィルタパネル開閉
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount =
+    (filters.studios.length > 0 ? 1 : 0) +
+    (filters.programSearch ? 1 : 0) +
+    (filters.instructors.length > 0 ? 1 : 0) +
+    (filters.ticketFilter !== "ALL" ? 1 : 0);
+
+  // ツールバー要素（CalendarViewのスロットに渡す）
+  const toolbarLeft = (
+    <Button
+      variant={filters.bookmarkOnly ? "default" : "outline"}
+      size="sm"
+      className={cn(
+        "h-8 text-xs gap-1.5 px-3",
+        filters.bookmarkOnly && "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
+      )}
+      onClick={() => setFilters((f) => ({ ...f, bookmarkOnly: !f.bookmarkOnly }))}
+    >
+      <Star className={cn("h-3.5 w-3.5", filters.bookmarkOnly && "fill-white")} />
+      ブックマーク
+    </Button>
+  );
+
+  const toolbarRight = (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-xs gap-1.5 px-3"
+        onClick={() => setFilterOpen(!filterOpen)}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        絞り込み
+        {activeFilterCount > 0 && (
+          <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
+            {activeFilterCount}
+          </Badge>
+        )}
+        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", filterOpen && "rotate-180")} />
+      </Button>
+      {activeFilterCount > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs gap-1 px-2 text-muted-foreground"
+          onClick={() => setFilters({ ...DEFAULT_FILTERS })}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </>
+  );
+
+  const filterPanel = (
+    <FilterBar
+      hideToolbar
+      open={filterOpen}
+      onOpenChange={setFilterOpen}
+      filters={filters}
+      onChange={setFilters}
+      allInstructors={allInstructors}
+      presets={presets}
+      onLoadPreset={handleLoadPreset}
+      onSavePreset={handleSavePreset}
+      onUpdatePreset={handleUpdatePreset}
+      onDeletePreset={removePreset}
+      onSetDefaultPreset={setDefaultPreset}
+    />
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1400px] mx-auto px-4 py-4 sm:px-6">
@@ -194,21 +268,6 @@ export default function LessonsPage() {
               {displayCount !== allLessons.length && ` / ${allLessons.length} 件中`}
             </span>
           )}
-        </div>
-
-        {/* フィルタバー */}
-        <div className="mb-4">
-          <FilterBar
-            filters={filters}
-            onChange={setFilters}
-            allInstructors={allInstructors}
-            presets={presets}
-            onLoadPreset={handleLoadPreset}
-            onSavePreset={handleSavePreset}
-            onUpdatePreset={handleUpdatePreset}
-            onDeletePreset={removePreset}
-            onSetDefaultPreset={setDefaultPreset}
-          />
         </div>
 
         {/* Loading */}
@@ -226,7 +285,7 @@ export default function LessonsPage() {
           </div>
         )}
 
-        {/* カレンダー */}
+        {/* カレンダー（ツールバー統合） */}
         {!loading && !error && (
           <CalendarView
             lessons={filteredLessons}
@@ -237,6 +296,9 @@ export default function LessonsPage() {
             isOnWaitlist={isOnWaitlist}
             onTapLesson={handleTapLesson}
             bookmarkOnly={filters.bookmarkOnly}
+            toolbarLeft={toolbarLeft}
+            toolbarRight={toolbarRight}
+            middleContent={filterPanel}
           />
         )}
         {/* レッスン詳細モーダル */}
