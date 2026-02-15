@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { decrypt } from '@/lib/crypto';
-import { getMypageWithReservations, getTickets } from '@/lib/feelcycle-api';
+import { getMypageWithReservations, getTickets, getLessonHistory } from '@/lib/feelcycle-api';
 import type { FeelcycleSession } from '@/lib/feelcycle-api';
+import { upsertHistory } from '@/lib/history-sync';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,10 +49,14 @@ export async function GET() {
     return NextResponse.json({ error: 'セッションの復号に失敗しました' }, { status: 500 });
   }
 
-  // マイページ情報 + チケット情報 を並列取得
-  const [mypageResult, ticketsResult] = await Promise.allSettled([
+  // マイページ情報 + チケット情報 + 今月の履歴 を並列取得
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const [mypageResult, ticketsResult, historyResult] = await Promise.allSettled([
     getMypageWithReservations(fcSession),
     getTickets(fcSession),
+    getLessonHistory(fcSession, currentMonth),
   ]);
 
   if (mypageResult.status === 'rejected') {
@@ -69,30 +74,47 @@ export async function GET() {
     console.warn('Dashboard ticket fetch failed:', ticketsResult.reason instanceof Error ? ticketsResult.reason.message : ticketsResult.reason);
   }
 
-  // 今月のサブスク受講回数をattendance_historyから集計
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthStart = `${currentMonth}-01`;
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const monthEndStr = `${currentMonth}-${String(monthEnd.getDate()).padStart(2, '0')}`;
+  // 今月の受講回数をFEELCYCLE APIから直接取得（常に最新）
+  let totalMonthly = 0;
+  let subscriptionUsed = 0;
 
-  const { data: historyRows } = await supabaseAdmin
-    .from('attendance_history')
-    .select('ticket_name')
-    .eq('user_id', user.id)
-    .eq('cancel_flg', 0)
-    .gte('shift_date', monthStart)
-    .lte('shift_date', monthEndStr);
+  if (historyResult.status === 'fulfilled') {
+    const records = historyResult.value.filter(r => r.cancelFlg === 0);
+    totalMonthly = records.length;
 
-  // サブスク利用 = ticket_nameが空/null/"-"または"他店利用チケット"のもの
-  const subscriptionUsed = (historyRows || []).filter(r => {
-    const t = r.ticket_name;
-    return !t || t === '-' || t === '' || t === '他店利用チケット';
-  }).length;
+    // サブスク利用 = ticketNameが空/null/"-"または"他店利用チケット"のもの
+    subscriptionUsed = records.filter(r => {
+      const t = r.ticketName;
+      return !t || t === '-' || t === '' || t === '他店利用チケット';
+    }).length;
+
+    // DBも同期（バックグラウンド、エラー無視）
+    upsertHistory(supabaseAdmin, user.id, historyResult.value, currentMonth).catch(e =>
+      console.warn('Dashboard history sync failed:', e)
+    );
+  } else {
+    console.warn('Dashboard history fetch failed:', historyResult.reason instanceof Error ? historyResult.reason.message : historyResult.reason);
+    // フォールバック: DBから取得
+    const monthStart = `${currentMonth}-01`;
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const monthEndStr = `${currentMonth}-${String(monthEnd.getDate()).padStart(2, '0')}`;
+
+    const { data: historyRows } = await supabaseAdmin
+      .from('attendance_history')
+      .select('ticket_name')
+      .eq('user_id', user.id)
+      .eq('cancel_flg', 0)
+      .gte('shift_date', monthStart)
+      .lte('shift_date', monthEndStr);
+
+    totalMonthly = (historyRows || []).length;
+    subscriptionUsed = (historyRows || []).filter(r => {
+      const t = r.ticket_name;
+      return !t || t === '-' || t === '' || t === '他店利用チケット';
+    }).length;
+  }
 
   const planLimit = parsePlanLimit(mypageData.mypage.membershipType);
-
-  const totalMonthly = (historyRows || []).length;
 
   return NextResponse.json({
     reservations: mypageData.reservations,
