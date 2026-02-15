@@ -1,12 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import type { Lesson } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, BellOff, Clock, MapPin, Users, LogIn } from 'lucide-react';
-import { formatStudio } from '@/lib/lessonUtils';
-import { cn } from '@/lib/utils';
+import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap } from 'lucide-react';
+import { formatStudio, formatDate } from '@/lib/lessonUtils';
+import SeatMap from '@/components/lessons/SeatMap';
 
 interface LessonDetailModalProps {
   lesson: Lesson | null;
@@ -14,9 +15,10 @@ interface LessonDetailModalProps {
   onOpenChange: (open: boolean) => void;
   isLoggedIn: boolean;
   hasLineUserId: boolean;
+  hasFcSession: boolean;
   isOnWaitlist: boolean;
   isReserved: boolean;
-  onAddWaitlist: (lesson: Lesson) => void;
+  onAddWaitlist: (lesson: Lesson, autoReserve?: boolean) => void;
   onRemoveWaitlist: (lessonId: string) => void;
 }
 
@@ -26,11 +28,14 @@ export default function LessonDetailModal({
   onOpenChange,
   isLoggedIn,
   hasLineUserId,
+  hasFcSession,
   isOnWaitlist,
   isReserved,
   onAddWaitlist,
   onRemoveWaitlist,
 }: LessonDetailModalProps) {
+  const [autoReserve, setAutoReserve] = useState(false);
+
   if (!lesson) return null;
 
   // TODO: テスト後に lesson.isFull 条件を戻す
@@ -38,7 +43,7 @@ export default function LessonDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span
@@ -52,7 +57,7 @@ export default function LessonDetailModal({
             <div className="space-y-2 pt-2">
               <div className="flex items-center gap-2 text-sm text-foreground">
                 <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span>{lesson.date} {lesson.startTime}–{lesson.endTime}</span>
+                <span>{formatDate(lesson.date)} {lesson.startTime}–{lesson.endTime}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-foreground">
                 <span className="text-muted-foreground shrink-0 w-4 text-center font-medium">IR</span>
@@ -120,19 +125,50 @@ export default function LessonDetailModal({
               通知登録済み（解除する）
             </Button>
           ) : (
-            <Button
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                onAddWaitlist(lesson);
-                onOpenChange(false);
-              }}
-            >
-              <Bell className="h-4 w-4 mr-2" />
-              空き通知を受け取る
-            </Button>
+            <div className="space-y-2">
+              {hasFcSession && (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoReserve}
+                    onChange={(e) => setAutoReserve(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <Zap className="h-3.5 w-3.5 text-amber-500" />
+                  空きが出たら自動予約する
+                </label>
+              )}
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  onAddWaitlist(lesson, autoReserve);
+                  setAutoReserve(false);
+                  onOpenChange(false);
+                }}
+              >
+                {autoReserve ? (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    自動予約を設定する
+                  </>
+                ) : (
+                  <>
+                    <Bell className="h-4 w-4 mr-2" />
+                    空き通知を受け取る
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
+
+        {/* 座席マップセクション */}
+        {!lesson.isPast && lesson.sidHash && hasFcSession && (
+          <div className="pt-2 border-t">
+            <SeatMap sidHash={lesson.sidHash} />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

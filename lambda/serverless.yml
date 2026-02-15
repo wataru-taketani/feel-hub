@@ -41,7 +41,8 @@ functions:
 
   checkCancellation:
     handler: dist/scraper/checkCancellation.handler
-    description: キャンセル待ちレッスンの空き枠をチェック
+    description: キャンセル待ちレッスンの空き枠をチェック+自動予約
+    timeout: 60
     events:
       # 毎分実行（Phase 3で有効化）
       - schedule:

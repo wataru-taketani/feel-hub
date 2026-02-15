@@ -1,5 +1,6 @@
 import { Handler } from 'aws-lambda';
 import { createClient } from '@supabase/supabase-js';
+import { autoReserveLesson } from './autoReserve';
 
 /**
  * キャンセル待ちチェック Lambda関数
@@ -26,6 +27,7 @@ interface WaitlistRow {
     instructor: string;
     studio: string;
     store_id: string;
+    sid_hash: string;
     available_slots: number;
     is_full: boolean;
   };
@@ -212,6 +214,7 @@ export const handler: Handler = async (event, context) => {
     }
 
     let notifiedCount = 0;
+    let autoReservedCount = 0;
 
     for (const entry of entries) {
       const key = `${entry.lessons.date}_${entry.lessons.time}_${entry.lessons.instructor}`;
@@ -222,14 +225,32 @@ export const handler: Handler = async (event, context) => {
       const hasAvailability = availableSlots > 0;
 
       if (hasAvailability) {
-        // 通知メッセージ用にフレッシュな残席数を反映
+        const lineUserId = entry.user_profiles?.line_user_id ?? null;
+
+        // 自動予約モード: autoReserveLesson に委譲（独自にLINE通知する）
+        if (entry.auto_reserve) {
+          const result = await autoReserveLesson(entry, supabase, lineUserId);
+          console.log(`AutoReserve entry ${entry.id}: result=${result}`);
+
+          if (result === 'success' || result === 'needs_confirm' || result === 'error' || result === 'auth_failed') {
+            // 成功 or 非回復エラー → waitlist 完了
+            await supabase
+              .from('waitlist')
+              .update({ notified: true })
+              .eq('id', entry.id);
+          }
+          // conflict → そのまま（次サイクルで再試行）
+
+          if (result === 'success') autoReservedCount++;
+          continue;
+        }
+
+        // 通常モード: LINE通知のみ
         const lessonForNotification = {
           ...entry.lessons,
           available_slots: availableSlots,
           is_full: availableSlots === 0,
         };
-
-        const lineUserId = entry.user_profiles?.line_user_id;
 
         if (lineUserId) {
           const sent = await sendLineNotification(lineUserId, lessonForNotification);
@@ -251,10 +272,6 @@ export const handler: Handler = async (event, context) => {
             .from('waitlist')
             .update({ notified: true })
             .eq('id', entry.id);
-        }
-
-        if (entry.auto_reserve) {
-          autoReserveLesson(entry);
         }
       }
     }
@@ -288,6 +305,7 @@ export const handler: Handler = async (event, context) => {
         message: 'Cancellation check completed',
         checked: entries.length,
         notified: notifiedCount,
+        autoReserved: autoReservedCount,
         cleaned: cleanedCount,
         freshFetched: allFresh.length,
         dbUpdated,
@@ -355,9 +373,3 @@ async function sendLineNotification(
   }
 }
 
-/**
- * 自動予約処理（Phase 5で実装）
- */
-function autoReserveLesson(entry: WaitlistRow): void {
-  console.log(`[Phase 5] Auto-reserve requested for entry ${entry.id}, lesson ${entry.lesson_id} - not implemented yet`);
-}

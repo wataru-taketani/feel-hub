@@ -1,0 +1,204 @@
+/**
+ * 自動予約ロジック（Step 1: S-1ケースのみ）
+ *
+ * 空き検知時に FC にログインし、空席を選んで予約を実行する。
+ * result_code に応じて LINE 通知を送信。
+ */
+
+import { SupabaseClient } from '@supabase/supabase-js';
+import { decrypt, login, getSeatMap, reserveLesson } from './fcClient';
+
+interface AutoReserveEntry {
+  id: string;
+  user_id: string;
+  lesson_id: string;
+  lessons: {
+    sid_hash: string;
+    program_name: string;
+    date: string;
+    time: string;
+    end_time: string;
+    instructor: string;
+    studio: string;
+  };
+}
+
+/** 自動予約の結果 */
+export type AutoReserveResult =
+  | 'success'        // rc=0: 予約成功
+  | 'needs_confirm'  // rc=303: 手動確認が必要（Step 2で自動化）
+  | 'conflict'       // rc=205: 競合（次サイクルで再試行）
+  | 'error'          // その他エラー
+  | 'auth_failed';   // FC認証失敗
+
+export async function autoReserveLesson(
+  entry: AutoReserveEntry,
+  supabase: SupabaseClient,
+  lineUserId: string | null
+): Promise<AutoReserveResult> {
+  const tag = `[AutoReserve entry=${entry.id}]`;
+  const sidHash = entry.lessons.sid_hash;
+
+  if (!sidHash) {
+    console.error(`${tag} sid_hash is missing, skipping`);
+    await notify(lineUserId, formatErrorMessage(entry, 'レッスン情報が不足しています'));
+    return 'error';
+  }
+
+  // 1. FC認証情報を取得して復号
+  const { data: cred } = await supabase
+    .from('feelcycle_credentials')
+    .select('encrypted_email, encrypted_password')
+    .eq('user_id', entry.user_id)
+    .single();
+
+  if (!cred) {
+    console.error(`${tag} No FC credentials for user ${entry.user_id}`);
+    await notify(lineUserId, '【自動予約失敗】\nFEELCYCLE連携が未設定です。マイページから再設定してください。');
+    return 'auth_failed';
+  }
+
+  let email: string;
+  let password: string;
+  try {
+    email = decrypt(cred.encrypted_email);
+    password = decrypt(cred.encrypted_password);
+  } catch (e) {
+    console.error(`${tag} Failed to decrypt credentials:`, e);
+    await notify(lineUserId, '【自動予約失敗】\nFEELCYCLE認証情報の復号に失敗しました。マイページから再設定してください。');
+    return 'auth_failed';
+  }
+
+  // 2. FCログイン
+  let session;
+  try {
+    session = await login(email, password);
+    console.log(`${tag} FC login successful`);
+  } catch (e) {
+    console.error(`${tag} FC login failed:`, e);
+    await notify(lineUserId, '【自動予約失敗】\nFEELCYCLEへのログインに失敗しました。マイページからFC連携を再設定してください。');
+    return 'auth_failed';
+  }
+
+  // 3. 座席マップ取得 → 空席選択
+  let sheetNo: string;
+  try {
+    const bikes = await getSeatMap(session, sidHash);
+    const availableSeats = Object.entries(bikes)
+      .filter(([, b]) => b.status === 2)
+      .map(([no]) => no);
+
+    if (availableSeats.length === 0) {
+      console.log(`${tag} No available seats found (race condition), will retry next cycle`);
+      return 'conflict';
+    }
+
+    // 最初の空席を選択（番号順で最小）
+    availableSeats.sort((a, b) => Number(a) - Number(b));
+    sheetNo = availableSeats[0];
+    console.log(`${tag} Selected seat #${sheetNo} from ${availableSeats.length} available`);
+  } catch (e) {
+    console.error(`${tag} getSeatMap failed:`, e);
+    if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
+      await notify(lineUserId, '【自動予約失敗】\nFEELCYCLEセッションが切れました。マイページから再設定してください。');
+      return 'auth_failed';
+    }
+    return 'error';
+  }
+
+  // 4. 予約実行
+  try {
+    const result = await reserveLesson(session, sidHash, sheetNo);
+    console.log(`${tag} Reserve result: rc=${result.resultCode}, msg=${result.message}`, JSON.stringify(result.raw));
+
+    switch (result.resultCode) {
+      case 0: {
+        // 成功
+        const msg = formatSuccessMessage(entry, sheetNo);
+        await notify(lineUserId, msg);
+        return 'success';
+      }
+      case 303: {
+        // 確認が必要（Step 2で自動処理追加予定）
+        const msg = formatNeedsConfirmMessage(entry);
+        await notify(lineUserId, msg);
+        return 'needs_confirm';
+      }
+      case 205: {
+        // 競合（他の人が先に取った）
+        console.log(`${tag} Seat conflict (rc=205), will retry next cycle`);
+        return 'conflict';
+      }
+      default: {
+        // その他エラー
+        console.error(`${tag} Unexpected result_code=${result.resultCode}: ${result.message}`);
+        await notify(lineUserId, formatErrorMessage(entry, result.message || `エラーコード: ${result.resultCode}`));
+        return 'error';
+      }
+    }
+  } catch (e) {
+    console.error(`${tag} reserveLesson threw:`, e);
+    if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
+      await notify(lineUserId, '【自動予約失敗】\nFEELCYCLEセッションが切れました。マイページから再設定してください。');
+      return 'auth_failed';
+    }
+    return 'error';
+  }
+}
+
+// ── メッセージテンプレート ──
+
+function formatLessonInfo(entry: AutoReserveEntry): string {
+  const l = entry.lessons;
+  const d = new Date(l.date);
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const dateStr = `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
+  const startTime = l.time.slice(0, 5);
+  const endTime = l.end_time.slice(0, 5);
+  return `${l.program_name}\n${dateStr} ${startTime}〜${endTime}\n${l.instructor}\n${l.studio}`;
+}
+
+function formatSuccessMessage(entry: AutoReserveEntry, sheetNo: string): string {
+  return `【自動予約完了】\n${formatLessonInfo(entry)}\n座席: ${sheetNo}\n\nhttps://m.feelcycle.com/reserved/top`;
+}
+
+function formatNeedsConfirmMessage(entry: AutoReserveEntry): string {
+  return `【要確認】空きが出ました\n${formatLessonInfo(entry)}\n\n追加確認が必要です。手動で予約してください。\nhttps://m.feelcycle.com/reserve`;
+}
+
+function formatErrorMessage(entry: AutoReserveEntry, detail: string): string {
+  return `【自動予約失敗】\n${formatLessonInfo(entry)}\n\n${detail}`;
+}
+
+// ── LINE通知 ──
+
+async function notify(lineUserId: string | null, message: string): Promise<void> {
+  if (!lineUserId) {
+    console.warn('No LINE user ID, skipping notification');
+    return;
+  }
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) {
+    console.error('LINE_CHANNEL_ACCESS_TOKEN is not set');
+    return;
+  }
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        to: lineUserId,
+        messages: [{ type: 'text', text: message }],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`LINE push failed: ${res.status} ${body}`);
+    }
+  } catch (e) {
+    console.error('LINE notification error:', e);
+  }
+}

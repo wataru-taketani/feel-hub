@@ -37,6 +37,7 @@ export default function LessonsPage() {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [hasLineUserId, setHasLineUserId] = useState(false);
+  const [hasFcSession, setHasFcSession] = useState(false);
 
   const handleTapLesson = useCallback((lesson: Lesson) => {
     setSelectedLesson(lesson);
@@ -44,7 +45,8 @@ export default function LessonsPage() {
   }, []);
 
   // ログイン済み: profile + dashboard を並列取得
-  const [reservedKeys, setReservedKeys] = useState<Set<string>>(new Set());
+  // key → sheetNo のマップ（予約済みレッスン + バイク番号）
+  const [reservedMap, setReservedMap] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     if (!user) return;
     Promise.all([
@@ -52,20 +54,25 @@ export default function LessonsPage() {
       fetch('/api/dashboard').then(res => res.ok ? res.json() : null).catch(() => null),
     ]).then(([profileData, dashboardData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);
+      if (dashboardData?.reservations) setHasFcSession(true);
       if (dashboardData?.reservations) {
-        const keys = new Set<string>(
-          dashboardData.reservations.map((r: { date: string; startTime: string; programName: string; instructor: string }) =>
-            `${r.date}_${r.startTime}_${r.programName}_${r.instructor}`
-          )
-        );
-        setReservedKeys(keys);
+        const map = new Map<string, string>();
+        for (const r of dashboardData.reservations as { date: string; startTime: string; programName: string; instructor: string; sheetNo: string }[]) {
+          map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
+        }
+        setReservedMap(map);
       }
     });
   }, [user]);
 
   const isReserved = useCallback(
-    (lesson: Lesson) => reservedKeys.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
-    [reservedKeys]
+    (lesson: Lesson) => reservedMap.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
+    [reservedMap]
+  );
+
+  const getSheetNo = useCallback(
+    (lesson: Lesson) => reservedMap.get(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`) || null,
+    [reservedMap]
   );
 
   // 全未来レッスンを初回のみ一括取得
@@ -126,10 +133,13 @@ export default function LessonsPage() {
       }
       if (filters.ticketFilter === "NORMAL" && lesson.ticketType !== null) return false;
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
-      if (filters.bookmarkOnly && !isBookmarked(lesson)) return false;
       return true;
     });
-  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, filters.bookmarkOnly, isBookmarked]);
+  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter]);
+
+  const displayCount = filters.bookmarkOnly
+    ? filteredLessons.filter((l) => isBookmarked(l)).length
+    : filteredLessons.length;
 
   // プリセット読み込み
   const handleLoadPreset = useCallback(
@@ -180,8 +190,8 @@ export default function LessonsPage() {
           <h2 className="text-lg font-bold text-foreground">レッスン一覧</h2>
           {!loading && (
             <span className="text-sm text-muted-foreground">
-              {filteredLessons.length} 件
-              {filteredLessons.length !== allLessons.length && ` / ${allLessons.length} 件中`}
+              {displayCount} 件
+              {displayCount !== allLessons.length && ` / ${allLessons.length} 件中`}
             </span>
           )}
         </div>
@@ -223,8 +233,10 @@ export default function LessonsPage() {
             isBookmarked={isBookmarked}
             onToggleBookmark={toggle}
             isReserved={isReserved}
+            getSheetNo={getSheetNo}
             isOnWaitlist={isOnWaitlist}
             onTapLesson={handleTapLesson}
+            bookmarkOnly={filters.bookmarkOnly}
           />
         )}
         {/* レッスン詳細モーダル */}
@@ -234,9 +246,10 @@ export default function LessonsPage() {
           onOpenChange={setModalOpen}
           isLoggedIn={!!user}
           hasLineUserId={hasLineUserId}
+          hasFcSession={hasFcSession}
           isOnWaitlist={selectedLesson ? isOnWaitlist(selectedLesson.id) : false}
           isReserved={selectedLesson ? isReserved(selectedLesson) : false}
-          onAddWaitlist={addToWaitlist}
+          onAddWaitlist={(lesson, autoReserve) => addToWaitlist(lesson, autoReserve)}
           onRemoveWaitlist={removeFromWaitlist}
         />
       </div>

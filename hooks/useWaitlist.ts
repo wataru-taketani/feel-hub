@@ -22,6 +22,7 @@ interface WaitlistItem {
   id: string;
   lessonId: string;
   notified: boolean;
+  autoReserve: boolean;
   lesson: WaitlistLesson | null;
 }
 
@@ -50,6 +51,7 @@ export function useWaitlist() {
             id: e.id,
             lessonId: e.lessonId,
             notified: e.notified,
+            autoReserve: e.autoReserve ?? false,
             lesson: e.lesson,
           });
         }
@@ -78,7 +80,7 @@ export function useWaitlist() {
   );
 
   const addToWaitlist = useCallback(
-    async (lesson: Lesson) => {
+    async (lesson: Lesson, autoReserve = false) => {
       if (!user) return;
 
       // 楽観的更新
@@ -89,6 +91,7 @@ export function useWaitlist() {
           id: tempId,
           lessonId: lesson.id,
           notified: false,
+          autoReserve,
           lesson: {
             id: lesson.id,
             date: lesson.date,
@@ -110,7 +113,7 @@ export function useWaitlist() {
         const res = await fetch('/api/waitlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lessonId: lesson.id }),
+          body: JSON.stringify({ lessonId: lesson.id, autoReserve }),
         });
         const data = await res.json();
         if (res.ok && data.entry) {
