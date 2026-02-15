@@ -26,10 +26,11 @@ interface AutoReserveEntry {
 /** 自動予約の結果 */
 export type AutoReserveResult =
   | 'success'        // rc=0: 予約成功
-  | 'needs_confirm'  // rc=303: 手動確認が必要（Step 2で自動化）
+  | 'needs_confirm'  // rc=303: 手動確認が必要
   | 'conflict'       // rc=205: 競合（次サイクルで再試行）
   | 'error'          // その他エラー
-  | 'auth_failed';   // FC認証失敗
+  | 'auth_failed'    // FC認証失敗（初回：auth_valid=false にセット + LINE通知）
+  | 'auth_invalid';  // 認証無効済み（既にflag済みなのでスキップ）
 
 export async function autoReserveLesson(
   entry: AutoReserveEntry,
@@ -48,7 +49,7 @@ export async function autoReserveLesson(
   // 1. FC認証情報を取得して復号
   const { data: cred } = await supabase
     .from('feelcycle_credentials')
-    .select('email_encrypted, password_encrypted')
+    .select('email_encrypted, password_encrypted, auth_valid')
     .eq('user_id', entry.user_id)
     .single();
 
@@ -56,6 +57,12 @@ export async function autoReserveLesson(
     console.error(`${tag} No FC credentials for user ${entry.user_id}`);
     await notify(lineUserId, '【自動予約失敗】\nFEELCYCLE連携が未設定です。マイページから再設定してください。');
     return 'auth_failed';
+  }
+
+  // 認証無効フラグチェック（パスワード変更等で以前失敗済み → ログイン試行しない）
+  if (cred.auth_valid === false) {
+    console.log(`${tag} Credentials flagged as invalid, skipping login`);
+    return 'auth_invalid';
   }
 
   let email: string;
@@ -76,7 +83,13 @@ export async function autoReserveLesson(
     console.log(`${tag} FC login successful`);
   } catch (e) {
     console.error(`${tag} FC login failed:`, e);
-    await notify(lineUserId, '【自動予約失敗】\nFEELCYCLEへのログインに失敗しました。マイページからFC連携を再設定してください。');
+    // 認証無効フラグをセット → 以降のログイン試行を停止（アカウントロック防止）
+    await supabase
+      .from('feelcycle_credentials')
+      .update({ auth_valid: false })
+      .eq('user_id', entry.user_id);
+    console.log(`${tag} Marked credentials as invalid for user ${entry.user_id}`);
+    await notify(lineUserId, '【自動予約停止】\nFEELCYCLEへのログインに失敗しました。\nパスワードが変更された可能性があります。\n\nマイページからFC連携を再設定してください。\nhttps://feel-hub.vercel.app/mypage');
     return 'auth_failed';
   }
 

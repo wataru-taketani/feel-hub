@@ -51,12 +51,14 @@ export async function POST(request: NextRequest) {
       });
 
     // 3. FEELCYCLE認証情報を暗号化して保存（自動再認証用）
+    //    auth_valid=true にリセット（パスワード変更後の再連携でロック解除）
     await supabaseAdmin
       .from('feelcycle_credentials')
       .upsert({
         user_id: user.id,
         email_encrypted: encrypt(email),
         password_encrypted: encrypt(password),
+        auth_valid: true,
         updated_at: new Date().toISOString(),
       });
 

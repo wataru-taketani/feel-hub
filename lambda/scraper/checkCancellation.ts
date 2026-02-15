@@ -107,14 +107,14 @@ export const handler: Handler = async (event, context) => {
           const result = await autoReserveLesson(entry, supabase, lineUserId);
           console.log(`AutoReserve entry ${entry.id}: result=${result}`);
 
-          if (result === 'success' || result === 'needs_confirm' || result === 'error' || result === 'auth_failed') {
+          if (result === 'success' || result === 'needs_confirm' || result === 'error') {
             // 成功 or 非回復エラー → waitlist 完了
             await supabase
               .from('waitlist')
               .update({ notified: true })
               .eq('id', entry.id);
           }
-          // conflict → そのまま（次サイクルで再試行）
+          // auth_failed, auth_invalid, conflict → そのまま（再連携後 or 次サイクルで再試行）
 
           if (result === 'success') autoReservedCount++;
           continue;
