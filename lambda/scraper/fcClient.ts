@@ -189,7 +189,7 @@ export async function reserveLesson(
       ...buildHeaders(session),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ sid: sidHash, sheet_no: sheetNo }),
+    body: JSON.stringify({ sid: sidHash, sheet_no: Number(sheetNo) }),
   });
 
   if (res.status === 401 || res.status === 302 || res.status === 403) {

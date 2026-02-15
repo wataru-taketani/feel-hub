@@ -5,13 +5,12 @@ import { autoReserveLesson } from './autoReserve';
 /**
  * キャンセル待ちチェック Lambda関数
  *
- * - ウォッチ対象レッスンの最新空き状況を FEELCYCLE API から直接取得
- * - DB を更新し、空きが見つかった場合に LINE 通知
- * - 自動予約が設定されている場合はログのみ（Phase 5で実装）
+ * - DB上のレッスン空き状況（メインスクレイパーが10分間隔で更新）を参照
+ * - 空きが見つかった場合に LINE 通知 or 自動予約
+ *
+ * NOTE: 未認証の lesson_calendar API は reserve_status_count=0 を返すことがあるため、
+ *       この関数では FEELCYCLE API を直接呼ばず、DB値のみを使用する。
  */
-
-const FEELCYCLE_API = 'https://m.feelcycle.com/api/reserve/lesson_calendar';
-const USER_AGENT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15';
 
 interface WaitlistRow {
   id: string;
@@ -34,80 +33,6 @@ interface WaitlistRow {
   user_profiles: {
     line_user_id: string | null;
   } | null;
-}
-
-interface FreshLesson {
-  date: string;       // YYYY-MM-DD
-  time: string;       // HH:MM
-  instructor: string;
-  studio: string;
-  available_slots: number;
-  is_full: boolean;
-}
-
-interface ApiSchedule {
-  lesson_name: string;
-  lesson_start: string;
-  lesson_end: string;
-  user_name_list: Array<{ id: number; name: string }>;
-  store_id: string;
-  store_name: string;
-  reserve_status_count: number;
-}
-
-interface ApiLessonDay {
-  lesson_date: string; // YYYYMMDD
-  schedule: ApiSchedule[];
-}
-
-interface ApiResponse {
-  result_code: number;
-  lesson_list?: ApiLessonDay[];
-}
-
-/**
- * FEELCYCLE API から1スタジオ・1日分のレッスン空き状況を取得
- */
-async function fetchFreshLessons(storeId: number, date: string): Promise<FreshLesson[]> {
-  const params = new URLSearchParams({
-    mode: '2',
-    shujiku_type: '1',
-    get_direction: '1',
-    get_starting_date: date,
-    shujiku_id: String(storeId),
-  });
-
-  try {
-    const res = await fetch(`${FEELCYCLE_API}?${params}`, {
-      headers: { 'User-Agent': USER_AGENT },
-    });
-
-    const json: ApiResponse = await res.json();
-    if (json.result_code !== 0 || !json.lesson_list) {
-      return [];
-    }
-
-    const lessons: FreshLesson[] = [];
-    for (const day of json.lesson_list) {
-      const d = `${day.lesson_date.substring(0, 4)}-${day.lesson_date.substring(4, 6)}-${day.lesson_date.substring(6, 8)}`;
-
-      for (const s of day.schedule) {
-        lessons.push({
-          date: d,
-          time: s.lesson_start,
-          instructor: s.user_name_list?.map((u) => u.name).join(', ') || '',
-          studio: s.store_name.replace(/（.*）/, ''),
-          available_slots: s.reserve_status_count,
-          is_full: s.reserve_status_count === 0,
-        });
-      }
-    }
-
-    return lessons;
-  } catch (error) {
-    console.error(`Failed to fetch fresh lessons for store ${storeId}, date ${date}:`, error);
-    return [];
-  }
 }
 
 export const handler: Handler = async (event, context) => {
@@ -164,65 +89,15 @@ export const handler: Handler = async (event, context) => {
 
     console.log(`Found ${entries.length} waitlist entries to check`);
 
-    // 2. storeId+date のユニークペアを抽出
-    const targets = new Map<string, { storeId: number; date: string }>();
-    for (const entry of entries) {
-      const key = `${entry.lessons.store_id}_${entry.lessons.date}`;
-      targets.set(key, {
-        storeId: parseInt(entry.lessons.store_id, 10),
-        date: entry.lessons.date,
-      });
-    }
-
-    console.log(`Fetching fresh data for ${targets.size} store/date pairs`);
-
-    // 3. FEELCYCLE API からフレッシュデータ取得（並列）
-    const freshResults = await Promise.all(
-      Array.from(targets.values()).map(({ storeId, date }) =>
-        fetchFreshLessons(storeId, date)
-      )
-    );
-    const allFresh = freshResults.flat();
-    console.log(`Fetched ${allFresh.length} fresh lessons from FEELCYCLE API`);
-
-    // 4. DB の lessons テーブルを部分更新
-    let dbUpdated = 0;
-    for (const fresh of allFresh) {
-      const { error } = await supabase
-        .from('lessons')
-        .update({
-          available_slots: fresh.available_slots,
-          is_full: fresh.is_full,
-        })
-        .match({
-          date: fresh.date,
-          time: fresh.time,
-          studio: fresh.studio,
-          instructor: fresh.instructor,
-        });
-
-      if (!error) {
-        dbUpdated++;
-      }
-    }
-    console.log(`Updated ${dbUpdated}/${allFresh.length} lessons in DB`);
-
-    // 5. フレッシュデータで空き判定（インメモリ）
-    const freshMap = new Map<string, FreshLesson>();
-    for (const f of allFresh) {
-      freshMap.set(`${f.date}_${f.time}_${f.instructor}`, f);
-    }
-
+    // 2. DB値で空き判定（メインスクレイパーが10分間隔で更新）
     let notifiedCount = 0;
     let autoReservedCount = 0;
 
     for (const entry of entries) {
-      const key = `${entry.lessons.date}_${entry.lessons.time}_${entry.lessons.instructor}`;
-      const fresh = freshMap.get(key);
-
-      // フレッシュデータがあればそれを使用、なければ DB の値にフォールバック
-      const availableSlots = fresh ? fresh.available_slots : entry.lessons.available_slots;
+      const availableSlots = entry.lessons.available_slots;
       const hasAvailability = availableSlots > 0;
+
+      console.log(`[Check] entry=${entry.id} lesson=${entry.lessons.program_name} ${entry.lessons.date} ${entry.lessons.time.slice(0, 5)} slots=${availableSlots} auto=${entry.auto_reserve}`);
 
       if (hasAvailability) {
         const lineUserId = entry.user_profiles?.line_user_id ?? null;
@@ -246,14 +121,8 @@ export const handler: Handler = async (event, context) => {
         }
 
         // 通常モード: LINE通知のみ
-        const lessonForNotification = {
-          ...entry.lessons,
-          available_slots: availableSlots,
-          is_full: availableSlots === 0,
-        };
-
         if (lineUserId) {
-          const sent = await sendLineNotification(lineUserId, lessonForNotification);
+          const sent = await sendLineNotification(lineUserId, entry.lessons);
 
           if (sent) {
             await supabase
@@ -276,7 +145,7 @@ export const handler: Handler = async (event, context) => {
       }
     }
 
-    // 6. 過去レッスンのウェイトリストエントリを自動削除
+    // 3. 過去レッスンのウェイトリストエントリを自動削除
     const today = new Date().toISOString().slice(0, 10);
     const { data: expiredIds, error: expiredError } = await supabase
       .from('waitlist')
@@ -307,8 +176,6 @@ export const handler: Handler = async (event, context) => {
         notified: notifiedCount,
         autoReserved: autoReservedCount,
         cleaned: cleanedCount,
-        freshFetched: allFresh.length,
-        dbUpdated,
       }),
     };
   } catch (error) {
@@ -372,4 +239,3 @@ async function sendLineNotification(
     return false;
   }
 }
-
