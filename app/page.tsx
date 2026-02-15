@@ -22,6 +22,7 @@ interface DashboardData {
   };
   monthlySubscription: {
     used: number;
+    total: number;
     limit: number | null;
     currentMonth: string;
   };
@@ -331,19 +332,13 @@ function Dashboard() {
             <CardTitle className="text-base">今月の受講</CardTitle>
           </CardHeader>
           <CardContent>
-            {sub.limit != null ? (
-              <>
-                <div className="text-2xl font-bold">
-                  残 {sub.limit - sub.used}<span className="text-sm font-normal text-muted-foreground">/{sub.limit}回</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  サブスク利用: {sub.used}回
-                </p>
-              </>
-            ) : (
-              <div className="text-2xl font-bold">
-                {sub.used}<span className="text-sm font-normal text-muted-foreground">回</span>
-              </div>
+            <div className="text-2xl font-bold">
+              {sub.total ?? sub.used}<span className="text-sm font-normal text-muted-foreground">回</span>
+            </div>
+            {sub.limit != null && (
+              <p className="text-xs text-muted-foreground mt-1">
+                サブスク残: {sub.limit - sub.used}/{sub.limit}
+              </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
               累計: {data.memberSummary.totalAttendance}回

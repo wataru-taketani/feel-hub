@@ -92,6 +92,8 @@ export async function GET() {
 
   const planLimit = parsePlanLimit(mypageData.mypage.membershipType);
 
+  const totalMonthly = (historyRows || []).length;
+
   return NextResponse.json({
     reservations: mypageData.reservations,
     memberSummary: {
@@ -101,6 +103,7 @@ export async function GET() {
     },
     monthlySubscription: {
       used: subscriptionUsed,
+      total: totalMonthly,
       limit: planLimit,
       currentMonth,
     },
