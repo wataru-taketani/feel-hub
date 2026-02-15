@@ -48,7 +48,7 @@ export async function autoReserveLesson(
   // 1. FC認証情報を取得して復号
   const { data: cred } = await supabase
     .from('feelcycle_credentials')
-    .select('encrypted_email, encrypted_password')
+    .select('email_encrypted, password_encrypted')
     .eq('user_id', entry.user_id)
     .single();
 
@@ -61,8 +61,8 @@ export async function autoReserveLesson(
   let email: string;
   let password: string;
   try {
-    email = decrypt(cred.encrypted_email);
-    password = decrypt(cred.encrypted_password);
+    email = decrypt(cred.email_encrypted);
+    password = decrypt(cred.password_encrypted);
   } catch (e) {
     console.error(`${tag} Failed to decrypt credentials:`, e);
     await notify(lineUserId, '【自動予約失敗】\nFEELCYCLE認証情報の復号に失敗しました。マイページから再設定してください。');
