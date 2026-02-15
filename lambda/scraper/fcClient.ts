@@ -23,7 +23,7 @@ export interface FcSession {
 }
 
 export interface SeatMapBike {
-  status: number; // 1=reserved, 2=available
+  status: number; // 1=available, 2=reserved
 }
 
 // ── 暗号化 ──

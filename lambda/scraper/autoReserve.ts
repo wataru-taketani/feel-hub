@@ -85,7 +85,7 @@ export async function autoReserveLesson(
   try {
     const bikes = await getSeatMap(session, sidHash);
     const availableSeats = Object.entries(bikes)
-      .filter(([, b]) => b.status === 2)
+      .filter(([, b]) => b.status === 1)
       .map(([no]) => no);
 
     if (availableSeats.length === 0) {
