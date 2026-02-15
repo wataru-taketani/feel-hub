@@ -12,11 +12,12 @@ interface LessonCardProps {
   isBookmarked: boolean;
   onToggleBookmark: (lesson: Lesson) => void;
   isReserved?: boolean;
+  sheetNo?: string | null;
   isOnWaitlist?: boolean;
   onTapLesson?: (lesson: Lesson) => void;
 }
 
-export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isReserved, isOnWaitlist, onTapLesson }: LessonCardProps) {
+export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isReserved, sheetNo, isOnWaitlist, onTapLesson }: LessonCardProps) {
   const { startTime, endTime, programName, instructor, studio, isFull, isPast, availableSlots, ticketType, colorCode, textColor } = lesson;
 
   const grayed = isFull && !isPast && !isReserved;
@@ -67,9 +68,14 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
         {programName}
       </div>
 
-      {/* IR名 */}
-      <div className={cn('text-[11px] font-medium mt-0.5 truncate', grayed ? 'text-muted-foreground/60' : 'text-foreground/80')}>
-        {instructor}
+      {/* IR名 + バイク番号 */}
+      <div className={cn('text-[11px] font-medium mt-0.5 flex items-center justify-between', grayed ? 'text-muted-foreground/60' : 'text-foreground/80')}>
+        <span className="truncate">{instructor}</span>
+        {isReserved && sheetNo && (
+          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 ml-1">
+            #{sheetNo}
+          </Badge>
+        )}
       </div>
 
       {/* スタジオ + 残席 + チケット種類 */}

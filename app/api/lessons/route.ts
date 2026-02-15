@@ -71,6 +71,7 @@ export async function GET() {
           ticketType: row.ticket_type ?? null,
           colorCode: row.color_code ?? '',
           textColor: row.text_color ?? '#FFFFFF',
+          sidHash: row.sid_hash || null,
         };
       })
       .filter((l) => !l.isPast);

@@ -47,6 +47,21 @@ export interface TicketInfo {
   details: { expiresAt: string; count: number }[];
 }
 
+export interface SeatMapBike {
+  x: number;
+  y: number;
+  status: number; // 1=reserved, 2=available
+}
+
+export interface SeatMapData {
+  bikes: Record<string, SeatMapBike>;
+  instructor: { x: number; y: number } | null;
+  mapImageUrl: string;
+  mapWidth: number;
+  mapHeight: number;
+  instructorImageUrl: string;
+}
+
 export interface HistoryRecord {
   shiftDate: string;
   startTime: string;
@@ -366,4 +381,58 @@ export async function getLessonHistory(
       cancelFlg: Number(h.cancel_flg || 0),
     };
   });
+}
+
+/**
+ * 座席マップ情報を取得（/api/reservation/modal/{sidHash} - GET）
+ */
+export async function getSeatMap(session: FeelcycleSession, sidHash: string): Promise<SeatMapData> {
+  const res = await fetch(`${BASE_URL}/api/reservation/modal/${sidHash}`, {
+    headers: buildHeaders(session),
+  });
+
+  if (res.status === 401 || res.status === 302 || res.status === 403) {
+    throw new Error('SESSION_EXPIRED');
+  }
+
+  if (!res.ok) {
+    throw new Error(`座席マップ取得失敗 (${res.status})`);
+  }
+
+  const data = await res.json();
+
+  // mappting_addr からバイク座標とインストラクター座標を取得
+  const mappingAddr = data.mappting_addr || data.mapping_addr || {};
+  const bikePositions = (mappingAddr.bikes || {}) as Record<string, { x: number; y: number }>;
+  const instructorPos = mappingAddr.instructor as { x: number; y: number } | null;
+
+  // bike_status_list: { "1": 1, "2": 2, ... } — bikeNo → status(1=reserved, 2=available)
+  const rawBikeStatus = (data.bike_status_list || {}) as Record<string, number>;
+
+  // バイク番号 → 座標+ステータスのマップを構築
+  const bikes: Record<string, SeatMapBike> = {};
+  for (const [bikeNo, status] of Object.entries(rawBikeStatus)) {
+    const pos = bikePositions[bikeNo];
+    if (!pos) continue;
+    bikes[bikeNo] = {
+      x: Number(pos.x),
+      y: Number(pos.y),
+      status: Number(status),
+    };
+  }
+
+  // マップ画像・寸法
+  const mapWidth = Number(data.bike_map_width || 26);
+  const mapHeight = Number(data.bike_map_height || 17);
+  const mapImageUrl = String(data.bike_map_image_path || '');
+  const instructorImageUrl = String(data.instructor_image_path || '');
+
+  return {
+    bikes,
+    instructor: instructorPos ? { x: Number(instructorPos.x), y: Number(instructorPos.y) } : null,
+    mapImageUrl,
+    mapWidth,
+    mapHeight,
+    instructorImageUrl,
+  };
 }

@@ -20,6 +20,7 @@ export interface Lesson {
   ticketType: TicketType; // アディショナルレッスンのチケット種類（通常レッスンはnull）
   colorCode: string; // プログラム背景色（例: "#FF9933"）
   textColor: string; // プログラムテキスト色（例: "#FFFFFF"）
+  sidHash?: string; // 座席マップ取得用ハッシュ
 }
 
 // フィルタプリセット

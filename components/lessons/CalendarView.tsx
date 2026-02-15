@@ -14,13 +14,15 @@ interface CalendarViewProps {
   isBookmarked: (lesson: Lesson) => boolean;
   onToggleBookmark: (lesson: Lesson) => void;
   isReserved?: (lesson: Lesson) => boolean;
+  getSheetNo?: (lesson: Lesson) => string | null;
   isOnWaitlist?: (lessonId: string) => boolean;
   onTapLesson?: (lesson: Lesson) => void;
+  bookmarkOnly?: boolean;
 }
 
 const COL_WIDTH = 'shrink-0 w-[calc(100%/3)] sm:w-[calc(100%/5)] lg:w-[calc(100%/7)] min-w-[150px]';
 
-export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, isReserved, isOnWaitlist, onTapLesson }: CalendarViewProps) {
+export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, bookmarkOnly }: CalendarViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const reservedRef = useRef<HTMLDivElement>(null);
@@ -174,6 +176,7 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
                         isBookmarked={isBookmarked(lesson)}
                         onToggleBookmark={onToggleBookmark}
                         isReserved
+                        sheetNo={getSheetNo?.(lesson) || null}
                         isOnWaitlist={isOnWaitlist?.(lesson.id) ?? false}
                         onTapLesson={onTapLesson}
                       />
@@ -192,9 +195,12 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
           onScroll={handleScroll}
         >
           {dates.map((date) => {
-            const dateLessons = dateMap.get(date) || [];
-            const displayLessons = (isReserved && pinReserved)
-              ? dateLessons.filter(l => !isReserved(l))
+            let dateLessons = dateMap.get(date) || [];
+            if (isReserved && pinReserved) {
+              dateLessons = dateLessons.filter(l => !isReserved(l));
+            }
+            const displayLessons = bookmarkOnly
+              ? dateLessons.filter(l => isBookmarked(l))
               : dateLessons;
             return (
               <CalendarDateColumn
@@ -204,6 +210,7 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
                 isBookmarked={isBookmarked}
                 onToggleBookmark={onToggleBookmark}
                 isReserved={pinReserved ? undefined : isReserved}
+                getSheetNo={getSheetNo}
                 isToday={date === today}
                 isOnWaitlist={isOnWaitlist}
                 onTapLesson={onTapLesson}
