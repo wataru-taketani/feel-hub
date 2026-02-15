@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, User, BookOpen, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap } from 'lucide-react';
+import { CalendarDays, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
@@ -386,27 +386,6 @@ function Dashboard() {
         </Card>
       </div>
 
-      {/* クイックリンク */}
-      <div className="grid grid-cols-3 gap-3">
-        <Button variant="outline" className="h-auto py-3 justify-start" asChild>
-          <Link href="/lessons">
-            <CalendarDays className="h-4 w-4 mr-2" />
-            レッスン一覧
-          </Link>
-        </Button>
-        <Button variant="outline" className="h-auto py-3 justify-start" asChild>
-          <Link href="/mypage">
-            <User className="h-4 w-4 mr-2" />
-            マイページ
-          </Link>
-        </Button>
-        <Button variant="outline" className="h-auto py-3 justify-start" asChild>
-          <Link href="/history">
-            <BookOpen className="h-4 w-4 mr-2" />
-            受講履歴
-          </Link>
-        </Button>
-      </div>
     </div>
   );
 }
