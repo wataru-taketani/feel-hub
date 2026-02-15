@@ -38,8 +38,7 @@ export default function LessonDetailModal({
 
   if (!lesson) return null;
 
-  // TODO: テスト後に lesson.isFull 条件を戻す
-  const canNotify = !isReserved && !lesson.isPast;
+  const canNotify = !isReserved && !lesson.isPast && lesson.isFull;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

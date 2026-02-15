@@ -6,7 +6,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { decrypt, login, getSeatMap, reserveLesson } from './fcClient';
+import { decrypt, login, getSeatMap, reserveLesson, reserveCompletion } from './fcClient';
 
 interface AutoReserveEntry {
   id: string;
@@ -119,9 +119,43 @@ export async function autoReserveLesson(
         return 'success';
       }
       case 303: {
-        // 確認が必要（Step 2で自動処理追加予定）
-        const msg = formatNeedsConfirmMessage(entry);
-        await notify(lineUserId, msg);
+        // modal_type に応じて自動完了 or 手動案内
+        const modalType = Number(result.raw.modal_type ?? 0);
+        const tmpLessonId = result.raw.tmp_lesson_id as string | undefined;
+        console.log(`${tag} rc=303 modal_type=${modalType} tmp_lesson_id=${tmpLessonId}`);
+
+        // 自動完了可能なケース
+        if (tmpLessonId && (modalType === 1042 || modalType === 1143)) {
+          // 1042: 他店利用案内 → 自動でOK
+          // 1143: チケット消費確認 → 自動で確定
+          let ticketType: number | undefined;
+          if (modalType === 1143) {
+            // consumption_ticket_list から最初のチケットを選択
+            const tickets = result.raw.consumption_ticket_list as Array<{ ticket_type?: number }> | undefined;
+            ticketType = tickets?.[0]?.ticket_type;
+          }
+
+          const completion = await reserveCompletion(session, tmpLessonId, ticketType);
+          console.log(`${tag} Completion result: rc=${completion.resultCode}, msg=${completion.message}`, JSON.stringify(completion.raw));
+
+          if (completion.resultCode === 0) {
+            const extra = modalType === 1143 ? '\n(チケット1枚使用)' : modalType === 1042 ? '\n(他店利用)' : '';
+            await notify(lineUserId, formatSuccessMessage(entry, sheetNo) + extra);
+            return 'success';
+          }
+          // completion 失敗
+          console.error(`${tag} Completion failed: rc=${completion.resultCode}`);
+          await notify(lineUserId, formatErrorMessage(entry, completion.message || `確定エラー (rc=${completion.resultCode})`));
+          return 'error';
+        }
+
+        // 自動完了不可: 差替え提案(1024), チケット購入誘導(10242), 未知の modal_type
+        const reason = modalType === 1024
+          ? '既存予約との差替えが提案されました。手動で確認してください。'
+          : modalType === 10242
+          ? result.raw.message as string || 'イベントチケットが必要です。'
+          : result.message || `追加操作が必要です (modal_type=${modalType})`;
+        await notify(lineUserId, formatNeedsConfirmMessage(entry, reason));
         return 'needs_confirm';
       }
       case 205: {
@@ -162,8 +196,9 @@ function formatSuccessMessage(entry: AutoReserveEntry, sheetNo: string): string 
   return `【自動予約完了】\n${formatLessonInfo(entry)}\n座席: ${sheetNo}\n\nhttps://m.feelcycle.com/reserved/top`;
 }
 
-function formatNeedsConfirmMessage(entry: AutoReserveEntry): string {
-  return `【要確認】空きが出ました\n${formatLessonInfo(entry)}\n\n追加確認が必要です。手動で予約してください。\nhttps://m.feelcycle.com/reserve`;
+function formatNeedsConfirmMessage(entry: AutoReserveEntry, reason?: string): string {
+  const detail = reason || '追加確認が必要です。手動で予約してください。';
+  return `【要確認】空きが出ました\n${formatLessonInfo(entry)}\n\n${detail}\nhttps://m.feelcycle.com/reserve`;
 }
 
 function formatErrorMessage(entry: AutoReserveEntry, detail: string): string {
