@@ -3,6 +3,33 @@
 ## プロジェクト概要
 FEELCYCLEレッスン情報管理アプリ。レッスン検索、予約状況確認、キャンセル待ち通知をLINE経由で提供。
 
+## 開発ルール（最重要）
+
+### 本番環境が正
+- **本番環境（Vercel / Lambda）を唯一の検証環境とする**。ローカル動作確認は不要
+- ユーザーはスマホで本番サイトを直接確認する。ローカルでの動作は保証にならない
+
+### コミット＆デプロイフロー
+コード変更後は以下を必ず順に実行すること：
+1. `npm run build` — ビルドエラーがないことを確認
+2. `git add <変更ファイル>` + `git commit` — 変更をコミット
+3. `git push origin main` — Vercel 自動デプロイをトリガー
+4. デプロイ完了を確認してからユーザーに報告する
+- **「修正しました」とだけ言ってデプロイしないのは禁止**
+- Lambda 変更がある場合: `cd lambda && npx tsc && npx serverless deploy --stage prod`
+
+### 変更方針
+- 必要最小限の変更のみ。勝手に余計な改修・リファクタをしない
+- 中間画面を増やすより直接遷移
+- DB調査は一括で行う。五月雨にcurlを打って毎回承認を求めない → subagentに委譲
+
+### モバイルUI原則
+- **モバイルファースト**: 375px（iPhone SE）を基準に設計
+- `hover:` はモバイルで残留するため原則 `active:` を使う
+- タッチターゲットは最低 32px（理想 44px）
+- ツールバーのテキストはモバイルで非表示（`hidden sm:inline`）、アイコンのみ表示
+- モーダルは `max-h-[85vh] overflow-y-auto` で縦溢れ防止
+
 ## 技術スタック
 - **フロントエンド**: Next.js 15 (App Router) + TypeScript + Tailwind CSS + shadcn/ui
 - **認証**: Supabase Auth（LINE Login経由、ダミーemail方式）
@@ -41,9 +68,8 @@ supabase/migrations/    # DBマイグレーション
 
 ## 開発コマンド
 ```bash
-npm run dev              # ローカル開発サーバー
-npm run build            # ビルド確認
-git push                 # Vercel自動デプロイ
+npm run build            # ビルド確認（必須）
+git push origin main     # Vercel自動デプロイ
 
 # Lambda
 cd lambda
