@@ -107,6 +107,10 @@ export default function LessonsPage() {
       if (profileData?.profile?.homeStore) {
         profileHomeStore.current = parseHomeStoreToStudio(profileData.profile.homeStore);
       }
+      // dashboardのhomeStoreをフォールバック（profileにhome_storeがない場合）
+      if (!profileHomeStore.current && dashboardData?.memberSummary?.homeStore) {
+        profileHomeStore.current = parseHomeStoreToStudio(dashboardData.memberSummary.homeStore);
+      }
       if (dashboardData?.reservations) setHasFcSession(true);
       if (dashboardData?.reservations) {
         const map = new Map<string, string>();

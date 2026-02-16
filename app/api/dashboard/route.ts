@@ -147,6 +147,7 @@ export async function GET() {
       displayName: mypageData.mypage.displayName,
       membershipType: mypageData.mypage.membershipType,
       totalAttendance: mypageData.mypage.totalAttendance,
+      homeStore: mypageData.mypage.homeStore,
     },
     monthlySubscription: {
       used: subscriptionUsed,
