@@ -120,7 +120,7 @@ export const handler: Handler = async (event, context) => {
         const batch = rows.slice(i, i + 1000);
         const { error } = await supabase
           .from('lessons')
-          .upsert(batch, { onConflict: 'date,time,studio,instructor' });
+          .upsert(batch, { onConflict: 'sid_hash' });
 
         if (error) {
           console.error(`Batch ${i}-${i + batch.length} error:`, error);
