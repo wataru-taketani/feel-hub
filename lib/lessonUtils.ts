@@ -131,6 +131,14 @@ export function formatStudio(studio: string): string {
 }
 
 /**
+ * FC API形式のホームストア名をDB形式に変換
+ * 例: "銀座（GNZ）" → "銀座"
+ */
+export function parseHomeStoreToStudio(homeStore: string): string {
+  return homeStore.replace(/（.*）$/, '');
+}
+
+/**
  * 今日の日付を YYYY-MM-DD で返す (JST)
  */
 export function getTodayDateString(): string {

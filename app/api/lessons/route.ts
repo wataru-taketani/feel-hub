@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // サーバーサイドAPI用: service role keyでRLSバイパス
@@ -8,25 +8,33 @@ const supabase = createClient(
 );
 
 /**
- * 全未来レッスン一括取得API
+ * レッスン取得API
  *
  * GET /api/lessons
+ * GET /api/lessons?studios=渋谷,銀座
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const studiosParam = request.nextUrl.searchParams.get('studios');
+    const studioList = studiosParam ? studiosParam.split(',').filter(Boolean) : [];
+
     // 全件取得（1000件ずつページネーション）
     const allData: Record<string, unknown>[] = [];
     const PAGE_SIZE = 1000;
     let from = 0;
 
     while (true) {
-      const query = supabase
+      let query = supabase
         .from('lessons')
         .select('*')
         .order('date', { ascending: true })
         .order('time', { ascending: true })
         .order('id', { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
+
+      if (studioList.length > 0) {
+        query = query.in('studio', studioList);
+      }
 
       const { data, error } = await query;
 

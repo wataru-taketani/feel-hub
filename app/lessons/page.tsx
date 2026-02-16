@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Loader2, Star, SlidersHorizontal, ChevronDown, RotateCcw } from "lucide-react";
 import type { Lesson, FilterPreset } from "@/types";
-import { matchesProgram } from "@/lib/lessonUtils";
+import { matchesProgram, parseHomeStoreToStudio } from "@/lib/lessonUtils";
 import { cn } from "@/lib/utils";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useFilterPresets } from "@/hooks/useFilterPresets";
@@ -15,6 +15,9 @@ import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
 import LessonDetailModal from "@/components/lessons/LessonDetailModal";
 import type { ReserveApiResult } from "@/components/lessons/LessonDetailModal";
+import StudioSelectDialog from "@/components/lessons/StudioSelectDialog";
+
+const LOCALSTORAGE_KEY = 'feelHub_defaultStudio';
 
 const DEFAULT_FILTERS: FilterState = {
   studios: [],
@@ -35,7 +38,13 @@ export default function LessonsPage() {
   const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
   const { isOnWaitlist, getAutoReserve, addToWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
 
-  const initialPresetApplied = useRef(false);
+  // デフォルトスタジオ解決
+  const [defaultStudios, setDefaultStudios] = useState<string[]>([]);
+  const [showStudioDialog, setShowStudioDialog] = useState(false);
+  const studioResolvedRef = useRef(false);
+  const profileHomeStore = useRef<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const prevStudiosRef = useRef<string[] | undefined>(undefined);
 
   // モーダル状態
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -57,16 +66,41 @@ export default function LessonsPage() {
     return res.json();
   }, []);
 
+  // レッスン取得（スタジオ指定）
+  const fetchLessons = useCallback(async (studios: string[]) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = studios.length > 0 ? `?studios=${encodeURIComponent(studios.join(','))}` : '';
+      const response = await fetch(`/api/lessons${params}`);
+      const data = await response.json();
+      if (data.success) {
+        setAllLessons(data.data);
+      } else {
+        setError("レッスン情報の取得に失敗しました");
+      }
+    } catch {
+      setError("レッスン情報の取得中にエラーが発生しました");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // ログイン済み: profile + dashboard を並列取得
-  // key → sheetNo のマップ（予約済みレッスン + バイク番号）
   const [reservedMap, setReservedMap] = useState<Map<string, string>>(new Map());
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setProfileLoaded(true);
+      return;
+    }
     Promise.all([
       fetch('/api/profile').then(res => res.ok ? res.json() : null).catch(() => null),
       fetch('/api/dashboard').then(res => res.ok ? res.json() : null).catch(() => null),
     ]).then(([profileData, dashboardData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);
+      if (profileData?.profile?.homeStore) {
+        profileHomeStore.current = parseHomeStoreToStudio(profileData.profile.homeStore);
+      }
       if (dashboardData?.reservations) setHasFcSession(true);
       if (dashboardData?.reservations) {
         const map = new Map<string, string>();
@@ -75,6 +109,7 @@ export default function LessonsPage() {
         }
         setReservedMap(map);
       }
+      setProfileLoaded(true);
     });
   }, [user]);
 
@@ -88,40 +123,85 @@ export default function LessonsPage() {
     [reservedMap]
   );
 
-  // 全未来レッスンを初回のみ一括取得
+  // デフォルトスタジオ解決（presets + profile 両方ロード後、1回のみ）
   useEffect(() => {
-    const fetchAllLessons = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch("/api/lessons");
-        const data = await response.json();
+    if (!presetsLoaded || !profileLoaded || studioResolvedRef.current) return;
+    studioResolvedRef.current = true;
 
-        if (data.success) {
-          setAllLessons(data.data);
-        } else {
-          setError("レッスン情報の取得に失敗しました");
-        }
-      } catch {
-        setError("レッスン情報の取得中にエラーが発生しました");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllLessons();
-  }, []);
-
-  // デフォルトプリセット初期適用（presetsロード後、1回のみ）
-  useEffect(() => {
-    if (!presetsLoaded || initialPresetApplied.current) return;
-    initialPresetApplied.current = true;
-
+    // ① デフォルトプリセット
     const defaultPreset = presets.find((p) => p.isDefault);
     if (defaultPreset) {
+      const studios = defaultPreset.filters.studios || [];
+      setDefaultStudios(studios);
       setFilters({ ...defaultPreset.filters, bookmarkOnly: false });
+      prevStudiosRef.current = studios;
+      fetchLessons(studios);
+      return;
     }
-  }, [presetsLoaded, presets]);
+
+    // ② homeStore（FC連携）
+    if (profileHomeStore.current) {
+      const studios = [profileHomeStore.current];
+      setDefaultStudios(studios);
+      setFilters(f => ({ ...f, studios }));
+      prevStudiosRef.current = studios;
+      fetchLessons(studios);
+      return;
+    }
+
+    // ③ localStorage
+    try {
+      const saved = localStorage.getItem(LOCALSTORAGE_KEY);
+      if (saved !== null) {
+        const val = JSON.parse(saved) as string;
+        if (val === '__all__') {
+          setDefaultStudios([]);
+          prevStudiosRef.current = [];
+          fetchLessons([]);
+        } else {
+          const studios = [val];
+          setDefaultStudios(studios);
+          setFilters(f => ({ ...f, studios }));
+          prevStudiosRef.current = studios;
+          fetchLessons(studios);
+        }
+        return;
+      }
+    } catch { /* ignore parse error */ }
+
+    // ④ ダイアログ表示
+    setShowStudioDialog(true);
+  }, [presetsLoaded, profileLoaded, presets, fetchLessons]);
+
+  // スタジオフィルタ変更検知 → API再取得
+  useEffect(() => {
+    if (prevStudiosRef.current === undefined) return;
+
+    const currentKey = [...filters.studios].sort().join(',');
+    const prevKey = [...prevStudiosRef.current].sort().join(',');
+
+    if (currentKey !== prevKey) {
+      prevStudiosRef.current = [...filters.studios];
+      fetchLessons(filters.studios);
+    }
+  }, [filters.studios, fetchLessons]);
+
+  // ダイアログ選択時
+  const handleStudioSelect = useCallback((studio: string | null) => {
+    setShowStudioDialog(false);
+    if (studio) {
+      localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(studio));
+      setDefaultStudios([studio]);
+      setFilters(f => ({ ...f, studios: [studio] }));
+      prevStudiosRef.current = [studio];
+      fetchLessons([studio]);
+    } else {
+      localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify('__all__'));
+      setDefaultStudios([]);
+      prevStudiosRef.current = [];
+      fetchLessons([]);
+    }
+  }, [fetchLessons]);
 
   // 全インストラクターを全レッスンから抽出（Wイントラはカンマ区切りで分割）
   const allInstructors = useMemo(() => {
@@ -135,7 +215,7 @@ export default function LessonsPage() {
     return [...set].sort();
   }, [allLessons]);
 
-  // クライアントサイドフィルタ（スタジオ含む）
+  // クライアントサイドフィルタ（スタジオ以外）
   const filteredLessons = useMemo(() => {
     return allLessons.filter((lesson) => {
       if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio)) return false;
@@ -203,6 +283,11 @@ export default function LessonsPage() {
     (filters.instructors.length > 0 ? 1 : 0) +
     (filters.ticketFilter !== "ALL" ? 1 : 0);
 
+  // フィルタリセット（デフォルトスタジオに戻す）
+  const handleResetFilters = useCallback(() => {
+    setFilters({ ...DEFAULT_FILTERS, studios: defaultStudios });
+  }, [defaultStudios]);
+
   // ツールバー要素（CalendarViewのスロットに渡す）
   const toolbarLeft = (
     <Button
@@ -241,7 +326,7 @@ export default function LessonsPage() {
           variant="ghost"
           size="sm"
           className="h-8 text-xs gap-1 px-2 text-muted-foreground"
-          onClick={() => setFilters({ ...DEFAULT_FILTERS })}
+          onClick={handleResetFilters}
         >
           <RotateCcw className="h-3.5 w-3.5" />
         </Button>
@@ -326,6 +411,11 @@ export default function LessonsPage() {
           onReserve={handleReserve}
           waitlistAutoReserve={selectedLesson ? getAutoReserve(selectedLesson.id) : false}
           onToggleAutoReserve={toggleAutoReserve}
+        />
+        {/* スタジオ選択ダイアログ */}
+        <StudioSelectDialog
+          open={showStudioDialog}
+          onSelect={handleStudioSelect}
         />
       </div>
     </div>
