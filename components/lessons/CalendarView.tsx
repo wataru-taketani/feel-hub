@@ -165,7 +165,7 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
           </div>
         </div>
 
-        {/* 固定行（sticky：予約済み） */}
+        {/* 固定行（sticky：予約済み + ブックマークON時はブックマーク済みも） */}
         {hasPinnable && (
           <div className="sticky top-[82px] z-[15] border-x border-border border-b-2 border-b-red-300 overflow-hidden bg-card">
             <div ref={reservedRef} className="flex overflow-hidden">
