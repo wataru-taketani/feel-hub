@@ -45,6 +45,7 @@ export default function LessonsPage() {
   const profileHomeStore = useRef<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const prevStudiosRef = useRef<string[] | undefined>(undefined);
+  const reservedStudiosRef = useRef<string[]>([]);
 
   // モーダル状態
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -66,12 +67,15 @@ export default function LessonsPage() {
     return res.json();
   }, []);
 
-  // レッスン取得（スタジオ指定）
+  // レッスン取得（スタジオ指定 + 予約スタジオも含める）
   const fetchLessons = useCallback(async (studios: string[]) => {
     try {
       setLoading(true);
       setError(null);
-      const params = studios.length > 0 ? `?studios=${encodeURIComponent(studios.join(','))}` : '';
+      const allStudios = studios.length > 0
+        ? [...new Set([...studios, ...reservedStudiosRef.current])]
+        : [];
+      const params = allStudios.length > 0 ? `?studios=${encodeURIComponent(allStudios.join(','))}` : '';
       const response = await fetch(`/api/lessons${params}`);
       const data = await response.json();
       if (data.success) {
@@ -104,10 +108,15 @@ export default function LessonsPage() {
       if (dashboardData?.reservations) setHasFcSession(true);
       if (dashboardData?.reservations) {
         const map = new Map<string, string>();
-        for (const r of dashboardData.reservations as { date: string; startTime: string; programName: string; instructor: string; sheetNo: string }[]) {
+        const studioSet = new Set<string>();
+        for (const r of dashboardData.reservations as { date: string; startTime: string; programName: string; instructor: string; sheetNo: string; studio: string }[]) {
           map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
+          if (r.studio) {
+            studioSet.add(parseHomeStoreToStudio(r.studio));
+          }
         }
         setReservedMap(map);
+        reservedStudiosRef.current = [...studioSet];
       }
       setProfileLoaded(true);
     });
@@ -215,10 +224,10 @@ export default function LessonsPage() {
     return [...set].sort();
   }, [allLessons]);
 
-  // クライアントサイドフィルタ（スタジオ以外）
+  // クライアントサイドフィルタ（スタジオ以外）— 予約済みはスタジオフィルタをバイパス
   const filteredLessons = useMemo(() => {
     return allLessons.filter((lesson) => {
-      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio)) return false;
+      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio) && !isReserved(lesson)) return false;
       if (!matchesProgram(lesson.programName, filters.programSearch)) return false;
       if (filters.instructors.length > 0) {
         const lessonIRs = lesson.instructor.split(", ");
@@ -228,7 +237,7 @@ export default function LessonsPage() {
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
       return true;
     });
-  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter]);
+  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, isReserved]);
 
   const displayCount = filters.bookmarkOnly
     ? filteredLessons.filter((l) => isBookmarked(l)).length

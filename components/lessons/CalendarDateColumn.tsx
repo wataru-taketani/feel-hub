@@ -14,18 +14,19 @@ interface CalendarDateColumnProps {
   isToday: boolean;
   isOnWaitlist?: (lessonId: string) => boolean;
   onTapLesson?: (lesson: Lesson) => void;
+  sortReservedFirst?: boolean;
 }
 
-export default function CalendarDateColumn({ date, lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson }: CalendarDateColumnProps) {
-  // 予約済みレッスンを先頭に（同グループ内は元の時間順を維持）
+export default function CalendarDateColumn({ date, lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, sortReservedFirst }: CalendarDateColumnProps) {
+  // 予約済みレッスンを先頭に（sortReservedFirst有効時のみ）
   const sortedLessons = useMemo(() => {
-    if (!isReserved) return lessons;
+    if (!isReserved || !sortReservedFirst) return lessons;
     return [...lessons].sort((a, b) => {
       const aR = isReserved(a) ? 0 : 1;
       const bR = isReserved(b) ? 0 : 1;
       return aR - bR;
     });
-  }, [lessons, isReserved]);
+  }, [lessons, isReserved, sortReservedFirst]);
 
   return (
     <div className="snap-start shrink-0 w-[calc(100%/3)] sm:w-[calc(100%/5)] lg:w-[calc(100%/7)] min-w-[150px] border-r border-border last:border-r-0">
