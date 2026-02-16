@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface SeatMapBike {
   x: number;
@@ -22,23 +23,36 @@ interface SeatMapResponse {
 
 interface SeatMapProps {
   sidHash: string;
+  interactive?: boolean;
+  selectedSeat?: string | null;
+  onSeatSelect?: (sheetNo: string) => void;
+  refreshKey?: number;
 }
 
 // status → スタイル
-function bikeStyle(status: number) {
+function bikeStyle(status: number, isInteractive: boolean, isSelected: boolean) {
+  if (isSelected) {
+    return 'bg-blue-500 border-2 border-blue-600 text-white ring-2 ring-blue-300';
+  }
   if (status === 1) {
     // 予約可能（空き）
-    return 'bg-white border-2 border-gray-400 text-gray-700';
+    return cn(
+      'bg-white border-2 border-gray-400 text-gray-700',
+      isInteractive && 'cursor-pointer hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100'
+    );
   }
   if (status === 3) {
     // 自分の予約
     return 'bg-pink-400 border-2 border-pink-500 text-white';
   }
   // status === 2 or other: 予約済（他の人）
-  return 'bg-gray-600 border border-gray-500 text-gray-300';
+  return cn(
+    'bg-gray-600 border border-gray-500 text-gray-300',
+    isInteractive && 'cursor-not-allowed opacity-60'
+  );
 }
 
-export default function SeatMap({ sidHash }: SeatMapProps) {
+export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey }: SeatMapProps) {
   const [data, setData] = useState<SeatMapResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +82,7 @@ export default function SeatMap({ sidHash }: SeatMapProps) {
 
   useEffect(() => {
     fetchSeatMap();
-  }, [fetchSeatMap]);
+  }, [fetchSeatMap, refreshKey]);
 
   if (loading) {
     return (
@@ -100,10 +114,18 @@ export default function SeatMap({ sidHash }: SeatMapProps) {
   // バイクの丸サイズ（px）
   const BIKE_SIZE = 28;
 
+  const handleBikeClick = (bikeNo: string, status: number) => {
+    if (!interactive || !onSeatSelect) return;
+    if (status !== 1) return; // 空席のみ選択可能
+    onSeatSelect(bikeNo);
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">座席マップ</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          {interactive ? '座席を選択してください' : '座席マップ'}
+        </p>
         <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={fetchSeatMap}>
           <RefreshCw className="h-3 w-3 mr-1" />
           更新
@@ -142,21 +164,25 @@ export default function SeatMap({ sidHash }: SeatMapProps) {
         )}
 
         {/* バイク配置 */}
-        {bikes.map(([bikeNo, bike]) => (
-          <div
-            key={bikeNo}
-            className={`absolute flex items-center justify-center rounded-full ${bikeStyle(bike.status)}`}
-            style={{
-              left: `${(bike.x / data.mapWidth) * 100}%`,
-              top: `${(bike.y / data.mapHeight) * 100}%`,
-              width: BIKE_SIZE,
-              height: BIKE_SIZE,
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            <span className="text-[9px] font-bold leading-none">{bikeNo}</span>
-          </div>
-        ))}
+        {bikes.map(([bikeNo, bike]) => {
+          const isSelected = selectedSeat === bikeNo;
+          return (
+            <div
+              key={bikeNo}
+              className={`absolute flex items-center justify-center rounded-full ${bikeStyle(bike.status, !!interactive, isSelected)}`}
+              style={{
+                left: `${(bike.x / data.mapWidth) * 100}%`,
+                top: `${(bike.y / data.mapHeight) * 100}%`,
+                width: BIKE_SIZE,
+                height: BIKE_SIZE,
+                transform: 'translate(-50%, -50%)',
+              }}
+              onClick={() => handleBikeClick(bikeNo, bike.status)}
+            >
+              <span className="text-[9px] font-bold leading-none">{bikeNo}</span>
+            </div>
+          );
+        })}
       </div>
 
       {/* 凡例 + カウント */}
@@ -174,6 +200,12 @@ export default function SeatMap({ sidHash }: SeatMapProps) {
             <span className="flex items-center gap-1">
               <span className="inline-block w-3 h-3 rounded-full bg-pink-400 border-2 border-pink-500" />
               自分
+            </span>
+          )}
+          {interactive && selectedSeat && (
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-600" />
+              選択中
             </span>
           )}
         </div>

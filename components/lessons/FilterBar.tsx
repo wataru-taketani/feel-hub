@@ -213,9 +213,9 @@ export default function FilterBar({
               </ToggleGroup>
             </div>
 
-            {/* セクション4: プリセット */}
+            {/* セクション4: お気に入り条件 */}
             <div className="p-3 space-y-2">
-              <SectionLabel>プリセット</SectionLabel>
+              <SectionLabel>お気に入り条件</SectionLabel>
               <PresetManager
                 presets={presets}
                 onLoad={onLoadPreset}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -14,7 +14,8 @@ export function useFilterPresets() {
   const [cloudPresets, setCloudPresets] = useState<FilterPreset[]>([]);
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const migrated = useRef(false);
-  const supabase = createClient();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const supabase = useMemo(() => createClient(), []);
 
   const presets = user ? cloudPresets : localPresets;
   const isLoaded = user ? cloudLoaded : localLoaded;
@@ -150,5 +151,21 @@ export function useFilterPresets() {
     [user, setLocalPresets, supabase]
   );
 
-  return { presets, save, update, remove, setDefault, isLoaded };
+  const rename = useCallback(
+    (id: string, newName: string) => {
+      if (user) {
+        setCloudPresets((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, name: newName } : p))
+        );
+        supabase.from('filter_presets').update({ name: newName }).eq('id', id).eq('user_id', user.id);
+      } else {
+        setLocalPresets((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, name: newName } : p))
+        );
+      }
+    },
+    [user, setLocalPresets, supabase]
+  );
+
+  return { presets, save, update, remove, rename, setDefault, isLoaded };
 }

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
 import LessonDetailModal from "@/components/lessons/LessonDetailModal";
+import type { ReserveApiResult } from "@/components/lessons/LessonDetailModal";
 
 const DEFAULT_FILTERS: FilterState = {
   studios: [],
@@ -32,7 +33,7 @@ export default function LessonsPage() {
   const { user } = useAuthContext();
   const { toggle, isBookmarked } = useBookmarks();
   const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
-  const { isOnWaitlist, addToWaitlist, removeFromWaitlist } = useWaitlist();
+  const { isOnWaitlist, getAutoReserve, addToWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
 
   const initialPresetApplied = useRef(false);
 
@@ -45,6 +46,15 @@ export default function LessonsPage() {
   const handleTapLesson = useCallback((lesson: Lesson) => {
     setSelectedLesson(lesson);
     setModalOpen(true);
+  }, []);
+
+  const handleReserve = useCallback(async (sidHash: string, sheetNo: string): Promise<ReserveApiResult> => {
+    const res = await fetch('/api/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sidHash, sheetNo }),
+    });
+    return res.json();
   }, []);
 
   // ログイン済み: profile + dashboard を並列取得
@@ -313,6 +323,9 @@ export default function LessonsPage() {
           isReserved={selectedLesson ? isReserved(selectedLesson) : false}
           onAddWaitlist={(lesson, autoReserve) => addToWaitlist(lesson, autoReserve)}
           onRemoveWaitlist={removeFromWaitlist}
+          onReserve={handleReserve}
+          waitlistAutoReserve={selectedLesson ? getAutoReserve(selectedLesson.id) : false}
+          onToggleAutoReserve={toggleAutoReserve}
         />
       </div>
     </div>

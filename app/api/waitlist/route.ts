@@ -43,6 +43,7 @@ export async function GET() {
         availableSlots: lesson.available_slots,
         colorCode: lesson.color_code,
         textColor: lesson.text_color,
+        sidHash: lesson.sid_hash,
       } : null,
     };
   });

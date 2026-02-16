@@ -116,8 +116,33 @@ export async function GET() {
 
   const planLimit = parsePlanLimit(mypageData.mypage.membershipType);
 
+  // 予約データにlessonId, sidHashを付与（lessonsテーブルと突合）
+  // FC APIの reservation_store は "上大岡（KOK）"、DBのstudioは "上大岡" なのでカッコ除去で正規化
+  const enrichedReservations = await Promise.all(
+    mypageData.reservations.map(async (r) => {
+      const studioNormalized = r.studio.replace(/（.*）/, '');
+
+      const { data: lessonRows } = await supabaseAdmin
+        .from('lessons')
+        .select('id, sid_hash')
+        .eq('date', r.date)
+        .eq('time', r.startTime + ':00')
+        .eq('program_name', r.programName)
+        .eq('studio', studioNormalized)
+        .limit(1);
+
+      const lessonRow = lessonRows?.[0] ?? null;
+
+      return {
+        ...r,
+        lessonId: lessonRow?.id ?? null,
+        sidHash: lessonRow?.sid_hash ?? null,
+      };
+    })
+  );
+
   return NextResponse.json({
-    reservations: mypageData.reservations,
+    reservations: enrichedReservations,
     memberSummary: {
       displayName: mypageData.mypage.displayName,
       membershipType: mypageData.mypage.membershipType,

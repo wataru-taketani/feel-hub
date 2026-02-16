@@ -1,13 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import type { Lesson } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown } from 'lucide-react';
 import { formatStudio, formatDate } from '@/lib/lessonUtils';
-import SeatMap from '@/components/lessons/SeatMap';
+
+const SeatMap = lazy(() => import('@/components/lessons/SeatMap'));
+
+export interface ReserveApiResult {
+  success: boolean;
+  resultCode: number;
+  message: string;
+  sheetNo?: string;
+  needsManualConfirm?: boolean;
+  confirmReason?: string;
+}
 
 interface LessonDetailModalProps {
   lesson: Lesson | null;
@@ -20,6 +31,9 @@ interface LessonDetailModalProps {
   isReserved: boolean;
   onAddWaitlist: (lesson: Lesson, autoReserve?: boolean) => void;
   onRemoveWaitlist: (lessonId: string) => void;
+  onReserve?: (sidHash: string, sheetNo: string) => Promise<ReserveApiResult>;
+  waitlistAutoReserve?: boolean;
+  onToggleAutoReserve?: (lessonId: string) => void;
 }
 
 export default function LessonDetailModal({
@@ -33,15 +47,60 @@ export default function LessonDetailModal({
   isReserved,
   onAddWaitlist,
   onRemoveWaitlist,
+  onReserve,
+  waitlistAutoReserve,
+  onToggleAutoReserve,
 }: LessonDetailModalProps) {
   const [autoReserve, setAutoReserve] = useState(false);
+  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [reserving, setReserving] = useState(false);
+  const [reserveResult, setReserveResult] = useState<ReserveApiResult | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [seatMapRefreshKey, setSeatMapRefreshKey] = useState(0);
+  const [showReadOnlySeatMap, setShowReadOnlySeatMap] = useState(false);
 
-  if (!lesson) return null;
+  if (!lesson || !open) return null;
 
   const canNotify = !isReserved && !lesson.isPast && lesson.isFull;
+  const canReserve = !isReserved && !lesson.isPast && !lesson.isFull && hasFcSession && lesson.sidHash && onReserve;
+
+  const handleReserve = async () => {
+    if (!onReserve || !lesson.sidHash || !selectedSeat) return;
+    setShowConfirm(false);
+    setReserving(true);
+    setReserveResult(null);
+    try {
+      const result = await onReserve(lesson.sidHash, selectedSeat);
+      setReserveResult(result);
+      if (result.resultCode === 205) {
+        // 競合: SeatMapリフレッシュ
+        setSelectedSeat(null);
+        setSeatMapRefreshKey(k => k + 1);
+      }
+      if (result.success) {
+        setSelectedSeat(null);
+      }
+    } catch {
+      setReserveResult({ success: false, resultCode: -1, message: '通信エラーが発生しました' });
+    } finally {
+      setReserving(false);
+    }
+  };
+
+  const handleOpenChange = (o: boolean) => {
+    if (!o) {
+      // reset state on close
+      setSelectedSeat(null);
+      setReserveResult(null);
+      setShowConfirm(false);
+      setReserving(false);
+      setShowReadOnlySeatMap(false);
+    }
+    onOpenChange(o);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -86,6 +145,74 @@ export default function LessonDetailModal({
           </DialogDescription>
         </DialogHeader>
 
+        {/* 予約結果表示 */}
+        {reserveResult && (
+          <div className={`p-3 rounded-lg text-sm ${reserveResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            <div className="flex items-start gap-2">
+              {reserveResult.success ? (
+                <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              )}
+              <span>{reserveResult.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 手動予約セクション（空席あり + 未予約 + FCセッションあり） */}
+        {canReserve && !reserveResult?.success && (
+          <div className="pt-2 border-t">
+            <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+              <SeatMap
+                sidHash={lesson.sidHash!}
+                interactive
+                selectedSeat={selectedSeat}
+                onSeatSelect={setSelectedSeat}
+                refreshKey={seatMapRefreshKey}
+              />
+            </Suspense>
+
+            {selectedSeat && !showConfirm && (
+              <Button
+                className="w-full mt-3"
+                size="sm"
+                onClick={() => setShowConfirm(true)}
+                disabled={reserving}
+              >
+                座席 #{selectedSeat} を予約する
+              </Button>
+            )}
+
+            {showConfirm && (
+              <div className="mt-3 p-3 bg-muted rounded-lg space-y-2">
+                <p className="text-sm font-medium">座席 #{selectedSeat} を予約しますか？</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setShowConfirm(false)}
+                    disabled={reserving}
+                  >
+                    戻る
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={handleReserve}
+                    disabled={reserving}
+                  >
+                    {reserving ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                    ) : null}
+                    予約する
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 空き通知セクション */}
         <div className="pt-2 border-t">
           {!isLoggedIn ? (
@@ -96,10 +223,12 @@ export default function LessonDetailModal({
           ) : !canNotify ? (
             lesson.isPast ? (
               <p className="text-sm text-muted-foreground">このレッスンは終了しました</p>
-            ) : isReserved ? (
+            ) : isReserved || reserveResult?.success ? (
               <p className="text-sm text-muted-foreground">このレッスンは予約済みです</p>
             ) : !lesson.isFull ? (
-              <p className="text-sm text-muted-foreground">空席があります</p>
+              !canReserve ? (
+                <p className="text-sm text-muted-foreground">空席があります</p>
+              ) : null
             ) : null
           ) : !hasLineUserId ? (
             <div className="space-y-2">
@@ -111,18 +240,32 @@ export default function LessonDetailModal({
               </Button>
             </div>
           ) : isOnWaitlist ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                onRemoveWaitlist(lesson.id);
-                onOpenChange(false);
-              }}
-            >
-              <BellOff className="h-4 w-4 mr-2" />
-              通知登録済み（解除する）
-            </Button>
+            <div className="space-y-2">
+              {hasFcSession && onToggleAutoReserve && (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!waitlistAutoReserve}
+                    onChange={() => onToggleAutoReserve(lesson.id)}
+                    className="rounded border-gray-300"
+                  />
+                  <Zap className={`h-3.5 w-3.5 ${waitlistAutoReserve ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                  空きが出たら自動予約する
+                </label>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  onRemoveWaitlist(lesson.id);
+                  handleOpenChange(false);
+                }}
+              >
+                <BellOff className="h-4 w-4 mr-2" />
+                通知登録済み（解除する）
+              </Button>
+            </div>
           ) : (
             <div className="space-y-2">
               {hasFcSession && (
@@ -143,7 +286,7 @@ export default function LessonDetailModal({
                 onClick={() => {
                   onAddWaitlist(lesson, autoReserve);
                   setAutoReserve(false);
-                  onOpenChange(false);
+                  handleOpenChange(false);
                 }}
               >
                 {autoReserve ? (
@@ -162,10 +305,24 @@ export default function LessonDetailModal({
           )}
         </div>
 
-        {/* 座席マップセクション */}
-        {!lesson.isPast && lesson.sidHash && hasFcSession && (
+        {/* 座席マップセクション（閲覧のみ: 満席 or 予約済みの場合） */}
+        {!lesson.isPast && lesson.sidHash && hasFcSession && !canReserve && (
           <div className="pt-2 border-t">
-            <SeatMap sidHash={lesson.sidHash} />
+            {showReadOnlySeatMap ? (
+              <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                <SeatMap sidHash={lesson.sidHash} />
+              </Suspense>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
+                onClick={() => setShowReadOnlySeatMap(true)}
+              >
+                座席マップを表示
+                <ChevronDown className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            )}
           </div>
         )}
       </DialogContent>

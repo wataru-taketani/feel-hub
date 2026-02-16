@@ -45,22 +45,24 @@ export default function Header() {
                 <span className="hidden sm:inline">ログアウト</span>
               </Button>
 
-              <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-                <DialogContent className="max-w-xs">
-                  <DialogHeader>
-                    <DialogTitle>ログアウト</DialogTitle>
-                    <DialogDescription>ログアウトしますか？</DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter className="flex-row gap-2">
-                    <Button variant="outline" className="flex-1" onClick={() => setShowLogoutDialog(false)}>
-                      キャンセル
-                    </Button>
-                    <Button variant="destructive" className="flex-1" onClick={() => { setShowLogoutDialog(false); logout(); }}>
-                      ログアウト
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              {showLogoutDialog && (
+                <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                  <DialogContent className="max-w-xs">
+                    <DialogHeader>
+                      <DialogTitle>ログアウト</DialogTitle>
+                      <DialogDescription>ログアウトしますか？</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex-row gap-2">
+                      <Button variant="outline" className="flex-1" onClick={() => setShowLogoutDialog(false)}>
+                        キャンセル
+                      </Button>
+                      <Button variant="destructive" className="flex-1" onClick={() => { setShowLogoutDialog(false); logout(); }}>
+                        ログアウト
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </>
           ) : (
             <Button variant="default" size="sm" asChild>

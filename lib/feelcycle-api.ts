@@ -386,6 +386,76 @@ export async function getLessonHistory(
 /**
  * 座席マップ情報を取得（/api/reservation/modal/{sidHash} - GET）
  */
+export interface ReserveResult {
+  resultCode: number;
+  message: string;
+  raw: Record<string, unknown>;
+}
+
+/**
+ * 通常レッスン予約 POST /api/reservation/normal
+ */
+export async function reserveLesson(
+  session: FeelcycleSession,
+  sidHash: string,
+  sheetNo: string
+): Promise<ReserveResult> {
+  const res = await fetch(`${BASE_URL}/api/reservation/normal`, {
+    method: 'POST',
+    headers: {
+      ...buildHeaders(session),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ sid: sidHash, sheet_no: Number(sheetNo) }),
+  });
+
+  if (res.status === 401 || res.status === 302 || res.status === 403) {
+    throw new Error('SESSION_EXPIRED');
+  }
+
+  const data = await res.json().catch(() => ({ result_code: -1, message: `HTTP ${res.status}` }));
+  return {
+    resultCode: Number(data.result_code ?? -1),
+    message: typeof data.message === 'string' ? data.message : JSON.stringify(data.message ?? ''),
+    raw: data,
+  };
+}
+
+/**
+ * 予約確定（2ステップ目） POST /api/reservation/normal/completion
+ * rc=303 の後、チケット消費確認や他店利用案内を経て予約を確定する
+ */
+export async function reserveCompletion(
+  session: FeelcycleSession,
+  tmpLessonId: string,
+  ticketType?: number
+): Promise<ReserveResult> {
+  const body: Record<string, unknown> = { tmp_lesson_id: tmpLessonId };
+  if (ticketType !== undefined) {
+    body.ticket_type = ticketType;
+  }
+
+  const res = await fetch(`${BASE_URL}/api/reservation/normal/completion`, {
+    method: 'POST',
+    headers: {
+      ...buildHeaders(session),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (res.status === 401 || res.status === 302 || res.status === 403) {
+    throw new Error('SESSION_EXPIRED');
+  }
+
+  const data = await res.json().catch(() => ({ result_code: -1, message: `HTTP ${res.status}` }));
+  return {
+    resultCode: Number(data.result_code ?? -1),
+    message: typeof data.message === 'string' ? data.message : JSON.stringify(data.message ?? ''),
+    raw: data,
+  };
+}
+
 export async function getSeatMap(session: FeelcycleSession, sidHash: string): Promise<SeatMapData> {
   const res = await fetch(`${BASE_URL}/api/reservation/modal/${sidHash}`, {
     headers: buildHeaders(session),

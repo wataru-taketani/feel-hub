@@ -16,6 +16,7 @@ interface WaitlistLesson {
   availableSlots: number;
   colorCode: string;
   textColor: string;
+  sidHash?: string;
 }
 
 interface WaitlistItem {
@@ -212,6 +213,58 @@ export function useWaitlist() {
     [user, entries]
   );
 
+  /** 指定レッスンの autoReserve 状態を取得 */
+  const getAutoReserve = useCallback(
+    (lessonId: string) => {
+      const item = entries.get(lessonId);
+      return !!item && item.autoReserve;
+    },
+    [entries]
+  );
+
+  /** autoReserve を切り替え */
+  const toggleAutoReserve = useCallback(
+    async (lessonId: string) => {
+      if (!user) return;
+
+      const item = entries.get(lessonId);
+      if (!item) return;
+
+      const newValue = !item.autoReserve;
+
+      // 楽観的更新
+      setEntries((prev) => {
+        const next = new Map(prev);
+        next.set(lessonId, { ...item, autoReserve: newValue });
+        return next;
+      });
+
+      try {
+        const res = await fetch(`/api/waitlist/${item.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ autoReserve: newValue }),
+        });
+        if (!res.ok) {
+          // ロールバック
+          setEntries((prev) => {
+            const next = new Map(prev);
+            next.set(lessonId, item);
+            return next;
+          });
+        }
+      } catch {
+        // ロールバック
+        setEntries((prev) => {
+          const next = new Map(prev);
+          next.set(lessonId, item);
+          return next;
+        });
+      }
+    },
+    [user, entries]
+  );
+
   /** レッスン情報付きの全エントリ配列（HOME表示用） */
   const waitlistEntries = useMemo(() => {
     return Array.from(entries.values())
@@ -229,9 +282,11 @@ export function useWaitlist() {
   return {
     isOnWaitlist,
     isNotified,
+    getAutoReserve,
     addToWaitlist,
     removeFromWaitlist,
     resumeWaitlist,
+    toggleAutoReserve,
     waitlistEntries,
     loaded,
   };

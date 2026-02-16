@@ -1,13 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, RefreshCw, Star } from 'lucide-react';
+import { Plus, MoreVertical, Star, RefreshCw, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FilterPreset } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface PresetManagerProps {
   presets: FilterPreset[];
@@ -33,59 +38,46 @@ export default function PresetManager({ presets, onLoad, onSave, onUpdate, onDel
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {presets.map((p) => (
-        <Badge
-          key={p.id}
-          variant="secondary"
-          className="cursor-pointer hover:bg-accent gap-0.5 pr-0.5 transition-colors"
-          onClick={() => onLoad(p)}
-        >
-          {p.name}
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSetDefault(p.isDefault ? null : p.id);
-                  }}
-                  className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
-                >
-                  <Star className={cn('h-2.5 w-2.5', p.isDefault ? 'fill-yellow-500 text-yellow-500' : 'text-muted-foreground')} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {p.isDefault ? 'デフォルト解除' : '起動時に自動適用'}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdate(p.id);
-                  }}
-                  className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
-                >
-                  <RefreshCw className="h-2.5 w-2.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                現在のフィルタで上書き
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(p.id);
-            }}
-            className="rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 transition-colors"
+        <div key={p.id} className="flex items-center">
+          <Badge
+            variant="secondary"
+            className={cn(
+              'cursor-pointer hover:bg-accent gap-1 pr-0.5 transition-colors',
+              p.isDefault && 'ring-1 ring-yellow-400'
+            )}
+            onClick={() => onLoad(p)}
           >
-            <X className="h-2.5 w-2.5" />
-          </button>
-        </Badge>
+            {p.isDefault && <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />}
+            {p.name}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+                >
+                  <MoreVertical className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[160px]">
+                <DropdownMenuItem onClick={() => onUpdate(p.id)}>
+                  <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                  現在の条件で上書き
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSetDefault(p.isDefault ? null : p.id)}>
+                  <Star className="h-3.5 w-3.5 mr-2" />
+                  {p.isDefault ? 'デフォルト解除' : 'デフォルトに設定'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onDelete(p.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                  削除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </Badge>
+        </div>
       ))}
 
       {showInput ? (
@@ -94,7 +86,7 @@ export default function PresetManager({ presets, onLoad, onSave, onUpdate, onDel
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-            placeholder="プリセット名"
+            placeholder="お気に入り名"
             className="h-7 w-28 text-xs"
             autoFocus
           />

@@ -1,20 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap } from 'lucide-react';
+import { CalendarDays, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
 import type { ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
+import type { Lesson } from '@/types';
+import LessonDetailModal from '@/components/lessons/LessonDetailModal';
+import type { ReserveApiResult } from '@/components/lessons/LessonDetailModal';
+
+interface DashboardReservation extends ReservationInfo {
+  lessonId?: string | null;
+  sidHash?: string | null;
+}
 
 interface DashboardData {
-  reservations: ReservationInfo[];
+  reservations: DashboardReservation[];
   memberSummary: {
     displayName: string;
     membershipType: string;
@@ -43,15 +51,138 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+/** ReservationInfo → Lesson 変換 */
+function reservationToLesson(r: DashboardReservation): Lesson {
+  return {
+    id: r.lessonId || `${r.date}_${r.startTime}_${r.programName}`,
+    date: r.date,
+    startTime: r.startTime,
+    endTime: r.endTime,
+    programName: r.programName,
+    instructor: r.instructor,
+    studio: r.studio,
+    isFull: true,
+    isPast: false,
+    availableSlots: 0,
+    ticketType: null,
+    colorCode: r.bgColor || '#6B7280',
+    textColor: r.textColor || '#FFFFFF',
+    sidHash: r.sidHash ?? undefined,
+  };
+}
+
+/** WaitlistItem.lesson → Lesson 変換 */
+function waitlistLessonToLesson(entry: WaitlistItem): Lesson | null {
+  const l = entry.lesson;
+  if (!l) return null;
+  return {
+    id: l.id,
+    date: l.date,
+    startTime: l.startTime.slice(0, 5),
+    endTime: l.endTime.slice(0, 5),
+    programName: l.programName,
+    instructor: l.instructor,
+    studio: l.studio,
+    isFull: l.isFull,
+    isPast: false,
+    availableSlots: l.availableSlots,
+    ticketType: null,
+    colorCode: l.colorCode || '#6B7280',
+    textColor: l.textColor || '#FFFFFF',
+    sidHash: l.sidHash,
+  };
+}
+
+// --- キャンセル待ちカード（Dialog無し・軽量） ---
+function WaitlistCard({
+  entry,
+  onTapCard,
+  onTapRemove,
+  onResume,
+}: {
+  entry: WaitlistItem;
+  onTapCard: (entry: WaitlistItem) => void;
+  onTapRemove: (entry: WaitlistItem) => void;
+  onResume: (lessonId: string) => void;
+}) {
+  const lesson = entry.lesson;
+  if (!lesson) return null;
+
+  return (
+    <button
+      type="button"
+      className="border rounded-lg p-3 space-y-1 w-full text-left cursor-pointer active:bg-accent/50 transition-colors"
+      onClick={() => onTapCard(entry)}
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-sm">
+          {formatDateWithDay(lesson.date)} {lesson.startTime.slice(0, 5)}〜{lesson.endTime.slice(0, 5)}
+        </span>
+        <span className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {entry.notified ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => onResume(entry.lessonId)}
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              再開
+            </Button>
+          ) : entry.autoReserve ? (
+            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
+              <Zap className="h-3 w-3 mr-1" />
+              自動予約
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-xs">
+              <Bell className="h-3 w-3 mr-1" />
+              監視中
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-muted-foreground"
+            onClick={() => onTapRemove(entry)}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </span>
+      </div>
+      <div className="text-sm">
+        <span
+          className="inline-block px-1.5 py-0.5 rounded text-xs font-medium mr-1"
+          style={
+            lesson.colorCode
+              ? { backgroundColor: lesson.colorCode, color: lesson.textColor || '#fff' }
+              : {}
+          }
+        >
+          {lesson.programName}
+        </span>
+        <span className="text-muted-foreground">{lesson.instructor}</span>
+      </div>
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <MapPin className="h-3 w-3" />
+        {lesson.studio}
+        <ChevronRight className="h-3 w-3 ml-auto" />
+      </div>
+    </button>
+  );
+}
+
 // --- キャンセル待ちセクション ---
 function WaitlistSection({
   entries,
   onResume,
-  onRemove,
+  onTapCard,
+  onTapRemove,
 }: {
   entries: WaitlistItem[];
   onResume: (lessonId: string) => void;
-  onRemove: (lessonId: string) => void;
+  onTapCard: (entry: WaitlistItem) => void;
+  onTapRemove: (entry: WaitlistItem) => void;
 }) {
   const watchingCount = entries.filter((e) => !e.notified).length;
 
@@ -82,8 +213,9 @@ function WaitlistSection({
               <WaitlistCard
                 key={entry.id}
                 entry={entry}
+                onTapCard={onTapCard}
+                onTapRemove={onTapRemove}
                 onResume={onResume}
-                onRemove={onRemove}
               />
             ))}
           </div>
@@ -93,103 +225,31 @@ function WaitlistSection({
   );
 }
 
-function WaitlistCard({
-  entry,
-  onResume,
-  onRemove,
-}: {
-  entry: WaitlistItem;
-  onResume: (lessonId: string) => void;
-  onRemove: (lessonId: string) => void;
-}) {
-  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
-  const lesson = entry.lesson;
-  if (!lesson) return null;
-
-  return (
-    <div className="border rounded-lg p-3 space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="font-medium text-sm">
-          {formatDateWithDay(lesson.date)} {lesson.startTime.slice(0, 5)}〜{lesson.endTime.slice(0, 5)}
-        </span>
-        <div className="flex items-center gap-1 shrink-0">
-          {entry.notified ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => onResume(entry.lessonId)}
-            >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              再開
-            </Button>
-          ) : entry.autoReserve ? (
-            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
-              <Zap className="h-3 w-3 mr-1" />
-              自動予約
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="text-xs">
-              <Bell className="h-3 w-3 mr-1" />
-              監視中
-            </Badge>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs text-muted-foreground"
-            onClick={() => setShowRemoveDialog(true)}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-      <div className="text-sm">
-        <span
-          className="inline-block px-1.5 py-0.5 rounded text-xs font-medium mr-1"
-          style={
-            lesson.colorCode
-              ? { backgroundColor: lesson.colorCode, color: lesson.textColor || '#fff' }
-              : {}
-          }
-        >
-          {lesson.programName}
-        </span>
-        <span className="text-muted-foreground">{lesson.instructor}</span>
-      </div>
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        <MapPin className="h-3 w-3" />
-        {lesson.studio}
-      </div>
-
-      <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-        <DialogContent className="max-w-xs">
-          <DialogHeader>
-            <DialogTitle>キャンセル待ち解除</DialogTitle>
-            <DialogDescription>
-              {lesson.programName}（{formatDateWithDay(lesson.date)} {lesson.startTime}）のキャンセル待ちを解除しますか？
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex-row gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setShowRemoveDialog(false)}>
-              戻る
-            </Button>
-            <Button variant="destructive" className="flex-1" onClick={() => { setShowRemoveDialog(false); onRemove(entry.lessonId); }}>
-              解除
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
 // --- ログイン済みダッシュボード ---
 function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { waitlistEntries, resumeWaitlist, removeFromWaitlist } = useWaitlist();
+  const { waitlistEntries, isOnWaitlist, getAutoReserve, addToWaitlist, resumeWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
+
+  // モーダル状態
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [hasLineUserId, setHasLineUserId] = useState(false);
+  const [modalIsReserved, setModalIsReserved] = useState(false);
+
+  // 共有: キャンセル待ち解除ダイアログ
+  const [removeTarget, setRemoveTarget] = useState<WaitlistItem | null>(null);
+
+  useEffect(() => {
+    // LINE userId 取得
+    fetch('/api/profile')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.profile?.lineUserId) setHasLineUserId(true);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     async function fetchDashboard(retried = false): Promise<DashboardData> {
@@ -219,6 +279,36 @@ function Dashboard() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleReserve = useCallback(async (sidHash: string, sheetNo: string): Promise<ReserveApiResult> => {
+    const res = await fetch('/api/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sidHash, sheetNo }),
+    });
+    return res.json();
+  }, []);
+
+  const handleTapReservation = useCallback((r: DashboardReservation) => {
+    const lesson = reservationToLesson(r);
+    setSelectedLesson(lesson);
+    setModalIsReserved(true);
+    setModalOpen(true);
+  }, []);
+
+  const handleTapWaitlist = useCallback((entry: WaitlistItem) => {
+    const lesson = waitlistLessonToLesson(entry);
+    if (!lesson) return;
+    setSelectedLesson(lesson);
+    setModalIsReserved(false);
+    setModalOpen(true);
+  }, []);
+
+  const handleConfirmRemove = useCallback(() => {
+    if (!removeTarget) return;
+    removeFromWaitlist(removeTarget.lessonId);
+    setRemoveTarget(null);
+  }, [removeTarget, removeFromWaitlist]);
 
   if (loading) {
     return (
@@ -286,7 +376,12 @@ function Dashboard() {
           ) : (
             <div className="space-y-3">
               {upcoming.map((r, i) => (
-                <div key={i} className="border rounded-lg p-3 space-y-1">
+                <button
+                  type="button"
+                  key={i}
+                  className="border rounded-lg p-3 space-y-1 w-full text-left cursor-pointer active:bg-accent/50 transition-colors"
+                  onClick={() => handleTapReservation(r)}
+                >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm">
                       {formatDateWithDay(r.date)} {r.startTime}〜{r.endTime}
@@ -310,8 +405,9 @@ function Dashboard() {
                         キャン待ち {r.cancelWaitPosition}/{r.cancelWaitTotal}
                       </Badge>
                     )}
+                    <ChevronRight className="h-3 w-3 ml-auto" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -322,7 +418,8 @@ function Dashboard() {
       <WaitlistSection
         entries={waitlistEntries}
         onResume={resumeWaitlist}
-        onRemove={removeFromWaitlist}
+        onTapCard={handleTapWaitlist}
+        onTapRemove={setRemoveTarget}
       />
 
       {/* サブスク残 + チケット */}
@@ -381,6 +478,44 @@ function Dashboard() {
         </Card>
       </div>
 
+      {/* レッスン詳細モーダル */}
+      <LessonDetailModal
+        lesson={selectedLesson}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        isLoggedIn={true}
+        hasLineUserId={hasLineUserId}
+        hasFcSession={true}
+        isOnWaitlist={selectedLesson ? isOnWaitlist(selectedLesson.id) : false}
+        isReserved={modalIsReserved}
+        onAddWaitlist={(lesson, autoReserve) => addToWaitlist(lesson, autoReserve)}
+        onRemoveWaitlist={removeFromWaitlist}
+        onReserve={handleReserve}
+        waitlistAutoReserve={selectedLesson ? getAutoReserve(selectedLesson.id) : false}
+        onToggleAutoReserve={toggleAutoReserve}
+      />
+
+      {/* 共有: キャンセル待ち解除ダイアログ */}
+      {removeTarget && (
+        <Dialog open onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}>
+          <DialogContent className="max-w-xs">
+            <DialogHeader>
+              <DialogTitle>キャンセル待ち解除</DialogTitle>
+              <DialogDescription>
+                {removeTarget.lesson?.programName}（{removeTarget.lesson && formatDateWithDay(removeTarget.lesson.date)} {removeTarget.lesson?.startTime.slice(0, 5)}）のキャンセル待ちを解除しますか？
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setRemoveTarget(null)}>
+                戻る
+              </Button>
+              <Button variant="destructive" className="flex-1" onClick={handleConfirmRemove}>
+                解除
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
