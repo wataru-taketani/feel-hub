@@ -11,6 +11,7 @@ import LessonCard from './LessonCard';
 
 interface CalendarViewProps {
   lessons: Lesson[];
+  reservedLessons?: Lesson[];
   isBookmarked: (lesson: Lesson) => boolean;
   onToggleBookmark: (lesson: Lesson) => void;
   isReserved?: (lesson: Lesson) => boolean;
@@ -28,7 +29,7 @@ interface CalendarViewProps {
 
 const COL_WIDTH = 'shrink-0 w-[calc(100%/3)] sm:w-[calc(100%/5)] lg:w-[calc(100%/7)] min-w-[150px]';
 
-export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, bookmarkOnly, toolbarLeft, toolbarRight, middleContent }: CalendarViewProps) {
+export default function CalendarView({ lessons, reservedLessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, bookmarkOnly, toolbarLeft, toolbarRight, middleContent }: CalendarViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const reservedRef = useRef<HTMLDivElement>(null);
@@ -51,20 +52,35 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
 
   const dates = useMemo(() => [...dateMap.keys()].sort(), [dateMap]);
 
-  // 固定行に表示するレッスン（予約済み + ブックマークON時はブックマーク済みも、時間順）
+  // 固定行に表示するレッスン（予約済み全件 + ブックマークON時はブックマーク済みも、時間順）
   const pinnedMap = useMemo(() => {
     const map = new Map<string, Lesson[]>();
-    for (const [date, dateLessons] of dateMap) {
-      const pinned = dateLessons.filter(l =>
-        isReserved?.(l) || (bookmarkOnly && isBookmarked(l))
-      );
-      if (pinned.length > 0) {
-        pinned.sort((a, b) => a.startTime.localeCompare(b.startTime));
-        map.set(date, pinned);
+    const pinnedIds = new Set<string>();
+    // 予約済みレッスン（スタジオフィルタ無視）
+    for (const l of reservedLessons || []) {
+      const arr = map.get(l.date) || [];
+      arr.push(l);
+      map.set(l.date, arr);
+      pinnedIds.add(l.id);
+    }
+    // ブックマークON時: フィルタ済みレッスンからブックマーク済みを追加
+    if (bookmarkOnly) {
+      for (const [date, dateLessons] of dateMap) {
+        for (const l of dateLessons) {
+          if (!pinnedIds.has(l.id) && isBookmarked(l)) {
+            const arr = map.get(date) || [];
+            arr.push(l);
+            map.set(date, arr);
+          }
+        }
       }
     }
+    // 時間順ソート
+    for (const [, arr] of map) {
+      arr.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    }
     return map;
-  }, [dateMap, isReserved, bookmarkOnly, isBookmarked]);
+  }, [reservedLessons, dateMap, bookmarkOnly, isBookmarked]);
 
   const hasPinnable = pinnedMap.size > 0;
 

@@ -242,10 +242,10 @@ export default function LessonsPage() {
     return [...set].sort();
   }, [allLessons]);
 
-  // クライアントサイドフィルタ（スタジオ以外）— 予約済みはスタジオフィルタをバイパス
+  // クライアントサイドフィルタ — 予約済みは固定行専用なのでバイパスしない
   const filteredLessons = useMemo(() => {
     return allLessons.filter((lesson) => {
-      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio) && !isReserved(lesson) && !(filters.bookmarkOnly && isBookmarked(lesson))) return false;
+      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio) && !(filters.bookmarkOnly && isBookmarked(lesson))) return false;
       if (!matchesProgram(lesson.programName, filters.programSearch)) return false;
       if (filters.instructors.length > 0) {
         const lessonIRs = lesson.instructor.split(", ");
@@ -255,7 +255,13 @@ export default function LessonsPage() {
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
       return true;
     });
-  }, [allLessons, filters.studios, filters.bookmarkOnly, filters.programSearch, filters.instructors, filters.ticketFilter, isReserved, isBookmarked]);
+  }, [allLessons, filters.studios, filters.bookmarkOnly, filters.programSearch, filters.instructors, filters.ticketFilter, isBookmarked]);
+
+  // 予約済みレッスン（固定行用、スタジオフィルタ無視）
+  const reservedLessons = useMemo(() =>
+    allLessons.filter(l => isReserved(l)),
+    [allLessons, isReserved]
+  );
 
   const displayCount = filteredLessons.length;
 
@@ -409,6 +415,7 @@ export default function LessonsPage() {
         {!loading && !error && (
           <CalendarView
             lessons={filteredLessons}
+            reservedLessons={reservedLessons}
             isBookmarked={isBookmarked}
             onToggleBookmark={toggle}
             isReserved={isReserved}
