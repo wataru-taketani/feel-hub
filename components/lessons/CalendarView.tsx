@@ -51,15 +51,20 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
 
   const dates = useMemo(() => [...dateMap.keys()].sort(), [dateMap]);
 
-  // 固定行に表示するレッスン（予約済みのみ）
+  // 固定行に表示するレッスン（予約済み + ブックマークON時はブックマーク済みも、時間順）
   const pinnedMap = useMemo(() => {
     const map = new Map<string, Lesson[]>();
     for (const [date, dateLessons] of dateMap) {
-      const pinned = dateLessons.filter(l => isReserved?.(l));
-      if (pinned.length > 0) map.set(date, pinned);
+      const pinned = dateLessons.filter(l =>
+        isReserved?.(l) || (bookmarkOnly && isBookmarked(l))
+      );
+      if (pinned.length > 0) {
+        pinned.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        map.set(date, pinned);
+      }
     }
     return map;
-  }, [dateMap, isReserved]);
+  }, [dateMap, isReserved, bookmarkOnly, isBookmarked]);
 
   const hasPinnable = pinnedMap.size > 0;
 
@@ -195,14 +200,11 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
         >
           {dates.map((date) => {
             const dateLessons = dateMap.get(date) || [];
-            const displayLessons = bookmarkOnly
-              ? dateLessons.filter(l => isBookmarked(l))
-              : dateLessons;
             return (
               <CalendarDateColumn
                 key={date}
                 date={date}
-                lessons={displayLessons}
+                lessons={dateLessons}
                 isBookmarked={isBookmarked}
                 onToggleBookmark={onToggleBookmark}
                 isReserved={isReserved}

@@ -253,9 +253,7 @@ export default function LessonsPage() {
     });
   }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, isReserved, isBookmarked]);
 
-  const displayCount = filters.bookmarkOnly
-    ? filteredLessons.filter((l) => isBookmarked(l)).length
-    : filteredLessons.length;
+  const displayCount = filteredLessons.length;
 
   // プリセット読み込み
   const handleLoadPreset = useCallback(
