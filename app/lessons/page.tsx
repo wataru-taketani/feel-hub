@@ -209,13 +209,13 @@ export default function LessonsPage() {
       variant={filters.bookmarkOnly ? "default" : "outline"}
       size="sm"
       className={cn(
-        "h-8 text-xs gap-1.5 px-3",
+        "h-8 text-xs gap-1.5 px-2 sm:px-3",
         filters.bookmarkOnly && "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
       )}
       onClick={() => setFilters((f) => ({ ...f, bookmarkOnly: !f.bookmarkOnly }))}
     >
       <Star className={cn("h-3.5 w-3.5", filters.bookmarkOnly && "fill-white")} />
-      ブックマーク
+      <span className="hidden sm:inline">ブックマーク</span>
     </Button>
   );
 
@@ -224,11 +224,11 @@ export default function LessonsPage() {
       <Button
         variant="outline"
         size="sm"
-        className="h-8 text-xs gap-1.5 px-3"
+        className="h-8 text-xs gap-1.5 px-2 sm:px-3"
         onClick={() => setFilterOpen(!filterOpen)}
       >
         <SlidersHorizontal className="h-3.5 w-3.5" />
-        絞り込み
+        <span className="hidden sm:inline">絞り込み</span>
         {activeFilterCount > 0 && (
           <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
             {activeFilterCount}

@@ -27,7 +27,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       className={cn(
         'group relative h-[88px] px-2.5 py-1.5 border-b border-border last:border-b-0 transition-colors',
         isPast && 'opacity-35',
-        grayed ? 'bg-muted' : isReserved ? 'ring-2 ring-inset ring-red-500 bg-[#f6dcdc]' : 'hover:bg-accent/50',
+        grayed ? 'bg-muted' : isReserved ? 'ring-2 ring-inset ring-red-500 bg-[#f6dcdc]' : 'active:bg-accent/30',
         onTapLesson && 'cursor-pointer'
       )}
       onClick={() => onTapLesson?.(lesson)}
@@ -36,7 +36,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       <Button
         variant="ghost"
         size="icon"
-        className={cn('absolute top-0.5 right-0.5 h-6 w-6 transition-opacity z-10', isReserved ? 'opacity-80' : 'opacity-50 group-hover:opacity-100')}
+        className={cn('absolute -top-0.5 -right-0.5 h-8 w-8 transition-opacity z-10', isReserved || isBookmarked ? 'opacity-80' : 'opacity-50')}
         onClick={(e) => {
           e.stopPropagation();
           onToggleBookmark(lesson);

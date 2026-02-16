@@ -112,7 +112,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
   const hasMine = bikes.some(([, b]) => b.status === 3);
 
   // バイクの丸サイズ（px）
-  const BIKE_SIZE = 28;
+  const BIKE_SIZE = 30;
 
   const handleBikeClick = (bikeNo: string, status: number) => {
     if (!interactive || !onSeatSelect) return;
@@ -126,7 +126,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         <p className="text-xs font-medium text-muted-foreground">
           {interactive ? '座席を選択してください' : '座席マップ'}
         </p>
-        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={fetchSeatMap}>
+        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={fetchSeatMap}>
           <RefreshCw className="h-3 w-3 mr-1" />
           更新
         </Button>
@@ -159,7 +159,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               transform: 'translate(-50%, -50%)',
             }}
           >
-            <span className="text-[9px] font-bold text-yellow-400 bg-black/60 rounded px-1">IR</span>
+            <span className="text-[10px] font-bold text-yellow-400 bg-black/60 rounded px-1">IR</span>
           </div>
         )}
 
@@ -179,7 +179,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               }}
               onClick={() => handleBikeClick(bikeNo, bike.status)}
             >
-              <span className="text-[9px] font-bold leading-none">{bikeNo}</span>
+              <span className="text-[10px] font-bold leading-none">{bikeNo}</span>
             </div>
           );
         })}
