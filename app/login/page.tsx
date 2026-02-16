@@ -14,7 +14,7 @@ function LoginContent() {
     <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Feel Hub</CardTitle>
+          <CardTitle className="text-2xl flex items-center justify-center gap-2"><span className="w-5 h-px bg-current" /><span className="italic tracking-tight"><span className="font-bold">FEEL</span><span className="font-light">hub</span></span><span className="w-5 h-px bg-current" /></CardTitle>
           <CardDescription>
             レッスン情報をもっと便利に
           </CardDescription>
@@ -55,7 +55,7 @@ export default function LoginPage() {
       <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Feel Hub</CardTitle>
+            <CardTitle className="text-2xl flex items-center justify-center gap-2"><span className="w-5 h-px bg-current" /><span className="italic tracking-tight"><span className="font-bold">FEEL</span><span className="font-light">hub</span></span><span className="w-5 h-px bg-current" /></CardTitle>
             <CardDescription>レッスン情報をもっと便利に</CardDescription>
           </CardHeader>
         </Card>
