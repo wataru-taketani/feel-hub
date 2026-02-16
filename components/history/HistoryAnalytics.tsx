@@ -7,7 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, RotateCcw, X } from 'lucide-react';
+import { ChevronDown, RotateCcw, X, Loader2 } from 'lucide-react';
+
+type HistoryRecord = {
+  shiftDate: string;
+  instructorName: string;
+  storeName: string;
+  startTime: string;
+};
 
 type RankingItem = { name: string; count: number };
 
@@ -127,6 +134,11 @@ export default function HistoryAnalytics() {
   const [splitInstructor, setSplitInstructor] = useState(false);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
 
+  // プログラム詳細レコード
+  const [detailRecords, setDetailRecords] = useState<HistoryRecord[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailExpanded, setDetailExpanded] = useState(false);
+
   useEffect(() => {
     fetch('/api/programs')
       .then(res => res.json())
@@ -153,6 +165,40 @@ export default function HistoryAnalytics() {
   useEffect(() => {
     if (tappedInstructor) setInstructorInput('');
   }, [tappedInstructor]);
+
+  // プログラム詳細レコード取得
+  useEffect(() => {
+    if (!tappedProgram) {
+      setDetailRecords([]);
+      setDetailExpanded(false);
+      return;
+    }
+    const fetchDetail = async () => {
+      setDetailLoading(true);
+      setDetailExpanded(false);
+      try {
+        const params = new URLSearchParams({ program: tappedProgram });
+        if (period === 'custom') {
+          if (customFrom) params.set('from', customFrom);
+          if (customTo) params.set('to', customTo);
+        } else {
+          const dates = getPeriodDates(period);
+          if (dates) {
+            params.set('from', dates.from);
+            params.set('to', dates.to);
+          }
+        }
+        const res = await fetch(`/api/history?${params.toString()}`);
+        const data = await res.json();
+        setDetailRecords(data.records || []);
+      } catch {
+        setDetailRecords([]);
+      } finally {
+        setDetailLoading(false);
+      }
+    };
+    fetchDetail();
+  }, [tappedProgram, period, customFrom, customTo]);
 
   // 実際にAPIに送る値: タップ優先、なければテキスト入力
   const effectiveProgram = tappedProgram || programFilter;
@@ -362,6 +408,58 @@ export default function HistoryAnalytics() {
               />
             </CardContent>
           </Card>
+
+          {/* プログラム詳細レコード */}
+          {tappedProgram && (
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  {programColors[tappedProgram] ? (
+                    <span
+                      className="inline-block px-1.5 py-0.5 rounded text-xs font-medium"
+                      style={{
+                        backgroundColor: programColors[tappedProgram].colorCode,
+                        color: programColors[tappedProgram].textColor,
+                      }}
+                    >
+                      {tappedProgram}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-medium">{tappedProgram}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">受講履歴</span>
+                </div>
+                {detailLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : detailRecords.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-2">レコードなし</p>
+                ) : (
+                  <>
+                    <div className="space-y-0.5">
+                      {(detailExpanded ? detailRecords : detailRecords.slice(0, INITIAL_SHOW)).map((r, i) => (
+                        <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-3">
+                          <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
+                          <span className="truncate flex-1">{r.instructorName}</span>
+                          <span className="text-muted-foreground text-xs whitespace-nowrap">{r.storeName}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {detailRecords.length > INITIAL_SHOW && (
+                      <button
+                        className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-0.5"
+                        onClick={() => setDetailExpanded(!detailExpanded)}
+                      >
+                        {detailExpanded ? '閉じる' : `もっと見る（全${detailRecords.length}件）`}
+                        <ChevronDown className={`h-3 w-3 transition-transform ${detailExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
