@@ -25,6 +25,7 @@ export async function GET() {
         .select('*')
         .order('date', { ascending: true })
         .order('time', { ascending: true })
+        .order('id', { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
 
       const { data, error } = await query;
