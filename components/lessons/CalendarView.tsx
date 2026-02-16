@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useCallback, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react';
 import type { Lesson } from '@/types';
 import { getTodayDateString, formatDate, getDayOfWeek } from '@/lib/lessonUtils';
 import { cn } from '@/lib/utils';
@@ -79,6 +79,14 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
   }, [reservedLessons, bookmarkedLessons]);
 
   const hasPinnable = pinnedMap.size > 0;
+  const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
+
+  // 固定行の合計件数
+  const pinnedCount = useMemo(() => {
+    let count = 0;
+    for (const [, arr] of pinnedMap) count += arr.length;
+    return count;
+  }, [pinnedMap]);
 
   // 今日の列にスクロール
   const scrollToToday = useCallback(() => {
@@ -179,28 +187,39 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
 
         {/* 固定行（sticky：予約済み + ブックマークON時はブックマーク済みも） */}
         {hasPinnable && (
-          <div className="sticky top-[82px] z-[15] border-x border-border border-b-2 border-b-red-300 overflow-hidden bg-card">
-            <div ref={reservedRef} className="flex overflow-hidden">
-              {dates.map((date) => {
-                const pinned = pinnedMap.get(date);
-                return (
-                  <div key={date} className={cn(COL_WIDTH, 'border-r border-border last:border-r-0')}>
-                    {pinned?.map((lesson) => (
-                      <LessonCard
-                        key={lesson.id}
-                        lesson={lesson}
-                        isBookmarked={isBookmarked(lesson)}
-                        onToggleBookmark={onToggleBookmark}
-                        isReserved={isReserved?.(lesson) ?? false}
-                        sheetNo={getSheetNo?.(lesson) || null}
-                        isOnWaitlist={isOnWaitlist?.(lesson.id) ?? false}
-                        onTapLesson={onTapLesson}
-                      />
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+          <div className="sticky top-[82px] z-[15] border-x border-border overflow-hidden bg-card">
+            {!pinnedCollapsed && (
+              <div ref={reservedRef} className="flex overflow-hidden">
+                {dates.map((date) => {
+                  const pinned = pinnedMap.get(date);
+                  return (
+                    <div key={date} className={cn(COL_WIDTH, 'border-r border-border last:border-r-0')}>
+                      {pinned?.map((lesson) => (
+                        <LessonCard
+                          key={lesson.id}
+                          lesson={lesson}
+                          isBookmarked={isBookmarked(lesson)}
+                          onToggleBookmark={onToggleBookmark}
+                          isReserved={isReserved?.(lesson) ?? false}
+                          sheetNo={getSheetNo?.(lesson) || null}
+                          isOnWaitlist={isOnWaitlist?.(lesson.id) ?? false}
+                          onTapLesson={onTapLesson}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {/* トグルバー */}
+            <button
+              type="button"
+              onClick={() => setPinnedCollapsed((v) => !v)}
+              className="w-full flex items-center justify-center gap-1 h-6 text-[10px] text-muted-foreground border-t border-b-2 border-b-red-300 active:bg-accent/30"
+            >
+              <span>予約・ブックマーク {pinnedCount}件</span>
+              {pinnedCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+            </button>
           </div>
         )}
 
