@@ -30,7 +30,7 @@ export function useAuth() {
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
-    window.location.href = '/lessons';
+    window.location.href = '/login';
   }, []);
 
   return { user, loading, logout };
