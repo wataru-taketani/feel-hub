@@ -34,12 +34,17 @@ export async function GET() {
     .eq('user_id', user.id)
     .single();
 
-  if (!sessionRow) {
-    return NextResponse.json({ error: 'FEELCYCLE未連携', code: 'FC_NOT_LINKED' }, { status: 404 });
-  }
+  if (!sessionRow || new Date(sessionRow.expires_at) < new Date()) {
+    const { data: creds } = await supabaseAdmin
+      .from('feelcycle_credentials')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .single();
 
-  if (new Date(sessionRow.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'セッションが期限切れです', code: 'FC_SESSION_EXPIRED' }, { status: 401 });
+    if (creds) {
+      return NextResponse.json({ error: 'セッションが期限切れです', code: 'FC_SESSION_EXPIRED' }, { status: 401 });
+    }
+    return NextResponse.json({ error: 'FEELCYCLE未連携', code: 'FC_NOT_LINKED' }, { status: 404 });
   }
 
   let fcSession: FeelcycleSession;
