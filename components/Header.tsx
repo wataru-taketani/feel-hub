@@ -14,8 +14,8 @@ export default function Header() {
   return (
     <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="text-lg text-primary italic tracking-tight">
-          <span className="font-bold">FEEL</span><span className="font-light">hub</span>
+        <Link href="/" className="text-lg font-bold text-primary">
+          FEELhub
         </Link>
 
         <nav className="flex items-center gap-1">

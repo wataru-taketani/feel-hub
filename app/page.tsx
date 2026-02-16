@@ -524,9 +524,7 @@ function Dashboard() {
 function Landing() {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center px-4">
-      <h1 className="text-4xl italic tracking-tight mb-3">
-        <span className="font-bold">FEEL</span><span className="font-light">hub</span>
-      </h1>
+      <h1 className="text-4xl font-bold mb-3">FEELhub</h1>
       <p className="text-muted-foreground mb-8">FEELCYCLEライフをもっと快適に</p>
 
       <div className="flex flex-col gap-3 w-full max-w-xs">
