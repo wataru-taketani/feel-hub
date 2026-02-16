@@ -245,7 +245,7 @@ export default function LessonsPage() {
   // クライアントサイドフィルタ（スタジオ以外）— 予約済みはスタジオフィルタをバイパス
   const filteredLessons = useMemo(() => {
     return allLessons.filter((lesson) => {
-      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio) && !isReserved(lesson) && !isBookmarked(lesson)) return false;
+      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio) && !isReserved(lesson) && !(filters.bookmarkOnly && isBookmarked(lesson))) return false;
       if (!matchesProgram(lesson.programName, filters.programSearch)) return false;
       if (filters.instructors.length > 0) {
         const lessonIRs = lesson.instructor.split(", ");
@@ -255,7 +255,7 @@ export default function LessonsPage() {
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
       return true;
     });
-  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, isReserved, isBookmarked]);
+  }, [allLessons, filters.studios, filters.bookmarkOnly, filters.programSearch, filters.instructors, filters.ticketFilter, isReserved, isBookmarked]);
 
   const displayCount = filteredLessons.length;
 
