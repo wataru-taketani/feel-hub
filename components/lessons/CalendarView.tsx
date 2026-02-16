@@ -118,14 +118,24 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
     container.scrollBy({ left: columnWidth * direction, behavior: 'smooth' });
   };
 
-  // 横スクロール同期: body → header + reserved row
-  const handleScroll = useCallback(() => {
-    if (scrollRef.current) {
-      const sl = scrollRef.current.scrollLeft;
-      if (headerRef.current) headerRef.current.scrollLeft = sl;
-      if (reservedRef.current) reservedRef.current.scrollLeft = sl;
-    }
+  // 横スクロール同期（3エリア双方向）
+  const isSyncing = useRef(false);
+  const syncScroll = useCallback((source: HTMLElement) => {
+    if (isSyncing.current) return;
+    isSyncing.current = true;
+    const sl = source.scrollLeft;
+    if (headerRef.current && headerRef.current !== source) headerRef.current.scrollLeft = sl;
+    if (reservedRef.current && reservedRef.current !== source) reservedRef.current.scrollLeft = sl;
+    if (scrollRef.current && scrollRef.current !== source) scrollRef.current.scrollLeft = sl;
+    requestAnimationFrame(() => { isSyncing.current = false; });
   }, []);
+
+  // 折り畳み解除時に固定行のスクロール位置を同期
+  useEffect(() => {
+    if (!pinnedCollapsed && reservedRef.current && scrollRef.current) {
+      reservedRef.current.scrollLeft = scrollRef.current.scrollLeft;
+    }
+  }, [pinnedCollapsed]);
 
   if (dates.length === 0) {
     return (
@@ -189,7 +199,7 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
         {hasPinnable && (
           <div className="sticky top-[82px] z-[15] border-x border-border overflow-hidden bg-card">
             {!pinnedCollapsed && (
-              <div ref={reservedRef} className="flex overflow-hidden">
+              <div ref={reservedRef} className="flex overflow-x-auto calendar-scroll" onScroll={(e) => syncScroll(e.currentTarget)}>
                 {dates.map((date) => {
                   const pinned = pinnedMap.get(date);
                   return (
@@ -227,7 +237,7 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
         <div
           ref={scrollRef}
           className="flex overflow-x-auto snap-x snap-mandatory calendar-scroll border border-t-0 rounded-b-lg bg-card shadow-sm"
-          onScroll={handleScroll}
+          onScroll={(e) => syncScroll(e.currentTarget)}
         >
           {dates.map((date) => {
             const dateLessons = dateMap.get(date) || [];
