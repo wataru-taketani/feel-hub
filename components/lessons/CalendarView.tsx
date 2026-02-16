@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, CalendarDays, Pin, PinOff } from 'lucide-react';
+import { useRef, useCallback, useEffect, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import type { Lesson } from '@/types';
 import { getTodayDateString, formatDate, getDayOfWeek } from '@/lib/lessonUtils';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,6 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
   const headerRef = useRef<HTMLDivElement>(null);
   const reservedRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
-  const [pinReserved, setPinReserved] = useState(true);
   const today = useMemo(() => getTodayDateString(), []);
 
   // 日付でグループ化（ソート済み）
@@ -52,17 +51,15 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
 
   const dates = useMemo(() => [...dateMap.keys()].sort(), [dateMap]);
 
-  // 固定行に表示するレッスン（予約済み + ブックマーク済みをマージ）
+  // 固定行に表示するレッスン（予約済みのみ）
   const pinnedMap = useMemo(() => {
     const map = new Map<string, Lesson[]>();
     for (const [date, dateLessons] of dateMap) {
-      const pinned = dateLessons.filter(l =>
-        isReserved?.(l) || (bookmarkOnly && isBookmarked(l))
-      );
+      const pinned = dateLessons.filter(l => isReserved?.(l));
       if (pinned.length > 0) map.set(date, pinned);
     }
     return map;
-  }, [dateMap, isReserved, bookmarkOnly, isBookmarked]);
+  }, [dateMap, isReserved]);
 
   const hasPinnable = pinnedMap.size > 0;
 
@@ -119,17 +116,6 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
       {/* ツールバー（1行に統合） */}
       <div className="flex items-center gap-1">
         {toolbarLeft}
-        {hasPinnable && (
-          <Button
-            variant={pinReserved ? 'default' : 'outline'}
-            size="sm"
-            className="h-8 text-xs px-2 sm:px-3"
-            onClick={() => setPinReserved(v => !v)}
-          >
-            {pinReserved ? <Pin className="h-3.5 w-3.5 sm:mr-1" /> : <PinOff className="h-3.5 w-3.5 sm:mr-1" />}
-            <span className="hidden sm:inline">予約固定</span>
-          </Button>
-        )}
         <div className="flex-1" />
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(-1)}>
           <ChevronLeft className="h-4 w-4" />
@@ -174,8 +160,8 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
           </div>
         </div>
 
-        {/* 固定行（sticky・ピン有効時：予約済み＋ブックマーク） */}
-        {hasPinnable && pinReserved && (
+        {/* 固定行（sticky：予約済み） */}
+        {hasPinnable && (
           <div className="sticky top-[82px] z-[15] border-x border-border border-b-2 border-b-red-300 overflow-hidden bg-card">
             <div ref={reservedRef} className="flex overflow-hidden">
               {dates.map((date) => {
@@ -224,7 +210,7 @@ export default function CalendarView({ lessons, isBookmarked, onToggleBookmark, 
                 isToday={date === today}
                 isOnWaitlist={isOnWaitlist}
                 onTapLesson={onTapLesson}
-                sortReservedFirst={!pinReserved}
+                sortReservedFirst={false}
               />
             );
           })}

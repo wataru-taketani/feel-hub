@@ -34,7 +34,7 @@ export default function LessonsPage() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
   const { user } = useAuthContext();
-  const { toggle, isBookmarked } = useBookmarks();
+  const { bookmarks, toggle, isBookmarked } = useBookmarks();
   const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
   const { isOnWaitlist, getAutoReserve, addToWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
 
@@ -46,6 +46,8 @@ export default function LessonsPage() {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const prevStudiosRef = useRef<string[] | undefined>(undefined);
   const reservedStudiosRef = useRef<string[]>([]);
+  const bookmarkedStudiosRef = useRef<string[]>([]);
+  const bookmarksFetchedRef = useRef(false);
 
   // モーダル状態
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -73,7 +75,7 @@ export default function LessonsPage() {
       setLoading(true);
       setError(null);
       const allStudios = studios.length > 0
-        ? [...new Set([...studios, ...reservedStudiosRef.current])]
+        ? [...new Set([...studios, ...reservedStudiosRef.current, ...bookmarkedStudiosRef.current])]
         : [];
       const params = allStudios.length > 0 ? `?studios=${encodeURIComponent(allStudios.join(','))}` : '';
       const response = await fetch(`/api/lessons${params}`);
@@ -131,6 +133,18 @@ export default function LessonsPage() {
     (lesson: Lesson) => reservedMap.get(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`) || null,
     [reservedMap]
   );
+
+  // ブックマーク済みスタジオ → 初回ロード時に再取得
+  useEffect(() => {
+    const studios = [...new Set(Object.values(bookmarks).map(b => b.studio).filter(Boolean))];
+    const prev = bookmarkedStudiosRef.current;
+    bookmarkedStudiosRef.current = studios;
+    // ブックマークが初めてロードされ、初回fetchが完了済みなら再取得
+    if (!bookmarksFetchedRef.current && studios.length > 0 && prev.length === 0 && prevStudiosRef.current !== undefined) {
+      bookmarksFetchedRef.current = true;
+      fetchLessons(prevStudiosRef.current);
+    }
+  }, [bookmarks, fetchLessons]);
 
   // デフォルトスタジオ解決（presets + profile 両方ロード後、1回のみ）
   useEffect(() => {
@@ -227,7 +241,7 @@ export default function LessonsPage() {
   // クライアントサイドフィルタ（スタジオ以外）— 予約済みはスタジオフィルタをバイパス
   const filteredLessons = useMemo(() => {
     return allLessons.filter((lesson) => {
-      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio) && !isReserved(lesson)) return false;
+      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio) && !isReserved(lesson) && !isBookmarked(lesson)) return false;
       if (!matchesProgram(lesson.programName, filters.programSearch)) return false;
       if (filters.instructors.length > 0) {
         const lessonIRs = lesson.instructor.split(", ");
@@ -237,7 +251,7 @@ export default function LessonsPage() {
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
       return true;
     });
-  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, isReserved]);
+  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter, isReserved, isBookmarked]);
 
   const displayCount = filters.bookmarkOnly
     ? filteredLessons.filter((l) => isBookmarked(l)).length
