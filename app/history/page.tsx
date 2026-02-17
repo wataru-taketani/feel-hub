@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, MapPin } from 'lucide-react';
 import HistoryAnalytics from '@/components/history/HistoryAnalytics';
+import InstructorMultiSelect from '@/components/lessons/InstructorMultiSelect';
 import type { AttendanceRecord } from '@/types';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
@@ -24,6 +25,8 @@ export default function HistoryPage() {
   });
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
 
   const fetchHistory = useCallback(async (month: string) => {
     setLoading(true);
@@ -68,6 +71,13 @@ export default function HistoryPage() {
     }
   };
 
+  // 月変更時にフィルタをリセット
+  const handleMonthChange = (month: string) => {
+    setSelectedPrograms([]);
+    setSelectedInstructors([]);
+    setSelectedMonth(month);
+  };
+
   // 月選択オプション（2年前〜今月）
   const monthOptions: string[] = [];
   const now = new Date();
@@ -76,10 +86,32 @@ export default function HistoryPage() {
     monthOptions.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
-  // 統計
-  const totalLessons = records.length;
-  const uniqueInstructors = new Set(records.map((r) => r.instructorName)).size;
-  const uniquePrograms = new Set(records.map((r) => r.programName)).size;
+  // フィルタ候補（その月のrecordsから抽出）
+  const programOptions = useMemo(
+    () => [...new Set(records.map((r) => r.programName))].sort(),
+    [records]
+  );
+  const instructorOptions = useMemo(
+    () => [...new Set(records.map((r) => r.instructorName))].sort(),
+    [records]
+  );
+
+  // フィルタ適用
+  const filteredRecords = useMemo(() => {
+    let result = records;
+    if (selectedPrograms.length > 0) {
+      result = result.filter((r) => selectedPrograms.includes(r.programName));
+    }
+    if (selectedInstructors.length > 0) {
+      result = result.filter((r) => selectedInstructors.includes(r.instructorName));
+    }
+    return result;
+  }, [records, selectedPrograms, selectedInstructors]);
+
+  // 統計（フィルタ後）
+  const totalLessons = filteredRecords.length;
+  const uniqueInstructors = new Set(filteredRecords.map((r) => r.instructorName)).size;
+  const uniquePrograms = new Set(filteredRecords.map((r) => r.programName)).size;
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-4">
@@ -107,9 +139,9 @@ export default function HistoryPage() {
 
         <TabsContent value="history">
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-40">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={selectedMonth} onValueChange={handleMonthChange}>
+                <SelectTrigger className="w-[130px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -123,10 +155,23 @@ export default function HistoryPage() {
                   })}
                 </SelectContent>
               </Select>
+              <InstructorMultiSelect
+                instructors={programOptions}
+                selected={selectedPrograms}
+                onChange={setSelectedPrograms}
+                label="プログラム"
+                labelUnit="件"
+                searchPlaceholder="プログラム名で検索..."
+              />
+              <InstructorMultiSelect
+                instructors={instructorOptions}
+                selected={selectedInstructors}
+                onChange={setSelectedInstructors}
+              />
             </div>
 
             {/* 統計サマリー */}
-            {!loading && records.length > 0 && (
+            {!loading && filteredRecords.length > 0 && (
               <div className="grid grid-cols-3 gap-3">
                 <Card>
                   <CardContent className="pt-4 text-center">
@@ -156,11 +201,17 @@ export default function HistoryPage() {
                   <Skeleton key={i} className="h-20 w-full" />
                 ))}
               </div>
-            ) : records.length === 0 ? (
+            ) : filteredRecords.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
-                  <p>この月の受講履歴はありません</p>
-                  <p className="text-xs mt-1">「同期」ボタンでFEELCYCLEから取得できます</p>
+                  {records.length > 0 ? (
+                    <p>条件に一致する履歴はありません</p>
+                  ) : (
+                    <>
+                      <p>この月の受講履歴はありません</p>
+                      <p className="text-xs mt-1">「同期」ボタンでFEELCYCLEから取得できます</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ) : (
@@ -174,7 +225,7 @@ export default function HistoryPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1">
-                  {records.map((r, i) => (
+                  {filteredRecords.map((r, i) => (
                     <div key={r.id}>
                       {i > 0 && <Separator className="my-2" />}
                       <div className="flex items-start justify-between gap-2">
