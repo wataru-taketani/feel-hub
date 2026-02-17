@@ -52,10 +52,13 @@ export async function GET(request: NextRequest) {
     studioCounts[r.store_name] = (studioCounts[r.store_name] || 0) + 1;
 
     if (splitInstructor && r.instructor_name.includes(', ')) {
-      // Wイントラ: 個別にカウント
+      // Wイントラ: 個別にカウント（フィルタ時は一致する名前のみ）
       for (const name of r.instructor_name.split(', ')) {
         const trimmed = name.trim();
         if (trimmed) {
+          if (instructor && !trimmed.toLowerCase().includes(instructor.toLowerCase())) {
+            continue;
+          }
           instructorCounts[trimmed] = (instructorCounts[trimmed] || 0) + 1;
         }
       }

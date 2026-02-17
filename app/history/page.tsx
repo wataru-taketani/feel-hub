@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, MapPin } from 'lucide-react';
 import HistoryAnalytics from '@/components/history/HistoryAnalytics';
-import SuggestInput from '@/components/ui/SuggestInput';
+import InstructorMultiSelect from '@/components/lessons/InstructorMultiSelect';
 import type { AttendanceRecord } from '@/types';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
@@ -25,8 +25,8 @@ export default function HistoryPage() {
   });
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
-  const [programFilter, setProgramFilter] = useState('');
-  const [instructorFilter, setInstructorFilter] = useState('');
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
 
   const fetchHistory = useCallback(async (month: string) => {
     setLoading(true);
@@ -73,8 +73,8 @@ export default function HistoryPage() {
 
   // 月変更時にフィルタをリセット
   const handleMonthChange = (month: string) => {
-    setProgramFilter('');
-    setInstructorFilter('');
+    setSelectedPrograms([]);
+    setSelectedInstructors([]);
     setSelectedMonth(month);
   };
 
@@ -86,29 +86,27 @@ export default function HistoryPage() {
     monthOptions.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
-  // サジェスト候補（その月のrecordsから抽出）
-  const programSuggestions = useMemo(
+  // フィルタ候補（その月のrecordsから抽出）
+  const programOptions = useMemo(
     () => [...new Set(records.map((r) => r.programName))].sort(),
     [records]
   );
-  const instructorSuggestions = useMemo(
+  const instructorOptions = useMemo(
     () => [...new Set(records.map((r) => r.instructorName))].sort(),
     [records]
   );
 
-  // フィルタ適用（部分一致）
+  // フィルタ適用
   const filteredRecords = useMemo(() => {
     let result = records;
-    if (programFilter) {
-      const q = programFilter.toLowerCase();
-      result = result.filter((r) => r.programName.toLowerCase().includes(q));
+    if (selectedPrograms.length > 0) {
+      result = result.filter((r) => selectedPrograms.includes(r.programName));
     }
-    if (instructorFilter) {
-      const q = instructorFilter.toLowerCase();
-      result = result.filter((r) => r.instructorName.toLowerCase().includes(q));
+    if (selectedInstructors.length > 0) {
+      result = result.filter((r) => selectedInstructors.includes(r.instructorName));
     }
     return result;
-  }, [records, programFilter, instructorFilter]);
+  }, [records, selectedPrograms, selectedInstructors]);
 
   // 統計（フィルタ後）
   const totalLessons = filteredRecords.length;
@@ -157,19 +155,18 @@ export default function HistoryPage() {
                   })}
                 </SelectContent>
               </Select>
-              <SuggestInput
-                value={programFilter}
-                onChange={setProgramFilter}
-                suggestions={programSuggestions}
-                placeholder="プログラム..."
-                className="w-[120px]"
+              <InstructorMultiSelect
+                instructors={programOptions}
+                selected={selectedPrograms}
+                onChange={setSelectedPrograms}
+                label="プログラム"
+                labelUnit="件"
+                searchPlaceholder="プログラム名で検索..."
               />
-              <SuggestInput
-                value={instructorFilter}
-                onChange={setInstructorFilter}
-                suggestions={instructorSuggestions}
-                placeholder="IR..."
-                className="w-[100px]"
+              <InstructorMultiSelect
+                instructors={instructorOptions}
+                selected={selectedInstructors}
+                onChange={setSelectedInstructors}
               />
             </div>
 
