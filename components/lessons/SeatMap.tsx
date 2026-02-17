@@ -27,6 +27,7 @@ interface SeatMapProps {
   selectedSeat?: string | null;
   onSeatSelect?: (sheetNo: string) => void;
   refreshKey?: number;
+  onDataLoaded?: (availableCount: number, totalCount: number) => void;
 }
 
 // status → スタイル
@@ -52,7 +53,7 @@ function bikeStyle(status: number, isInteractive: boolean, isSelected: boolean) 
   );
 }
 
-export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey }: SeatMapProps) {
+export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey, onDataLoaded }: SeatMapProps) {
   const [data, setData] = useState<SeatMapResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +74,11 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
       }
       const json: SeatMapResponse = await res.json();
       setData(json);
+      if (onDataLoaded) {
+        const entries = Object.values(json.bikes);
+        const avail = entries.filter((b) => b.status === 1).length;
+        onDataLoaded(avail, entries.length);
+      }
     } catch {
       setError('座席マップを取得できませんでした');
     } finally {

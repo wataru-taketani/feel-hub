@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import type { Lesson } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -58,11 +58,34 @@ export default function LessonDetailModal({
   const [showConfirm, setShowConfirm] = useState(false);
   const [seatMapRefreshKey, setSeatMapRefreshKey] = useState(0);
   const [showReadOnlySeatMap, setShowReadOnlySeatMap] = useState(false);
+  // 座席マップから取得したリアルタイム空き状況（DB値を上書き）
+  const [realAvailable, setRealAvailable] = useState<{ available: number; total: number } | null>(null);
+
+  // DB上「満席」の場合、モーダル表示時に座席APIでリアルタイム確認
+  useEffect(() => {
+    if (!open || !lesson || !lesson.isFull || !lesson.sidHash || !hasFcSession || lesson.isPast) return;
+    setRealAvailable(null);
+    fetch(`/api/seatmap?sidHash=${encodeURIComponent(lesson.sidHash)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (!json?.bikes) return;
+        const entries = Object.values(json.bikes) as { status: number }[];
+        setRealAvailable({
+          available: entries.filter(b => b.status === 1).length,
+          total: entries.length,
+        });
+      })
+      .catch(() => {});
+  }, [open, lesson?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!lesson || !open) return null;
 
-  const canNotify = !isReserved && !lesson.isPast && lesson.isFull;
-  const canReserve = !isReserved && !lesson.isPast && !lesson.isFull && hasFcSession && lesson.sidHash && onReserve;
+  // リアルタイム空き情報があればそちらを優先
+  const effectiveIsFull = realAvailable ? realAvailable.available === 0 : lesson.isFull;
+  const effectiveAvailableSlots = realAvailable ? realAvailable.available : lesson.availableSlots;
+
+  const canNotify = !isReserved && !lesson.isPast && effectiveIsFull;
+  const canReserve = !isReserved && !lesson.isPast && !effectiveIsFull && hasFcSession && lesson.sidHash && onReserve;
 
   const handleReserve = async () => {
     if (!onReserve || !lesson.sidHash || !selectedSeat) return;
@@ -95,6 +118,7 @@ export default function LessonDetailModal({
       setShowConfirm(false);
       setReserving(false);
       setShowReadOnlySeatMap(false);
+      setRealAvailable(null);
     }
     onOpenChange(o);
   };
@@ -127,10 +151,10 @@ export default function LessonDetailModal({
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-                {lesson.isFull ? (
+                {effectiveIsFull ? (
                   <Badge variant="destructive" className="text-xs">満席</Badge>
                 ) : (
-                  <span className="text-green-700 font-medium">残り {lesson.availableSlots} 席</span>
+                  <span className="text-green-700 font-medium">残り {effectiveAvailableSlots} 席</span>
                 )}
               </div>
               {isReserved && (
@@ -169,6 +193,7 @@ export default function LessonDetailModal({
                 selectedSeat={selectedSeat}
                 onSeatSelect={setSelectedSeat}
                 refreshKey={seatMapRefreshKey}
+                onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
               />
             </Suspense>
 
@@ -225,7 +250,7 @@ export default function LessonDetailModal({
               <p className="text-sm text-muted-foreground">このレッスンは終了しました</p>
             ) : isReserved || reserveResult?.success ? (
               <p className="text-sm text-muted-foreground">このレッスンは予約済みです</p>
-            ) : !lesson.isFull ? (
+            ) : !effectiveIsFull ? (
               !canReserve ? (
                 <p className="text-sm text-muted-foreground">空席があります</p>
               ) : null
@@ -310,7 +335,10 @@ export default function LessonDetailModal({
           <div className="pt-2 border-t">
             {showReadOnlySeatMap ? (
               <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
-                <SeatMap sidHash={lesson.sidHash} />
+                <SeatMap
+                  sidHash={lesson.sidHash}
+                  onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                />
               </Suspense>
             ) : (
               <Button
