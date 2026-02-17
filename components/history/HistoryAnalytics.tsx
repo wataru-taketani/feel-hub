@@ -3,11 +3,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, RotateCcw, X, Loader2 } from 'lucide-react';
+import { ChevronDown, RotateCcw, Loader2 } from 'lucide-react';
+import InstructorMultiSelect from '@/components/lessons/InstructorMultiSelect';
 
 type HistoryRecord = {
   shiftDate: string;
@@ -101,18 +100,6 @@ function RankingSection({
   );
 }
 
-/** アクティブフィルターチップ */
-function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
-  return (
-    <Badge variant="secondary" className="gap-1 pr-1 text-xs">
-      {label}
-      <button onClick={onClear} className="hover:bg-accent rounded-full p-0.5">
-        <X className="h-3 w-3" />
-      </button>
-    </Badge>
-  );
-}
-
 export default function HistoryAnalytics() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,24 +107,19 @@ export default function HistoryAnalytics() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
-  // 検索フィルター（テキスト入力用）
-  const [programInput, setProgramInput] = useState('');
-  const [instructorInput, setInstructorInput] = useState('');
-  // デバウンス後の実際のフィルター値
-  const [programFilter, setProgramFilter] = useState('');
-  const [instructorFilter, setInstructorFilter] = useState('');
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
+  const [programOptions, setProgramOptions] = useState<string[]>([]);
+  const [instructorOptions, setInstructorOptions] = useState<string[]>([]);
 
-  // タップで設定されたフィルター（完全一致）
+  // プログラム詳細レコード（ランキングタップ）
   const [tappedProgram, setTappedProgram] = useState<string | null>(null);
-  const [tappedInstructor, setTappedInstructor] = useState<string | null>(null);
-
-  const [splitInstructor, setSplitInstructor] = useState(false);
-  const [programColors, setProgramColors] = useState<ProgramColorMap>({});
-
-  // プログラム詳細レコード
   const [detailRecords, setDetailRecords] = useState<HistoryRecord[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailExpanded, setDetailExpanded] = useState(false);
+
+  const [splitInstructor, setSplitInstructor] = useState(false);
+  const [programColors, setProgramColors] = useState<ProgramColorMap>({});
 
   useEffect(() => {
     fetch('/api/programs')
@@ -146,25 +128,19 @@ export default function HistoryAnalytics() {
       .catch(() => {});
   }, []);
 
-  // デバウンス: programInput
-  useEffect(() => {
-    const timer = setTimeout(() => setProgramFilter(programInput), 300);
-    return () => clearTimeout(timer);
-  }, [programInput]);
+  // 期間変更時にフィルタをリセット
+  const handlePeriodChange = useCallback((v: string) => {
+    setSelectedPrograms([]);
+    setSelectedInstructors([]);
+    setTappedProgram(null);
+    setPeriod(v as PeriodPreset);
+  }, []);
 
-  // デバウンス: instructorInput
-  useEffect(() => {
-    const timer = setTimeout(() => setInstructorFilter(instructorInput), 300);
-    return () => clearTimeout(timer);
-  }, [instructorInput]);
-
-  // タップフィルターが設定されたら入力欄をクリア
-  useEffect(() => {
-    if (tappedProgram) setProgramInput('');
-  }, [tappedProgram]);
-  useEffect(() => {
-    if (tappedInstructor) setInstructorInput('');
-  }, [tappedInstructor]);
+  // splitInstructor変更時にIRフィルタをリセット
+  const handleSplitChange = useCallback((checked: boolean) => {
+    setSelectedInstructors([]);
+    setSplitInstructor(checked);
+  }, []);
 
   // プログラム詳細レコード取得
   useEffect(() => {
@@ -200,10 +176,6 @@ export default function HistoryAnalytics() {
     fetchDetail();
   }, [tappedProgram, period, customFrom, customTo]);
 
-  // 実際にAPIに送る値: タップ優先、なければテキスト入力
-  const effectiveProgram = tappedProgram || programFilter;
-  const effectiveInstructor = tappedInstructor || instructorFilter;
-
   const fetchStats = useCallback(async () => {
     setLoading(true);
     try {
@@ -218,19 +190,25 @@ export default function HistoryAnalytics() {
           params.set('to', dates.to);
         }
       }
-      if (effectiveProgram) params.set('program', effectiveProgram);
-      if (effectiveInstructor) params.set('instructor', effectiveInstructor);
+      if (selectedPrograms.length > 0) params.set('programs', selectedPrograms.join(','));
+      if (selectedInstructors.length > 0) params.set('instructors', selectedInstructors.join(','));
       if (splitInstructor) params.set('splitInstructor', '1');
 
       const res = await fetch(`/api/history/stats?${params.toString()}`);
       const data = await res.json();
       setStats(data);
+
+      // フィルタ未適用時に候補リストを更新
+      if (selectedPrograms.length === 0 && selectedInstructors.length === 0) {
+        setProgramOptions((data.programRanking || []).map((r: RankingItem) => r.name));
+        setInstructorOptions((data.instructorRanking || []).map((r: RankingItem) => r.name));
+      }
     } catch {
       setStats(null);
     } finally {
       setLoading(false);
     }
-  }, [period, customFrom, customTo, effectiveProgram, effectiveInstructor, splitInstructor]);
+  }, [period, customFrom, customTo, selectedPrograms, selectedInstructors, splitInstructor]);
 
   useEffect(() => {
     fetchStats();
@@ -240,27 +218,24 @@ export default function HistoryAnalytics() {
   const uniquePrograms = useMemo(() => stats?.programRanking.length ?? 0, [stats]);
 
   const handleTapProgram = useCallback((name: string) => {
-    setTappedProgram(name);
+    setTappedProgram(prev => prev === name ? null : name);
   }, []);
 
   const handleTapInstructor = useCallback((name: string) => {
-    setTappedInstructor(name);
+    setSelectedInstructors(prev =>
+      prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]
+    );
   }, []);
 
-  const hasActiveFilter = !!(tappedProgram || tappedInstructor);
-
-  const hasAnyFilter = period !== 'all' || !!programInput || !!instructorInput || !!tappedProgram || !!tappedInstructor || splitInstructor;
+  const hasAnyFilter = period !== 'all' || selectedPrograms.length > 0 || selectedInstructors.length > 0 || splitInstructor;
 
   const handleClearAll = useCallback(() => {
     setPeriod('all');
     setCustomFrom('');
     setCustomTo('');
-    setProgramInput('');
-    setInstructorInput('');
-    setProgramFilter('');
-    setInstructorFilter('');
+    setSelectedPrograms([]);
+    setSelectedInstructors([]);
     setTappedProgram(null);
-    setTappedInstructor(null);
     setSplitInstructor(false);
   }, []);
 
@@ -268,8 +243,8 @@ export default function HistoryAnalytics() {
     <div className="space-y-4">
       {/* フィルター */}
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
-          <SelectTrigger className="w-36">
+        <Select value={period} onValueChange={handlePeriodChange}>
+          <SelectTrigger className="w-[130px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -281,24 +256,20 @@ export default function HistoryAnalytics() {
           </SelectContent>
         </Select>
 
-        {!tappedProgram && (
-          <Input
-            type="text"
-            placeholder="プログラム検索..."
-            value={programInput}
-            onChange={(e) => setProgramInput(e.target.value)}
-            className="w-36"
-          />
-        )}
-        {!tappedInstructor && (
-          <Input
-            type="text"
-            placeholder="IR検索..."
-            value={instructorInput}
-            onChange={(e) => setInstructorInput(e.target.value)}
-            className="w-28"
-          />
-        )}
+        <InstructorMultiSelect
+          instructors={programOptions}
+          selected={selectedPrograms}
+          onChange={setSelectedPrograms}
+          label="プログラム"
+          labelUnit="件"
+          searchPlaceholder="プログラム名で検索..."
+        />
+        <InstructorMultiSelect
+          instructors={instructorOptions}
+          selected={selectedInstructors}
+          onChange={setSelectedInstructors}
+        />
+
         {hasAnyFilter && (
           <Button
             variant="ghost"
@@ -330,24 +301,12 @@ export default function HistoryAnalytics() {
         </div>
       )}
 
-      {/* タップフィルターチップ */}
-      {hasActiveFilter && (
-        <div className="flex flex-wrap items-center gap-2">
-          {tappedProgram && (
-            <FilterChip label={tappedProgram} onClear={() => setTappedProgram(null)} />
-          )}
-          {tappedInstructor && (
-            <FilterChip label={tappedInstructor} onClear={() => setTappedInstructor(null)} />
-          )}
-        </div>
-      )}
-
       {/* Wイントラ分割 */}
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input
           type="checkbox"
           checked={splitInstructor}
-          onChange={(e) => setSplitInstructor(e.target.checked)}
+          onChange={(e) => handleSplitChange(e.target.checked)}
           className="rounded border-gray-300"
         />
         Wイントラを個別に集計
