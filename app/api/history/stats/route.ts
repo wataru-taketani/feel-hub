@@ -33,22 +33,6 @@ export async function GET(request: NextRequest) {
   if (program) query = query.ilike('program_name', `%${program}%`);
   if (instructor) query = query.ilike('instructor_name', `%${instructor}%`);
 
-  const programs = searchParams.get('programs');
-  const instructors = searchParams.get('instructors');
-  if (programs) {
-    query = query.in('program_name', programs.split(','));
-  }
-  if (instructors) {
-    const list = instructors.split(',');
-    if (splitInstructor) {
-      // Wイントラ分割時: 個々の名前で部分一致検索
-      const orConditions = list.map(name => `instructor_name.ilike.%${name}%`).join(',');
-      query = query.or(orConditions);
-    } else {
-      query = query.in('instructor_name', list);
-    }
-  }
-
   const { data, error } = await query;
 
   if (error) {
