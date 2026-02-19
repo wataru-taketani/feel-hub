@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, ChevronDown, Star, Loader2, ArrowUpDown, Save } from 'lucide-react';
-import { formatStudio, STUDIO_REGIONS } from '@/lib/lessonUtils';
+import { formatStudio, STUDIO_REGIONS, parseHomeStoreToStudio } from '@/lib/lessonUtils';
 import type { AttendanceRecord } from '@/types';
 
 const SeatMap = lazy(() => import('@/components/lessons/SeatMap'));
@@ -86,7 +86,9 @@ export default function StudioTab({ programColors }: StudioTabProps) {
         const prefsData = await prefsRes.json();
         const map: Record<string, number> = {};
         for (const item of (statsData.studioRanking || []) as StudioRanking[]) {
-          map[item.name] = item.count;
+          // store_name は「銀座（GNZ）」形式 → STUDIO_REGIONS の「銀座」形式に正規化
+          const normalized = parseHomeStoreToStudio(item.name);
+          map[normalized] = (map[normalized] || 0) + item.count;
         }
         setRankingMap(map);
         setPreferences(prefsData.preferences || {});
@@ -141,7 +143,9 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     setSelectedSeats(preferences[studio] || []);
 
     try {
-      const res = await fetch(`/api/history?store=${encodeURIComponent(studio)}`);
+      // store_name は「銀座（GNZ）」形式で格納されている
+      const storeName = formatStudio(studio);
+      const res = await fetch(`/api/history?store=${encodeURIComponent(storeName)}`);
       const data = await res.json();
       const records: AttendanceRecord[] = data.records || [];
 
