@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { Loader2, Star, SlidersHorizontal, ChevronDown, RotateCcw } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 import type { Lesson } from "@/types";
 import { matchesProgram, parseHomeStoreToStudio } from "@/lib/lessonUtils";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,6 @@ import { useFilterPresets } from "@/hooks/useFilterPresets";
 import { useWaitlist } from "@/hooks/useWaitlist";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
 import LessonDetailModal from "@/components/lessons/LessonDetailModal";
@@ -298,20 +297,6 @@ export default function LessonsPage() {
 
   // フィルタパネル開閉
   const [filterOpen, setFilterOpen] = useState(false);
-  const activeFilterCount =
-    (filters.studios.length > 0 ? 1 : 0) +
-    (filters.programSearch ? 1 : 0) +
-    (filters.instructors.length > 0 ? 1 : 0) +
-    (filters.ticketFilter !== "ALL" ? 1 : 0);
-
-  // フィルタリセット（保存済みプリセットがあればそこに戻す、なければデフォルト）
-  const handleResetFilters = useCallback(() => {
-    if (preset) {
-      setFilters({ ...preset.filters, bookmarkOnly: false });
-    } else {
-      setFilters({ ...DEFAULT_FILTERS, studios: defaultStudios });
-    }
-  }, [preset, defaultStudios]);
 
   // ツールバー要素（CalendarViewのスロットに渡す）
   const toolbarLeft = (
@@ -327,49 +312,6 @@ export default function LessonsPage() {
       <Star className={cn("h-3.5 w-3.5", filters.bookmarkOnly && "fill-white")} />
       <span className="hidden sm:inline">ブックマーク</span>
     </Button>
-  );
-
-  // リセットボタン表示条件: リセット先と現在の条件が異なるときだけ表示
-  const filtersMatchResetTarget = useMemo(() => {
-    const target = preset
-      ? { studios: preset.filters.studios, programSearch: preset.filters.programSearch, instructors: preset.filters.instructors, ticketFilter: preset.filters.ticketFilter }
-      : { studios: defaultStudios, programSearch: "", instructors: [] as string[], ticketFilter: "ALL" as const };
-    return (
-      [...filters.studios].sort().join(",") === [...target.studios].sort().join(",") &&
-      filters.programSearch === target.programSearch &&
-      [...filters.instructors].sort().join(",") === [...target.instructors].sort().join(",") &&
-      filters.ticketFilter === target.ticketFilter
-    );
-  }, [filters, preset, defaultStudios]);
-
-  const toolbarRight = (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8 text-xs gap-1.5 px-2 sm:px-3"
-        onClick={() => setFilterOpen(!filterOpen)}
-      >
-        <SlidersHorizontal className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">絞り込み</span>
-        {activeFilterCount > 0 && (
-          <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
-            {activeFilterCount}
-          </Badge>
-        )}
-        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", filterOpen && "rotate-180")} />
-      </Button>
-      {!filtersMatchResetTarget && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 text-xs gap-1 px-2 text-muted-foreground"
-          onClick={handleResetFilters}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-        </Button>
-      )}
-    </>
   );
 
   const filterPanel = (
@@ -430,7 +372,6 @@ export default function LessonsPage() {
             onTapLesson={handleTapLesson}
             bookmarkOnly={filters.bookmarkOnly}
             toolbarLeft={toolbarLeft}
-            toolbarRight={toolbarRight}
             middleContent={filterPanel}
           />
         )}
