@@ -29,17 +29,13 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // セッションの更新（重要: getUser()を呼び出してセッションを更新）
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // 認証が必要なルートの保護（オプション）
-  // if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-  //   const url = request.nextUrl.clone();
-  //   url.pathname = '/login';
-  //   return NextResponse.redirect(url);
-  // }
+  // セッションの更新（エラーが出てもリクエストを続行する）
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    // Cookieが壊れている・セッションが無効な場合でも続行
+    // 400/401エラーでサイトが壊れないようにする
+  }
 
   return supabaseResponse;
 }
