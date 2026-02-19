@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { RotateCcw, Star, Search, SlidersHorizontal, ChevronDown, X, MapPin, User } from 'lucide-react';
+import { RotateCcw, Star, Search, SlidersHorizontal, ChevronDown, X, MapPin, User, Heart, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import StudioMultiSelect from './StudioMultiSelect';
 import InstructorMultiSelect from './InstructorMultiSelect';
-import PresetManager from './PresetManager';
 import type { FilterPreset } from '@/types';
 
 export interface FilterState {
@@ -24,12 +23,9 @@ interface FilterBarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
   allInstructors: string[];
-  presets: FilterPreset[];
-  onLoadPreset: (preset: FilterPreset) => void;
-  onSavePreset: (name: string) => void;
-  onUpdatePreset: (id: string) => void;
-  onDeletePreset: (id: string) => void;
-  onSetDefaultPreset: (id: string | null) => void;
+  preset: FilterPreset | null;
+  onSavePreset: () => void;
+  onLoadPreset: () => void;
   /** ツールバー行を非表示（親で統合描画する場合） */
   hideToolbar?: boolean;
   /** 外部制御のopen state */
@@ -45,12 +41,9 @@ export default function FilterBar({
   filters,
   onChange,
   allInstructors,
-  presets,
-  onLoadPreset,
+  preset,
   onSavePreset,
-  onUpdatePreset,
-  onDeletePreset,
-  onSetDefaultPreset,
+  onLoadPreset,
   hideToolbar,
   open: controlledOpen,
   onOpenChange,
@@ -206,27 +199,51 @@ export default function FilterBar({
                 }}
                 variant="outline"
                 size="sm"
+                className="justify-start"
               >
                 <ToggleGroupItem value="ALL" className="text-xs h-7 px-3 data-[state=on]:bg-foreground data-[state=on]:text-background">全て</ToggleGroupItem>
                 <ToggleGroupItem value="NORMAL" className="text-xs h-7 px-3 data-[state=on]:bg-foreground data-[state=on]:text-background">通常</ToggleGroupItem>
                 <ToggleGroupItem value="ADDITIONAL" className="text-xs h-7 px-3 data-[state=on]:bg-foreground data-[state=on]:text-background">ADD</ToggleGroupItem>
               </ToggleGroup>
             </div>
-
-            {/* セクション4: お気に入り条件 */}
-            <div className="p-3 space-y-2">
-              <SectionLabel>お気に入り条件</SectionLabel>
-              <PresetManager
-                presets={presets}
-                onLoad={onLoadPreset}
-                onSave={onSavePreset}
-                onUpdate={onUpdatePreset}
-                onDelete={onDeletePreset}
-                onSetDefault={onSetDefaultPreset}
-              />
-            </div>
           </div>
         </div>
+      </div>
+
+      {/* ── お気に入り条件ボタン（折り畳みの外、常時表示） ── */}
+      <div className="flex items-center gap-2">
+        {preset ? (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={onLoadPreset}
+            >
+              <Heart className="h-3 w-3" />
+              読み込む
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={onSavePreset}
+            >
+              <Save className="h-3 w-3" />
+              上書き保存
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={onSavePreset}
+          >
+            <Heart className="h-3 w-3" />
+            現在の条件を保存
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Loader2, Star, SlidersHorizontal, ChevronDown, RotateCcw } from "lucide-react";
-import type { Lesson, FilterPreset } from "@/types";
+import type { Lesson } from "@/types";
 import { matchesProgram, parseHomeStoreToStudio } from "@/lib/lessonUtils";
 import { cn } from "@/lib/utils";
 import { useBookmarks } from "@/hooks/useBookmarks";
@@ -35,7 +35,7 @@ export default function LessonsPage() {
 
   const { user } = useAuthContext();
   const { bookmarks, toggle, isBookmarked, loaded: bookmarksLoaded } = useBookmarks();
-  const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
+  const { preset, savePreset, isLoaded: presetsLoaded } = useFilterPresets();
   const { isOnWaitlist, getAutoReserve, addToWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
 
   // デフォルトスタジオ解決
@@ -155,12 +155,11 @@ export default function LessonsPage() {
     if (!presetsLoaded || !profileLoaded || studioResolvedRef.current) return;
     studioResolvedRef.current = true;
 
-    // ① デフォルトプリセット
-    const defaultPreset = presets.find((p) => p.isDefault);
-    if (defaultPreset) {
-      const studios = defaultPreset.filters.studios || [];
+    // ① 保存済みプリセット
+    if (preset) {
+      const studios = preset.filters.studios || [];
       setDefaultStudios(studios);
-      setFilters({ ...defaultPreset.filters, bookmarkOnly: false });
+      setFilters({ ...preset.filters, bookmarkOnly: false });
       prevStudiosRef.current = studios;
       fetchLessons(studios);
       return;
@@ -198,7 +197,7 @@ export default function LessonsPage() {
 
     // ④ ダイアログ表示
     setShowStudioDialog(true);
-  }, [presetsLoaded, profileLoaded, presets, fetchLessons]);
+  }, [presetsLoaded, profileLoaded, preset, fetchLessons]);
 
   // スタジオフィルタ変更検知 → API再取得
   useEffect(() => {
@@ -272,45 +271,24 @@ export default function LessonsPage() {
   const displayCount = filteredLessons.length;
 
   // プリセット読み込み
-  const handleLoadPreset = useCallback(
-    (preset: FilterPreset) => {
+  const handleLoadPreset = useCallback(() => {
+    if (preset) {
       setFilters({
         ...preset.filters,
         bookmarkOnly: false,
       });
-    },
-    []
-  );
+    }
+  }, [preset]);
 
-  // プリセット保存
-  const handleSavePreset = useCallback(
-    (name: string) => {
-      savePreset({
-        id: crypto.randomUUID(),
-        name,
-        filters: {
-          studios: filters.studios,
-          programSearch: filters.programSearch,
-          instructors: filters.instructors,
-          ticketFilter: filters.ticketFilter,
-        },
-      });
-    },
-    [filters, savePreset]
-  );
-
-  // プリセット更新
-  const handleUpdatePreset = useCallback(
-    (id: string) => {
-      updatePreset(id, {
-        studios: filters.studios,
-        programSearch: filters.programSearch,
-        instructors: filters.instructors,
-        ticketFilter: filters.ticketFilter,
-      });
-    },
-    [filters, updatePreset]
-  );
+  // プリセット保存（現在の条件で保存/上書き）
+  const handleSavePreset = useCallback(() => {
+    savePreset({
+      studios: filters.studios,
+      programSearch: filters.programSearch,
+      instructors: filters.instructors,
+      ticketFilter: filters.ticketFilter,
+    });
+  }, [filters, savePreset]);
 
   // フィルタパネル開閉
   const [filterOpen, setFilterOpen] = useState(false);
@@ -379,12 +357,9 @@ export default function LessonsPage() {
       filters={filters}
       onChange={setFilters}
       allInstructors={allInstructors}
-      presets={presets}
+      preset={preset}
       onLoadPreset={handleLoadPreset}
       onSavePreset={handleSavePreset}
-      onUpdatePreset={handleUpdatePreset}
-      onDeletePreset={removePreset}
-      onSetDefaultPreset={setDefaultPreset}
     />
   );
 

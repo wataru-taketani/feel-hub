@@ -23,11 +23,9 @@ export interface Lesson {
   sidHash?: string; // 座席マップ取得用ハッシュ
 }
 
-// フィルタプリセット
+// フィルタプリセット（ユーザーごとに1つ、名前なし）
 export interface FilterPreset {
   id: string;
-  name: string;
-  isDefault?: boolean;
   filters: {
     studios: string[];
     programSearch: string;

@@ -6,27 +6,24 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ presets: [] });
+    return NextResponse.json({ preset: null });
   }
 
   const { data, error } = await supabase
     .from('filter_presets')
-    .select('id, name, is_default, filters')
+    .select('id, filters')
     .eq('user_id', user.id)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .limit(1);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const presets = (data || []).map((row) => ({
-    id: row.id,
-    name: row.name,
-    isDefault: row.is_default,
-    filters: row.filters,
-  }));
+  const row = data?.[0];
+  const preset = row ? { id: row.id, filters: row.filters } : null;
 
-  return NextResponse.json({ presets });
+  return NextResponse.json({ preset });
 }
 
 export async function PUT(request: NextRequest) {
@@ -38,96 +35,42 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { action, preset, id, filters, name, isDefault } = body;
+  const { filters } = body;
 
-  switch (action) {
-    case 'save': {
-      if (!preset) return NextResponse.json({ error: 'preset required' }, { status: 400 });
-      const { error } = await supabase.from('filter_presets').upsert({
-        id: preset.id,
-        user_id: user.id,
-        name: preset.name,
-        is_default: preset.isDefault || false,
-        filters: preset.filters,
-      });
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true });
-    }
-
-    case 'update': {
-      if (!id || !filters) return NextResponse.json({ error: 'id and filters required' }, { status: 400 });
-      const { error } = await supabase.from('filter_presets')
-        .update({ filters })
-        .eq('id', id)
-        .eq('user_id', user.id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true });
-    }
-
-    case 'rename': {
-      if (!id || !name) return NextResponse.json({ error: 'id and name required' }, { status: 400 });
-      const { error } = await supabase.from('filter_presets')
-        .update({ name })
-        .eq('id', id)
-        .eq('user_id', user.id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true });
-    }
-
-    case 'setDefault': {
-      // 全件 false → 対象 true
-      await supabase.from('filter_presets')
-        .update({ is_default: false })
-        .eq('user_id', user.id);
-      if (id) {
-        await supabase.from('filter_presets')
-          .update({ is_default: true })
-          .eq('id', id)
-          .eq('user_id', user.id);
-      }
-      return NextResponse.json({ success: true });
-    }
-
-    case 'delete': {
-      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-      const { error } = await supabase.from('filter_presets')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true });
-    }
-
-    case 'migrate': {
-      // localStorage → Supabase 一括移行
-      const presets = body.presets;
-      if (!Array.isArray(presets)) return NextResponse.json({ error: 'presets required' }, { status: 400 });
-      const rows = presets.map((p: { id: string; name: string; isDefault?: boolean; filters: unknown }) => ({
-        id: p.id,
-        user_id: user.id,
-        name: p.name,
-        is_default: p.isDefault || false,
-        filters: p.filters,
-      }));
-      const { error } = await supabase.from('filter_presets').upsert(rows);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-      // 移行後のデータを返す
-      const { data } = await supabase.from('filter_presets')
-        .select('id, name, is_default, filters')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
-
-      const merged = (data || []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        isDefault: row.is_default,
-        filters: row.filters,
-      }));
-      return NextResponse.json({ success: true, presets: merged });
-    }
-
-    default:
-      return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+  if (!filters) {
+    return NextResponse.json({ error: 'filters required' }, { status: 400 });
   }
+
+  // 既存行を取得（最新1行）
+  const { data: existing } = await supabase
+    .from('filter_presets')
+    .select('id')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (existing && existing.length > 0) {
+    // 最新1行を更新
+    const { error } = await supabase
+      .from('filter_presets')
+      .update({ filters, name: '', is_default: true })
+      .eq('id', existing[0].id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // 古い行をクリーンアップ
+    if (existing.length > 1) {
+      const oldIds = existing.slice(1).map((r) => r.id);
+      await supabase.from('filter_presets').delete().in('id', oldIds);
+    }
+  } else {
+    // 新規挿入
+    const { error } = await supabase.from('filter_presets').insert({
+      user_id: user.id,
+      name: '',
+      is_default: true,
+      filters,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }
