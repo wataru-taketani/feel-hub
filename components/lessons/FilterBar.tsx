@@ -233,7 +233,7 @@ export default function FilterBar({
             <div className="p-3 space-y-2">
               <SectionLabel>条件の保存</SectionLabel>
               {!preset ? (
-                /* State A: 未保存 */
+                /* 未保存 */
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground">💡 保存すると次回から自動で適用されます</p>
                   <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={onSavePreset}>
@@ -241,27 +241,26 @@ export default function FilterBar({
                     保存する
                   </Button>
                 </div>
-              ) : filtersMatchPreset(filters, preset) ? (
-                /* State B: 保存済み・条件一致 */
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-emerald-600">
-                    <Check className="h-3.5 w-3.5" />
-                    保存した条件で表示中
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" onClick={onDeletePreset}>
-                    <Trash2 className="h-3 w-3" />
-                    削除
-                  </Button>
-                </div>
               ) : (
-                /* State C: 保存済み・条件不一致 */
+                /* 保存済み: 状態テキスト + 常時アクションボタン */
                 <div className="space-y-2">
-                  <p className="text-xs text-amber-600">保存した条件と異なります</p>
+                  {filtersMatchPreset(filters, preset) ? (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-600">
+                      <Check className="h-3.5 w-3.5" />
+                      保存した条件で表示中
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-600">
+                      保存した条件と異なります
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={onLoadPreset}>
-                      <RotateCcw className="h-3 w-3" />
-                      元に戻す
-                    </Button>
+                    {!filtersMatchPreset(filters, preset) && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={onLoadPreset}>
+                        <RotateCcw className="h-3 w-3" />
+                        元に戻す
+                      </Button>
+                    )}
                     <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={onSavePreset}>
                       <Save className="h-3 w-3" />
                       上書き保存
