@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, ChevronDown, Star, Loader2, ArrowUpDown, Save } from 'lucide-react';
-import { formatStudio, STUDIO_REGIONS, parseHomeStoreToStudio } from '@/lib/lessonUtils';
+import { formatStudio, STUDIO_REGIONS } from '@/lib/lessonUtils';
 import type { AttendanceRecord } from '@/types';
 
 const SeatMap = lazy(() => import('@/components/lessons/SeatMap'));
@@ -21,6 +21,11 @@ interface StudioRanking {
 
 interface StudioTabProps {
   programColors: ProgramColorMap;
+}
+
+// store_name から略称部分を除去: "銀座（GNZ）" or "銀座(GNZ)" → "銀座"
+function stripStoreAbbr(storeName: string): string {
+  return storeName.replace(/[（(].*[）)]$/, '').trim();
 }
 
 // STUDIO_REGIONS からフラットなスタジオ名リスト（エリア順）を生成
@@ -53,6 +58,8 @@ type SortMode = 'count' | 'area';
 
 export default function StudioTab({ programColors }: StudioTabProps) {
   const [rankingMap, setRankingMap] = useState<Record<string, number>>({});
+  // 正規化名 → 元の store_name（API呼び出し用）
+  const [storeNameMap, setStoreNameMap] = useState<Record<string, string>>({});
   const [preferences, setPreferences] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('count');
@@ -85,12 +92,15 @@ export default function StudioTab({ programColors }: StudioTabProps) {
         const statsData = await statsRes.json();
         const prefsData = await prefsRes.json();
         const map: Record<string, number> = {};
+        const nameMap: Record<string, string> = {};
         for (const item of (statsData.studioRanking || []) as StudioRanking[]) {
-          // store_name は「銀座（GNZ）」形式 → STUDIO_REGIONS の「銀座」形式に正規化
-          const normalized = parseHomeStoreToStudio(item.name);
+          // store_name は「銀座（GNZ）」or「銀座(GNZ)」形式 → 「銀座」に正規化
+          const normalized = stripStoreAbbr(item.name);
           map[normalized] = (map[normalized] || 0) + item.count;
+          nameMap[normalized] = item.name; // 元のstore_name を保持
         }
         setRankingMap(map);
+        setStoreNameMap(nameMap);
         setPreferences(prefsData.preferences || {});
       } catch {
         // ignore
@@ -143,8 +153,8 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     setSelectedSeats(preferences[studio] || []);
 
     try {
-      // store_name は「銀座（GNZ）」形式で格納されている
-      const storeName = formatStudio(studio);
+      // store_name は元の形式（銀座（GNZ） or 銀座(GNZ)）で検索
+      const storeName = storeNameMap[studio] || studio;
       const res = await fetch(`/api/history?store=${encodeURIComponent(storeName)}`);
       const data = await res.json();
       const records: AttendanceRecord[] = data.records || [];
@@ -167,7 +177,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     } finally {
       setRecentLoading(false);
     }
-  }, [expandedStudio, preferences]);
+  }, [expandedStudio, preferences, storeNameMap]);
 
   // SeatMap 表示トグル
   const handleShowSeatMap = async (studio: string) => {

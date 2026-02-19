@@ -195,10 +195,12 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
             <div
               key={bikeNo}
               className={`absolute flex items-center justify-center rounded-full ${
-                isMultiSelected
-                  ? 'bg-white border-2 border-gray-400 text-gray-700 ring-2 ring-yellow-400 cursor-pointer'
-                  : bikeStyle(bike.status, !!(interactive || multiSelect), isSelected)
-              } ${isPreferred && !isSelected && !isMultiSelected ? 'ring-2 ring-yellow-400' : ''}`}
+                multiSelect
+                  ? isMultiSelected
+                    ? 'bg-white border-2 border-gray-400 text-gray-700 ring-2 ring-yellow-400 cursor-pointer'
+                    : 'bg-white border-2 border-gray-400 text-gray-700 cursor-pointer'
+                  : bikeStyle(bike.status, !!interactive, isSelected)
+              } ${!multiSelect && isPreferred && !isSelected ? 'ring-2 ring-yellow-400' : ''}`}
               style={{
                 left: `${(bike.x / data.mapWidth) * 100}%`,
                 top: `${(bike.y / data.mapHeight) * 100}%`,
