@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   const from = searchParams.get('from');   // YYYY-MM-DD
   const to = searchParams.get('to');       // YYYY-MM-DD
   const program = searchParams.get('program'); // exact match
+  const store = searchParams.get('store');     // exact match
 
   let query = supabaseAdmin
     .from('attendance_history')
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
   if (from) query = query.gte('shift_date', from);
   if (to) query = query.lte('shift_date', to);
   if (program) query = query.eq('program_name', program);
+  if (store) query = query.eq('store_name', store);
 
   const { data, error } = await query;
 

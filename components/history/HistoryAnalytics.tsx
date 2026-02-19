@@ -14,6 +14,8 @@ type HistoryRecord = {
   instructorName: string;
   storeName: string;
   startTime: string;
+  programName: string;
+  sheetNo: number | null;
 };
 
 type RankingItem = { name: string; count: number };
@@ -130,6 +132,7 @@ export default function HistoryAnalytics() {
   // タップで設定されたフィルター（完全一致）
   const [tappedProgram, setTappedProgram] = useState<string | null>(null);
   const [tappedInstructor, setTappedInstructor] = useState<string | null>(null);
+  const [tappedStudio, setTappedStudio] = useState<string | null>(null);
 
   const [splitInstructor, setSplitInstructor] = useState(false);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
@@ -142,6 +145,11 @@ export default function HistoryAnalytics() {
   const [detailRecords, setDetailRecords] = useState<HistoryRecord[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailExpanded, setDetailExpanded] = useState(false);
+
+  // スタジオ詳細レコード
+  const [studioDetailRecords, setStudioDetailRecords] = useState<HistoryRecord[]>([]);
+  const [studioDetailLoading, setStudioDetailLoading] = useState(false);
+  const [studioDetailExpanded, setStudioDetailExpanded] = useState(false);
 
   useEffect(() => {
     fetch('/api/programs')
@@ -204,9 +212,44 @@ export default function HistoryAnalytics() {
     fetchDetail();
   }, [tappedProgram, period, customFrom, customTo]);
 
+  // スタジオ詳細レコード取得
+  useEffect(() => {
+    if (!tappedStudio) {
+      setStudioDetailRecords([]);
+      setStudioDetailExpanded(false);
+      return;
+    }
+    const fetchStudioDetail = async () => {
+      setStudioDetailLoading(true);
+      setStudioDetailExpanded(false);
+      try {
+        const params = new URLSearchParams({ store: tappedStudio });
+        if (period === 'custom') {
+          if (customFrom) params.set('from', customFrom);
+          if (customTo) params.set('to', customTo);
+        } else {
+          const dates = getPeriodDates(period);
+          if (dates) {
+            params.set('from', dates.from);
+            params.set('to', dates.to);
+          }
+        }
+        const res = await fetch(`/api/history?${params.toString()}`);
+        const data = await res.json();
+        setStudioDetailRecords(data.records || []);
+      } catch {
+        setStudioDetailRecords([]);
+      } finally {
+        setStudioDetailLoading(false);
+      }
+    };
+    fetchStudioDetail();
+  }, [tappedStudio, period, customFrom, customTo]);
+
   // 実際にAPIに送る値: タップ優先、なければテキスト入力
   const effectiveProgram = tappedProgram || programFilter;
   const effectiveInstructor = tappedInstructor || instructorFilter;
+  const effectiveStudio = tappedStudio || '';
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -224,6 +267,7 @@ export default function HistoryAnalytics() {
       }
       if (effectiveProgram) params.set('program', effectiveProgram);
       if (effectiveInstructor) params.set('instructor', effectiveInstructor);
+      if (effectiveStudio) params.set('studio', effectiveStudio);
       if (splitInstructor) params.set('splitInstructor', '1');
 
       const res = await fetch(`/api/history/stats?${params.toString()}`);
@@ -240,7 +284,7 @@ export default function HistoryAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, [period, customFrom, customTo, effectiveProgram, effectiveInstructor, splitInstructor]);
+  }, [period, customFrom, customTo, effectiveProgram, effectiveInstructor, effectiveStudio, splitInstructor]);
 
   useEffect(() => {
     fetchStats();
@@ -257,9 +301,13 @@ export default function HistoryAnalytics() {
     setTappedInstructor(name);
   }, []);
 
-  const hasActiveFilter = !!(tappedProgram || tappedInstructor);
+  const handleTapStudio = useCallback((name: string) => {
+    setTappedStudio(name);
+  }, []);
 
-  const hasAnyFilter = period !== 'all' || !!programInput || !!instructorInput || !!tappedProgram || !!tappedInstructor || splitInstructor;
+  const hasActiveFilter = !!(tappedProgram || tappedInstructor || tappedStudio);
+
+  const hasAnyFilter = period !== 'all' || !!programInput || !!instructorInput || !!tappedProgram || !!tappedInstructor || !!tappedStudio || splitInstructor;
 
   const handleClearAll = useCallback(() => {
     setPeriod('all');
@@ -271,6 +319,7 @@ export default function HistoryAnalytics() {
     setInstructorFilter('');
     setTappedProgram(null);
     setTappedInstructor(null);
+    setTappedStudio(null);
     setSplitInstructor(false);
   }, []);
 
@@ -349,6 +398,9 @@ export default function HistoryAnalytics() {
           {tappedInstructor && (
             <FilterChip label={tappedInstructor} onClear={() => setTappedInstructor(null)} />
           )}
+          {tappedStudio && (
+            <FilterChip label={tappedStudio} onClear={() => setTappedStudio(null)} />
+          )}
         </div>
       )}
 
@@ -415,6 +467,7 @@ export default function HistoryAnalytics() {
               <RankingSection
                 title="スタジオ"
                 items={stats.studioRanking}
+                onTapItem={handleTapStudio}
               />
             </CardContent>
           </Card>
@@ -463,6 +516,74 @@ export default function HistoryAnalytics() {
                       >
                         {detailExpanded ? '閉じる' : `もっと見る（全${detailRecords.length}件）`}
                         <ChevronDown className={`h-3 w-3 transition-transform ${detailExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* スタジオ詳細レコード */}
+          {tappedStudio && (
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-medium">{tappedStudio}</span>
+                  <span className="text-xs text-muted-foreground">受講履歴</span>
+                </div>
+                {studioDetailLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : studioDetailRecords.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-2">レコードなし</p>
+                ) : (
+                  <>
+                    {/* バイクNo.分布 */}
+                    {(() => {
+                      const bikeCounts: Record<string, number> = {};
+                      for (const r of studioDetailRecords) {
+                        if (r.sheetNo) {
+                          const key = `#${r.sheetNo}`;
+                          bikeCounts[key] = (bikeCounts[key] || 0) + 1;
+                        }
+                      }
+                      const bikeRanking = Object.entries(bikeCounts)
+                        .sort((a, b) => b[1] - a[1]);
+                      if (bikeRanking.length === 0) return null;
+                      return (
+                        <div className="mb-3 text-sm">
+                          <span className="text-muted-foreground text-xs">よく使う席: </span>
+                          {bikeRanking.slice(0, 5).map(([no, count], i) => (
+                            <span key={no}>
+                              {i > 0 && <span className="text-muted-foreground"> </span>}
+                              <span className="font-medium">{no}</span>
+                              <span className="text-muted-foreground text-xs">({count}回)</span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    <div className="space-y-0.5">
+                      {(studioDetailExpanded ? studioDetailRecords : studioDetailRecords.slice(0, INITIAL_SHOW)).map((r, i) => (
+                        <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-2">
+                          <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
+                          <span className="truncate flex-1">{r.programName}</span>
+                          <span className="truncate text-xs text-muted-foreground">{r.instructorName}</span>
+                          {r.sheetNo && (
+                            <span className="text-xs font-medium whitespace-nowrap">#{r.sheetNo}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {studioDetailRecords.length > INITIAL_SHOW && (
+                      <button
+                        className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-0.5"
+                        onClick={() => setStudioDetailExpanded(!studioDetailExpanded)}
+                      >
+                        {studioDetailExpanded ? '閉じる' : `もっと見る（全${studioDetailRecords.length}件）`}
+                        <ChevronDown className={`h-3 w-3 transition-transform ${studioDetailExpanded ? 'rotate-180' : ''}`} />
                       </button>
                     )}
                   </>

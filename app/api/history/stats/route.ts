@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   const to = searchParams.get('to');
   const program = searchParams.get('program');
   const instructor = searchParams.get('instructor');
+  const studio = searchParams.get('studio');
   const splitInstructor = searchParams.get('splitInstructor') === '1';
 
   let query = supabaseAdmin
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
   if (to) query = query.lte('shift_date', to);
   if (program) query = query.ilike('program_name', `%${program}%`);
   if (instructor) query = query.ilike('instructor_name', `%${instructor}%`);
+  if (studio) query = query.ilike('store_name', `%${studio}%`);
 
   const { data, error } = await query;
 
