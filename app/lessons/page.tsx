@@ -34,7 +34,7 @@ export default function LessonsPage() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
 
   const { user } = useAuthContext();
-  const { bookmarks, toggle, isBookmarked } = useBookmarks();
+  const { bookmarks, toggle, isBookmarked, loaded: bookmarksLoaded } = useBookmarks();
   const { presets, save: savePreset, update: updatePreset, remove: removePreset, setDefault: setDefaultPreset, isLoaded: presetsLoaded } = useFilterPresets();
   const { isOnWaitlist, getAutoReserve, addToWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
 
@@ -70,9 +70,9 @@ export default function LessonsPage() {
   }, []);
 
   // レッスン取得（スタジオ指定 + 予約スタジオも含める）
-  const fetchLessons = useCallback(async (studios: string[]) => {
+  const fetchLessons = useCallback(async (studios: string[], background = false) => {
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
       setError(null);
       const allStudios = studios.length > 0
         ? [...new Set([...studios, ...reservedStudiosRef.current, ...bookmarkedStudiosRef.current])]
@@ -82,13 +82,13 @@ export default function LessonsPage() {
       const data = await response.json();
       if (data.success) {
         setAllLessons(data.data);
-      } else {
+      } else if (!background) {
         setError("レッスン情報の取得に失敗しました");
       }
     } catch {
-      setError("レッスン情報の取得中にエラーが発生しました");
+      if (!background) setError("レッスン情報の取得中にエラーが発生しました");
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, []);
 
@@ -143,10 +143,10 @@ export default function LessonsPage() {
     const studios = [...new Set(Object.values(bookmarks).map(b => b.studio).filter(Boolean))];
     const prev = bookmarkedStudiosRef.current;
     bookmarkedStudiosRef.current = studios;
-    // ブックマークが初めてロードされ、初回fetchが完了済みなら再取得
+    // ブックマークが初めてロードされ、初回fetchが完了済みなら背景で再取得（ローディング表示なし）
     if (!bookmarksFetchedRef.current && studios.length > 0 && prev.length === 0 && prevStudiosRef.current !== undefined) {
       bookmarksFetchedRef.current = true;
-      fetchLessons(prevStudiosRef.current);
+      fetchLessons(prevStudiosRef.current, true);
     }
   }, [bookmarks, fetchLessons]);
 
@@ -263,10 +263,10 @@ export default function LessonsPage() {
     [allLessons, isReserved]
   );
 
-  // 固定行用: ブックマーク済み（全スタジオ、bookmarkON時のみ）
+  // 固定行用: ブックマーク済み（全スタジオ、bookmarkON時かつロード完了時のみ）
   const bookmarkedLessons = useMemo(() =>
-    filters.bookmarkOnly ? allLessons.filter(l => isBookmarked(l)) : [],
-    [allLessons, filters.bookmarkOnly, isBookmarked]
+    filters.bookmarkOnly && bookmarksLoaded ? allLessons.filter(l => isBookmarked(l)) : [],
+    [allLessons, filters.bookmarkOnly, bookmarksLoaded, isBookmarked]
   );
 
   const displayCount = filteredLessons.length;

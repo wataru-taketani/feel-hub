@@ -16,10 +16,14 @@ export function useAuth() {
       setLoading(false);
     });
 
-    // Auth状態変化を監視
+    // Auth状態変化を監視（同一ユーザーなら参照を維持し不要な再レンダーを防ぐ）
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUser(session?.user ?? null);
+        const next = session?.user ?? null;
+        setUser(prev => {
+          if (prev?.id === next?.id) return prev;
+          return next;
+        });
         setLoading(false);
       }
     );

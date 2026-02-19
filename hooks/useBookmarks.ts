@@ -5,6 +5,17 @@ import { getLessonKey } from '@/lib/lessonUtils';
 import { useAuthContext } from '@/contexts/AuthContext';
 import type { Lesson, BookmarkEntry } from '@/types';
 
+/** fetch wrapper: 401 なら 1回だけリトライ */
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  const res = await fetch(url, init);
+  if (res.status === 401) {
+    // セッション更新を待ってリトライ
+    await new Promise((r) => setTimeout(r, 500));
+    return fetch(url, init);
+  }
+  return res;
+}
+
 export function useBookmarks() {
   const { user } = useAuthContext();
   const [bookmarks, setBookmarks] = useState<Record<string, BookmarkEntry>>({});
@@ -52,12 +63,28 @@ export function useBookmarks() {
           return next;
         });
 
-        fetch('/api/bookmarks', {
+        fetchWithRetry('/api/bookmarks', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key }),
+        }).then((res) => {
+          if (!res.ok) {
+            // 失敗時: 元に戻す
+            setBookmarks((prev) => ({
+              ...prev,
+              [key]: {
+                key,
+                date: lesson.date,
+                startTime: lesson.startTime,
+                programName: lesson.programName,
+                instructor: lesson.instructor,
+                studio: lesson.studio,
+                addedAt: Date.now(),
+              },
+            }));
+          }
         }).catch(() => {
-          // 失敗時: 元に戻す
+          // ネットワークエラー時: 元に戻す
           setBookmarks((prev) => ({
             ...prev,
             [key]: {
@@ -84,7 +111,7 @@ export function useBookmarks() {
         };
         setBookmarks((prev) => ({ ...prev, [key]: entry }));
 
-        fetch('/api/bookmarks', {
+        fetchWithRetry('/api/bookmarks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
