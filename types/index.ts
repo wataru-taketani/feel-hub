@@ -110,3 +110,9 @@ export interface TicketInfo {
   totalCount: number;
   details: { expiresAt: string; count: number }[];
 }
+
+// お気に入り席
+export interface SeatPreference {
+  studio: string;
+  seatNumbers: string[];
+}

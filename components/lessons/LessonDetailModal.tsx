@@ -60,6 +60,22 @@ export default function LessonDetailModal({
   const [showReadOnlySeatMap, setShowReadOnlySeatMap] = useState(false);
   // 座席マップから取得したリアルタイム空き状況（DB値を上書き）
   const [realAvailable, setRealAvailable] = useState<{ available: number; total: number } | null>(null);
+  // お気に入り席
+  const [preferredSeats, setPreferredSeats] = useState<string[]>([]);
+
+  // モーダル表示時にお気に入り席を取得
+  useEffect(() => {
+    if (!open || !lesson || !hasFcSession) return;
+    setPreferredSeats([]);
+    fetch(`/api/seat-preferences?studio=${encodeURIComponent(lesson.studio)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.preferences?.[lesson.studio]) {
+          setPreferredSeats(data.preferences[lesson.studio]);
+        }
+      })
+      .catch(() => {});
+  }, [open, lesson?.id, lesson?.studio, hasFcSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // DB上「満席」の場合、モーダル表示時に座席APIでリアルタイム確認
   useEffect(() => {
@@ -119,6 +135,7 @@ export default function LessonDetailModal({
       setReserving(false);
       setShowReadOnlySeatMap(false);
       setRealAvailable(null);
+      setPreferredSeats([]);
     }
     onOpenChange(o);
   };
@@ -194,6 +211,7 @@ export default function LessonDetailModal({
                 onSeatSelect={setSelectedSeat}
                 refreshKey={seatMapRefreshKey}
                 onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                preferredSeats={preferredSeats}
               />
             </Suspense>
 
@@ -338,6 +356,7 @@ export default function LessonDetailModal({
                 <SeatMap
                   sidHash={lesson.sidHash}
                   onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                  preferredSeats={preferredSeats}
                 />
               </Suspense>
             ) : (

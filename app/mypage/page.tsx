@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays, LinkIcon, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell } from 'lucide-react';
+import { LinkIcon, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell } from 'lucide-react';
 import type { MypageInfo, ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
 import type { AttendanceRecord } from '@/types';
+import StudioTab from '@/components/mypage/StudioTab';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
 
@@ -161,11 +162,17 @@ function MypageContent() {
     }
   }, []);
 
-  // 履歴タブを開いたときに初回ロード
+  // スタジオタブ表示フラグ
+  const [studioTabShown, setStudioTabShown] = useState(false);
+
+  // タブ切り替えハンドラ
   const handleTabChange = useCallback((value: string) => {
     if (value === 'history' && !historyLoaded) {
       setHistoryLoaded(true);
       fetchHistory(selectedMonth);
+    }
+    if (value === 'studios') {
+      setStudioTabShown(true);
     }
   }, [historyLoaded, selectedMonth, fetchHistory]);
 
@@ -337,7 +344,7 @@ function MypageContent() {
       <Tabs defaultValue="overview" onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">概要</TabsTrigger>
-          <TabsTrigger value="reservations">予約</TabsTrigger>
+          <TabsTrigger value="studios">スタジオ</TabsTrigger>
           <TabsTrigger value="history">履歴</TabsTrigger>
         </TabsList>
 
@@ -499,57 +506,9 @@ function MypageContent() {
           </Card>
         </TabsContent>
 
-        {/* 予約タブ */}
-        <TabsContent value="reservations">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5" />
-                予約一覧
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.reservations.length === 0 ? (
-                <p className="text-muted-foreground text-sm">予約はありません</p>
-              ) : (
-                <div className="space-y-3">
-                  {data.reservations.map((r, i) => (
-                    <div key={i} className="border rounded-lg p-3 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{r.date} {r.startTime}〜{r.endTime}</span>
-                        <Badge variant="outline">#{r.sheetNo}</Badge>
-                      </div>
-                      <div className="text-sm">
-                        <span
-                          className="inline-block px-1.5 py-0.5 rounded text-xs font-medium mr-1"
-                          style={r.bgColor ? { backgroundColor: r.bgColor, color: r.textColor || '#fff' } : {}}
-                        >
-                          {r.programName}
-                        </span>
-                        <span className="text-muted-foreground">{r.instructor}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        {r.studio}
-                        {r.cancelWaitTotal > 0 && (
-                          <Badge variant="secondary" className="ml-1 text-xs">
-                            キャン待ち {r.cancelWaitPosition}/{r.cancelWaitTotal}
-                          </Badge>
-                        )}
-                        {r.ticketName && (
-                          <>
-                            <span className="mx-1">|</span>
-                            <Ticket className="h-3 w-3" />
-                            {r.ticketName}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* スタジオタブ */}
+        <TabsContent value="studios">
+          {studioTabShown && <StudioTab programColors={programColors} />}
         </TabsContent>
 
         {/* 履歴タブ */}
