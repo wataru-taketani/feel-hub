@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { RotateCcw, Star, Search, SlidersHorizontal, ChevronDown, X, MapPin, User, Save, Check } from 'lucide-react';
+import { RotateCcw, Star, Search, SlidersHorizontal, ChevronDown, X, MapPin, User, Save, Check, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,7 @@ interface FilterBarProps {
   preset: FilterPreset | null;
   onSavePreset: () => void;
   onLoadPreset: () => void;
+  onDeletePreset: () => void;
   /** ツールバー行を非表示（親で統合描画する場合） */
   hideToolbar?: boolean;
   /** 外部制御のopen state */
@@ -55,6 +56,7 @@ export default function FilterBar({
   preset,
   onSavePreset,
   onLoadPreset,
+  onDeletePreset,
   hideToolbar,
   open: controlledOpen,
   onOpenChange,
@@ -241,9 +243,15 @@ export default function FilterBar({
                 </div>
               ) : filtersMatchPreset(filters, preset) ? (
                 /* State B: 保存済み・条件一致 */
-                <div className="flex items-center gap-1.5 text-xs text-emerald-600">
-                  <Check className="h-3.5 w-3.5" />
-                  保存した条件で表示中
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-600">
+                    <Check className="h-3.5 w-3.5" />
+                    保存した条件で表示中
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" onClick={onDeletePreset}>
+                    <Trash2 className="h-3 w-3" />
+                    削除
+                  </Button>
                 </div>
               ) : (
                 /* State C: 保存済み・条件不一致 */
@@ -257,6 +265,10 @@ export default function FilterBar({
                     <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={onSavePreset}>
                       <Save className="h-3 w-3" />
                       上書き保存
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground" onClick={onDeletePreset}>
+                      <Trash2 className="h-3 w-3" />
+                      削除
                     </Button>
                   </div>
                 </div>

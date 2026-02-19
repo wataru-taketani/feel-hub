@@ -162,5 +162,26 @@ export function useFilterPresets() {
     [userId, cloudPreset, preset, setLocalPreset, apiCall]
   );
 
-  return { preset, savePreset, isLoaded };
+  const deletePreset = useCallback(() => {
+    if (userId) {
+      const prevPreset = cloudPreset;
+      setCloudPreset(null);
+      (async () => {
+        try {
+          const res = await fetch('/api/filter-presets', { method: 'DELETE' });
+          if (!res.ok) {
+            console.error('[useFilterPresets] delete error:', res.status);
+            setCloudPreset(prevPreset);
+          }
+        } catch {
+          console.error('[useFilterPresets] delete network error');
+          setCloudPreset(prevPreset);
+        }
+      })();
+    } else {
+      setLocalPreset(null);
+    }
+  }, [userId, cloudPreset, setLocalPreset]);
+
+  return { preset, savePreset, deletePreset, isLoaded };
 }

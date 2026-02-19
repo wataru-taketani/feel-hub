@@ -35,7 +35,7 @@ export default function LessonsPage() {
 
   const { user } = useAuthContext();
   const { bookmarks, toggle, isBookmarked, loaded: bookmarksLoaded } = useBookmarks();
-  const { preset, savePreset, isLoaded: presetsLoaded } = useFilterPresets();
+  const { preset, savePreset, deletePreset, isLoaded: presetsLoaded } = useFilterPresets();
   const { isOnWaitlist, getAutoReserve, addToWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
 
   // デフォルトスタジオ解決
@@ -280,6 +280,12 @@ export default function LessonsPage() {
     }
   }, [preset]);
 
+  // プリセット削除
+  const handleDeletePreset = useCallback(() => {
+    deletePreset();
+    setFilters(f => ({ ...DEFAULT_FILTERS, studios: defaultStudios, bookmarkOnly: f.bookmarkOnly }));
+  }, [deletePreset, defaultStudios]);
+
   // プリセット保存（現在の条件で保存/上書き）
   const handleSavePreset = useCallback(() => {
     savePreset({
@@ -377,6 +383,7 @@ export default function LessonsPage() {
       preset={preset}
       onLoadPreset={handleLoadPreset}
       onSavePreset={handleSavePreset}
+      onDeletePreset={handleDeletePreset}
     />
   );
 
