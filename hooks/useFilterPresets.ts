@@ -1,118 +1,146 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { createClient } from '@/lib/supabase/client';
 import type { FilterPreset } from '@/types';
 
 const MAX_PRESETS = 10;
 
+/**
+ * フィルタープリセット管理フック
+ *
+ * ログイン時: サーバーAPI経由でSupabase管理（認証はサーバー側で確実に処理）
+ * 未ログイン時: localStorage管理
+ *
+ * 旧実装の問題点:
+ * - クライアント側Supabase直クエリでRLSがセッション未準備時に空データを返す
+ * - save/update/deleteがfire-and-forget（失敗検知なし）
+ * - cancelled flagのレースコンディション
+ */
 export function useFilterPresets() {
   const { user } = useAuthContext();
   const [localPresets, setLocalPresets, localLoaded] = useLocalStorage<FilterPreset[]>('feelhub_presets', []);
   const [cloudPresets, setCloudPresets] = useState<FilterPreset[]>([]);
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const migrated = useRef(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const supabase = useMemo(() => createClient(), []);
+  const loadingRef = useRef(false);
 
-  const presets = user ? cloudPresets : localPresets;
-  const isLoaded = user ? cloudLoaded : localLoaded;
+  const userId = user?.id;
+  const presets = userId ? cloudPresets : localPresets;
+  const isLoaded = userId ? cloudLoaded : localLoaded;
 
-  // ログイン時: Supabaseからプリセット読み込み（リトライ付き）
+  // ログイン時: APIからプリセット読み込み
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setCloudLoaded(false);
       return;
     }
 
-    let cancelled = false;
-    let retryCount = 0;
-    const MAX_RETRIES = 2;
+    let active = true;
+    loadingRef.current = true;
 
-    const loadPresets = () => {
-      supabase
-        .from('filter_presets')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .then(({ data, error }) => {
-          if (cancelled) return;
-          if (error) {
-            console.error('[useFilterPresets] load error:', error.message);
-            if (retryCount < MAX_RETRIES) {
-              retryCount++;
-              setTimeout(loadPresets, 1000);
-              return;
-            }
-            // リトライ上限: 既存データを維持して loaded にする
-            setCloudLoaded(true);
-            return;
-          }
-          const list: FilterPreset[] = (data || []).map((row) => ({
-            id: row.id,
-            name: row.name,
-            isDefault: row.is_default,
-            filters: row.filters,
-          }));
-          setCloudPresets(list);
+    const load = async (attempt = 0) => {
+      try {
+        const res = await fetch('/api/filter-presets');
+        if (!active) return;
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (!active) return;
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setCloudPresets(data.presets || []);
+        setCloudLoaded(true);
+      } catch (err) {
+        if (!active) return;
+        console.error('[useFilterPresets] load error:', err);
+        // 最大2回リトライ
+        if (attempt < 2) {
+          setTimeout(() => load(attempt + 1), 1000 * (attempt + 1));
+        } else {
+          // リトライ上限: 既存データを維持して loaded にする
           setCloudLoaded(true);
-        });
+        }
+      } finally {
+        loadingRef.current = false;
+      }
     };
 
-    loadPresets();
-    return () => { cancelled = true; };
-  }, [user, supabase]);
+    load();
+    return () => { active = false; };
+  }, [userId]);
 
-  // ログイン直後: localStorageからSupabaseにマイグレーション
+  // ログイン直後: localStorageからAPI経由でマイグレーション
   useEffect(() => {
-    if (!user || !cloudLoaded || migrated.current) return;
+    if (!userId || !cloudLoaded || migrated.current) return;
     migrated.current = true;
 
     if (localPresets.length === 0) return;
 
-    const rows = localPresets.map((p) => ({
-      id: p.id,
-      user_id: user.id,
-      name: p.name,
-      is_default: p.isDefault || false,
-      filters: p.filters,
-    }));
-
-    supabase
-      .from('filter_presets')
-      .upsert(rows)
-      .then(({ error }) => {
-        if (!error) {
+    const migrate = async () => {
+      try {
+        const res = await fetch('/api/filter-presets', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'migrate', presets: localPresets }),
+        });
+        const data = await res.json();
+        if (res.ok && data.presets) {
+          // マイグレーション成功: サーバーから確認済みデータで更新してからローカルをクリア
+          setCloudPresets(data.presets);
           setLocalPresets([]);
-          setCloudPresets((prev) => {
-            const merged = [...prev];
-            for (const p of localPresets) {
-              if (!merged.find((m) => m.id === p.id)) {
-                merged.push(p);
-              }
-            }
-            return merged.slice(-MAX_PRESETS);
-          });
         }
+        // 失敗時はローカルデータを維持（次回再試行）
+      } catch {
+        // 失敗時はローカルデータを維持
+      }
+    };
+    migrate();
+  }, [userId, cloudLoaded, localPresets, setLocalPresets]);
+
+  // API呼び出しヘルパー（エラー時に楽観的更新をロールバック）
+  const apiCall = useCallback(async (
+    body: Record<string, unknown>,
+    optimistic: () => void,
+    rollback: () => void,
+  ) => {
+    optimistic();
+    try {
+      const res = await fetch('/api/filter-presets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
-  }, [user, cloudLoaded, localPresets, setLocalPresets, supabase]);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error('[useFilterPresets] API error:', data.error || res.status);
+        rollback();
+      }
+    } catch {
+      console.error('[useFilterPresets] network error');
+      rollback();
+    }
+  }, []);
 
   const save = useCallback(
     (preset: FilterPreset) => {
-      if (user) {
-        setCloudPresets((prev) => {
-          const filtered = prev.filter((p) => p.id !== preset.id);
-          return [...filtered, preset].slice(-MAX_PRESETS);
-        });
-        supabase.from('filter_presets').upsert({
-          id: preset.id,
-          user_id: user.id,
-          name: preset.name,
-          is_default: preset.isDefault || false,
-          filters: preset.filters,
-        });
+      if (userId) {
+        const prevPresets = [...cloudPresets];
+        apiCall(
+          { action: 'save', preset },
+          () => setCloudPresets((prev) => {
+            const filtered = prev.filter((p) => p.id !== preset.id);
+            return [...filtered, preset].slice(-MAX_PRESETS);
+          }),
+          () => setCloudPresets(prevPresets),
+        );
       } else {
         setLocalPresets((prev) => {
           const filtered = prev.filter((p) => p.id !== preset.id);
@@ -120,72 +148,83 @@ export function useFilterPresets() {
         });
       }
     },
-    [user, setLocalPresets, supabase]
+    [userId, cloudPresets, setLocalPresets, apiCall]
   );
 
   const update = useCallback(
     (id: string, newFilters: FilterPreset['filters']) => {
-      if (user) {
-        setCloudPresets((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, filters: newFilters } : p))
+      if (userId) {
+        const prevPresets = [...cloudPresets];
+        apiCall(
+          { action: 'update', id, filters: newFilters },
+          () => setCloudPresets((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, filters: newFilters } : p))
+          ),
+          () => setCloudPresets(prevPresets),
         );
-        supabase.from('filter_presets').update({ filters: newFilters }).eq('id', id).eq('user_id', user.id);
       } else {
         setLocalPresets((prev) =>
           prev.map((p) => (p.id === id ? { ...p, filters: newFilters } : p))
         );
       }
     },
-    [user, setLocalPresets, supabase]
+    [userId, cloudPresets, setLocalPresets, apiCall]
   );
 
   const remove = useCallback(
     (id: string) => {
-      if (user) {
-        setCloudPresets((prev) => prev.filter((p) => p.id !== id));
-        supabase.from('filter_presets').delete().eq('id', id).eq('user_id', user.id);
+      if (userId) {
+        const prevPresets = [...cloudPresets];
+        apiCall(
+          { action: 'delete', id },
+          () => setCloudPresets((prev) => prev.filter((p) => p.id !== id)),
+          () => setCloudPresets(prevPresets),
+        );
       } else {
         setLocalPresets((prev) => prev.filter((p) => p.id !== id));
       }
     },
-    [user, setLocalPresets, supabase]
+    [userId, cloudPresets, setLocalPresets, apiCall]
   );
 
   const setDefault = useCallback(
     (id: string | null) => {
-      if (user) {
-        setCloudPresets((prev) =>
-          prev.map((p) => ({ ...p, isDefault: p.id === id }))
+      if (userId) {
+        const prevPresets = [...cloudPresets];
+        apiCall(
+          { action: 'setDefault', id },
+          () => setCloudPresets((prev) =>
+            prev.map((p) => ({ ...p, isDefault: p.id === id }))
+          ),
+          () => setCloudPresets(prevPresets),
         );
-        // 全件をis_default=falseにしてから対象をtrueに
-        supabase.from('filter_presets').update({ is_default: false }).eq('user_id', user.id).then(() => {
-          if (id) {
-            supabase.from('filter_presets').update({ is_default: true }).eq('id', id).eq('user_id', user.id);
-          }
-        });
       } else {
         setLocalPresets((prev) =>
           prev.map((p) => ({ ...p, isDefault: p.id === id }))
         );
       }
     },
-    [user, setLocalPresets, supabase]
+    [userId, cloudPresets, setLocalPresets, apiCall]
   );
 
   const rename = useCallback(
     (id: string, newName: string) => {
-      if (user) {
-        setCloudPresets((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, name: newName } : p))
+      if (userId) {
+        const prevPresets = [...cloudPresets];
+        apiCall(
+          { action: 'rename', id, name: newName },
+          () => setCloudPresets((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, name: newName } : p))
+          ),
+          () => setCloudPresets(prevPresets),
         );
-        supabase.from('filter_presets').update({ name: newName }).eq('id', id).eq('user_id', user.id);
       } else {
         setLocalPresets((prev) =>
           prev.map((p) => (p.id === id ? { ...p, name: newName } : p))
         );
       }
     },
-    [user, setLocalPresets, supabase]
+    [userId, cloudPresets, setLocalPresets, apiCall]
   );
 
   return { presets, save, update, remove, rename, setDefault, isLoaded };
