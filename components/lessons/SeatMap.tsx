@@ -29,6 +29,10 @@ interface SeatMapProps {
   refreshKey?: number;
   onDataLoaded?: (availableCount: number, totalCount: number) => void;
   preferredSeats?: string[];
+  // マルチセレクトモード（おすすめバイク選択用）
+  multiSelect?: boolean;
+  selectedSeats?: string[];
+  onSelectedSeatsChange?: (seats: string[]) => void;
 }
 
 // status → スタイル
@@ -54,7 +58,7 @@ function bikeStyle(status: number, isInteractive: boolean, isSelected: boolean) 
   );
 }
 
-export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey, onDataLoaded, preferredSeats }: SeatMapProps) {
+export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey, onDataLoaded, preferredSeats, multiSelect, selectedSeats, onSelectedSeatsChange }: SeatMapProps) {
   const [data, setData] = useState<SeatMapResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +127,17 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
   const BIKE_SIZE = 30;
 
   const handleBikeClick = (bikeNo: string, status: number) => {
+    // マルチセレクトモード: 全バイクをトグル可能
+    if (multiSelect && onSelectedSeatsChange) {
+      const current = selectedSeats || [];
+      if (current.includes(bikeNo)) {
+        onSelectedSeatsChange(current.filter(s => s !== bikeNo));
+      } else {
+        onSelectedSeatsChange([...current, bikeNo]);
+      }
+      return;
+    }
+    // 単一選択モード
     if (!interactive || !onSeatSelect) return;
     if (status !== 1) return; // 空席のみ選択可能
     onSeatSelect(bikeNo);
@@ -132,7 +147,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">
-          {interactive ? '座席を選択してください' : '座席マップ'}
+          {multiSelect ? 'おすすめバイクを選択' : interactive ? 'バイク番号を選択してください' : '座席マップ'}
         </p>
         <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={fetchSeatMap}>
           <RefreshCw className="h-3 w-3 mr-1" />
@@ -174,11 +189,16 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         {/* バイク配置 */}
         {bikes.map(([bikeNo, bike]) => {
           const isSelected = selectedSeat === bikeNo;
+          const isMultiSelected = multiSelect && (selectedSeats || []).includes(bikeNo);
           const isPreferred = preferredSet.has(bikeNo);
           return (
             <div
               key={bikeNo}
-              className={`absolute flex items-center justify-center rounded-full ${bikeStyle(bike.status, !!interactive, isSelected)} ${isPreferred && !isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+              className={`absolute flex items-center justify-center rounded-full ${
+                isMultiSelected
+                  ? 'bg-white border-2 border-gray-400 text-gray-700 ring-2 ring-yellow-400 cursor-pointer'
+                  : bikeStyle(bike.status, !!(interactive || multiSelect), isSelected)
+              } ${isPreferred && !isSelected && !isMultiSelected ? 'ring-2 ring-yellow-400' : ''}`}
               style={{
                 left: `${(bike.x / data.mapWidth) * 100}%`,
                 top: `${(bike.y / data.mapHeight) * 100}%`,
@@ -189,7 +209,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               onClick={() => handleBikeClick(bikeNo, bike.status)}
             >
               <span className="text-[10px] font-bold leading-none">{bikeNo}</span>
-              {isPreferred && (
+              {(isMultiSelected || (isPreferred && !isMultiSelected)) && (
                 <span className="absolute -top-1 -right-1 text-[8px] text-yellow-400 leading-none">★</span>
               )}
             </div>
@@ -200,35 +220,44 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
       {/* 凡例 + カウント */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-white border-2 border-gray-400" />
-            空き
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-gray-600 border border-gray-500" />
-            予約済
-          </span>
-          {hasMine && (
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded-full bg-pink-400 border-2 border-pink-500" />
-              自分
-            </span>
-          )}
-          {preferredSet.size > 0 && (
+          {multiSelect ? (
             <span className="flex items-center gap-1">
               <span className="inline-block w-3 h-3 rounded-full border-2 border-gray-400 ring-2 ring-yellow-400 bg-white" />
-              お気に入り
-            </span>
-          )}
-          {interactive && selectedSeat && (
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-600" />
               選択中
             </span>
+          ) : (
+            <>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-full bg-white border-2 border-gray-400" />
+                空き
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-full bg-gray-600 border border-gray-500" />
+                予約済
+              </span>
+              {hasMine && (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 rounded-full bg-pink-400 border-2 border-pink-500" />
+                  自分
+                </span>
+              )}
+              {preferredSet.size > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 rounded-full border-2 border-gray-400 ring-2 ring-yellow-400 bg-white" />
+                  おすすめ
+                </span>
+              )}
+              {interactive && selectedSeat && (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-600" />
+                  選択中
+                </span>
+              )}
+            </>
           )}
         </div>
         <span className="font-medium">
-          空き {availableCount} / {totalCount} 台
+          {multiSelect ? `選択中 ${(selectedSeats || []).length} 台` : `空き ${availableCount} / ${totalCount} 台`}
         </span>
       </div>
     </div>

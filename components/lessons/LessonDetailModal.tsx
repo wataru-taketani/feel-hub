@@ -222,13 +222,13 @@ export default function LessonDetailModal({
                 onClick={() => setShowConfirm(true)}
                 disabled={reserving}
               >
-                座席 #{selectedSeat} を予約する
+                バイク #{selectedSeat} を予約する
               </Button>
             )}
 
             {showConfirm && (
               <div className="mt-3 p-3 bg-muted rounded-lg space-y-2">
-                <p className="text-sm font-medium">座席 #{selectedSeat} を予約しますか？</p>
+                <p className="text-sm font-medium">バイク #{selectedSeat} を予約しますか？</p>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
