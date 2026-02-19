@@ -194,10 +194,10 @@ export default function StudioTab({ programColors }: StudioTabProps) {
         setSeatMapSidHash(data.sidHash);
         setShowSeatMap(true);
       } else {
-        setSaveMessage('このスタジオの座席マップが見つかりません');
+        setSaveMessage('このスタジオのバイクマップが見つかりません');
       }
     } catch {
-      setSaveMessage('座席マップの取得に失敗しました');
+      setSaveMessage('バイクマップの取得に失敗しました');
     } finally {
       setSeatMapLoading(false);
     }

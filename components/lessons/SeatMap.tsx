@@ -73,7 +73,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         if (body.code === 'FC_SESSION_EXPIRED') {
           setError('FCセッション切れ。マイページで再連携してください');
         } else {
-          setError('座席マップを取得できませんでした');
+          setError('バイクマップを取得できませんでした');
         }
         return;
       }
@@ -85,7 +85,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         onDataLoaded(avail, entries.length);
       }
     } catch {
-      setError('座席マップを取得できませんでした');
+      setError('バイクマップを取得できませんでした');
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
   if (loading) {
     return (
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">座席マップ</p>
+        <p className="text-xs font-medium text-muted-foreground">バイクマップ</p>
         <Skeleton className="w-full h-48 rounded-lg" />
       </div>
     );
@@ -107,7 +107,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
   if (error) {
     return (
       <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">座席マップ</p>
+        <p className="text-xs font-medium text-muted-foreground">バイクマップ</p>
         <p className="text-xs text-destructive">{error}</p>
       </div>
     );
@@ -147,7 +147,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">
-          {multiSelect ? 'おすすめバイクを選択' : interactive ? 'バイク番号を選択してください' : '座席マップ'}
+          {multiSelect ? 'おすすめバイクを選択' : interactive ? 'バイク番号を選択してください' : 'バイクマップ'}
         </p>
         <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={fetchSeatMap}>
           <RefreshCw className="h-3 w-3 mr-1" />
@@ -155,7 +155,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         </Button>
       </div>
 
-      {/* 座席マップ */}
+      {/* バイクマップ */}
       <div
         className="relative w-full rounded-lg overflow-hidden bg-gray-900"
         style={{ aspectRatio: `${data.mapWidth} / ${data.mapHeight}` }}

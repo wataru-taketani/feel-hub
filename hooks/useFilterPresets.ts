@@ -20,28 +20,49 @@ export function useFilterPresets() {
   const presets = user ? cloudPresets : localPresets;
   const isLoaded = user ? cloudLoaded : localLoaded;
 
-  // ログイン時: Supabaseからプリセット読み込み
+  // ログイン時: Supabaseからプリセット読み込み（リトライ付き）
   useEffect(() => {
     if (!user) {
       setCloudLoaded(false);
       return;
     }
 
-    supabase
-      .from('filter_presets')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
-        const list: FilterPreset[] = (data || []).map((row) => ({
-          id: row.id,
-          name: row.name,
-          isDefault: row.is_default,
-          filters: row.filters,
-        }));
-        setCloudPresets(list);
-        setCloudLoaded(true);
-      });
+    let cancelled = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 2;
+
+    const loadPresets = () => {
+      supabase
+        .from('filter_presets')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .then(({ data, error }) => {
+          if (cancelled) return;
+          if (error) {
+            console.error('[useFilterPresets] load error:', error.message);
+            if (retryCount < MAX_RETRIES) {
+              retryCount++;
+              setTimeout(loadPresets, 1000);
+              return;
+            }
+            // リトライ上限: 既存データを維持して loaded にする
+            setCloudLoaded(true);
+            return;
+          }
+          const list: FilterPreset[] = (data || []).map((row) => ({
+            id: row.id,
+            name: row.name,
+            isDefault: row.is_default,
+            filters: row.filters,
+          }));
+          setCloudPresets(list);
+          setCloudLoaded(true);
+        });
+    };
+
+    loadPresets();
+    return () => { cancelled = true; };
   }, [user, supabase]);
 
   // ログイン直後: localStorageからSupabaseにマイグレーション

@@ -366,7 +366,7 @@ export default function LessonDetailModal({
                 className="w-full text-xs text-muted-foreground"
                 onClick={() => setShowReadOnlySeatMap(true)}
               >
-                座席マップを表示
+                バイクマップを表示
                 <ChevronDown className="h-3.5 w-3.5 ml-1" />
               </Button>
             )}

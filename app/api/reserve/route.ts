@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: false,
           resultCode: 205,
-          message: 'この座席は他の方に予約されました。座席マップを更新してください。',
+          message: 'このバイクは他の方に予約されました。マップを更新してください。',
         });
 
       default:
