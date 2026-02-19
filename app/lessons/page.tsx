@@ -298,10 +298,14 @@ export default function LessonsPage() {
     (filters.instructors.length > 0 ? 1 : 0) +
     (filters.ticketFilter !== "ALL" ? 1 : 0);
 
-  // フィルタリセット（デフォルトスタジオに戻す）
+  // フィルタリセット（保存済みプリセットがあればそこに戻す、なければデフォルト）
   const handleResetFilters = useCallback(() => {
-    setFilters({ ...DEFAULT_FILTERS, studios: defaultStudios });
-  }, [defaultStudios]);
+    if (preset) {
+      setFilters({ ...preset.filters, bookmarkOnly: false });
+    } else {
+      setFilters({ ...DEFAULT_FILTERS, studios: defaultStudios });
+    }
+  }, [preset, defaultStudios]);
 
   // ツールバー要素（CalendarViewのスロットに渡す）
   const toolbarLeft = (
@@ -318,6 +322,19 @@ export default function LessonsPage() {
       <span className="hidden sm:inline">ブックマーク</span>
     </Button>
   );
+
+  // リセットボタン表示条件: リセット先と現在の条件が異なるときだけ表示
+  const filtersMatchResetTarget = useMemo(() => {
+    const target = preset
+      ? { studios: preset.filters.studios, programSearch: preset.filters.programSearch, instructors: preset.filters.instructors, ticketFilter: preset.filters.ticketFilter }
+      : { studios: defaultStudios, programSearch: "", instructors: [] as string[], ticketFilter: "ALL" as const };
+    return (
+      [...filters.studios].sort().join(",") === [...target.studios].sort().join(",") &&
+      filters.programSearch === target.programSearch &&
+      [...filters.instructors].sort().join(",") === [...target.instructors].sort().join(",") &&
+      filters.ticketFilter === target.ticketFilter
+    );
+  }, [filters, preset, defaultStudios]);
 
   const toolbarRight = (
     <>
@@ -336,7 +353,7 @@ export default function LessonsPage() {
         )}
         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", filterOpen && "rotate-180")} />
       </Button>
-      {activeFilterCount > 0 && (
+      {!filtersMatchResetTarget && (
         <Button
           variant="ghost"
           size="sm"

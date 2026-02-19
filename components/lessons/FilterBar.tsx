@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { RotateCcw, Star, Search, SlidersHorizontal, ChevronDown, X, MapPin, User, Heart, Save } from 'lucide-react';
+import { RotateCcw, Star, Search, SlidersHorizontal, ChevronDown, X, MapPin, User, Save, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,17 @@ export interface FilterState {
   instructors: string[];
   ticketFilter: 'ALL' | 'NORMAL' | 'ADDITIONAL';
   bookmarkOnly: boolean;
+}
+
+/** プリセットと現在のフィルタが一致するか比較 */
+function filtersMatchPreset(filters: FilterState, preset: FilterPreset): boolean {
+  const pf = preset.filters;
+  return (
+    [...filters.studios].sort().join(',') === [...pf.studios].sort().join(',') &&
+    filters.programSearch === pf.programSearch &&
+    [...filters.instructors].sort().join(',') === [...pf.instructors].sort().join(',') &&
+    filters.ticketFilter === pf.ticketFilter
+  );
 }
 
 interface FilterBarProps {
@@ -151,6 +162,15 @@ export default function FilterBar({
         </div>
       )}
 
+      {/* ── 保存済みインジケータ（アコーディオン閉じ時のみ） ── */}
+      {preset && !open && (
+        <div>
+          <Badge variant="secondary" className="text-[11px] gap-1 font-normal">
+            💾 保存済みの条件
+          </Badge>
+        </div>
+      )}
+
       {/* ── 折り畳みフィルタ本体 ── */}
       <div className={cn(
         'grid transition-[grid-template-rows] duration-200 ease-out',
@@ -206,45 +226,46 @@ export default function FilterBar({
                 <ToggleGroupItem value="ADDITIONAL" className="text-xs h-7 px-3 data-[state=on]:bg-foreground data-[state=on]:text-background">ADD</ToggleGroupItem>
               </ToggleGroup>
             </div>
+
+            {/* セクション4: 条件の保存 */}
+            <div className="p-3 space-y-2">
+              <SectionLabel>条件の保存</SectionLabel>
+              {!preset ? (
+                /* State A: 未保存 */
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">💡 保存すると次回から自動で適用されます</p>
+                  <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={onSavePreset}>
+                    <Save className="h-3 w-3" />
+                    保存する
+                  </Button>
+                </div>
+              ) : filtersMatchPreset(filters, preset) ? (
+                /* State B: 保存済み・条件一致 */
+                <div className="flex items-center gap-1.5 text-xs text-emerald-600">
+                  <Check className="h-3.5 w-3.5" />
+                  保存した条件で表示中
+                </div>
+              ) : (
+                /* State C: 保存済み・条件不一致 */
+                <div className="space-y-2">
+                  <p className="text-xs text-amber-600">保存した条件と異なります</p>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={onLoadPreset}>
+                      <RotateCcw className="h-3 w-3" />
+                      元に戻す
+                    </Button>
+                    <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={onSavePreset}>
+                      <Save className="h-3 w-3" />
+                      上書き保存
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── お気に入り条件ボタン（折り畳みの外、常時表示） ── */}
-      <div className="flex items-center gap-2">
-        {preset ? (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={onLoadPreset}
-            >
-              <Heart className="h-3 w-3" />
-              読み込む
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={onSavePreset}
-            >
-              <Save className="h-3 w-3" />
-              上書き保存
-            </Button>
-          </>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs gap-1"
-            onClick={onSavePreset}
-          >
-            <Heart className="h-3 w-3" />
-            現在の条件を保存
-          </Button>
-        )}
-      </div>
     </div>
   );
 }
