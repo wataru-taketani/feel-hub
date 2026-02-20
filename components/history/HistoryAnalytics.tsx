@@ -333,81 +333,83 @@ export default function HistoryAnalytics() {
   return (
     <div className="space-y-4">
       {/* フィルター */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="month">単月</SelectItem>
-            <SelectItem value="3m">過去3ヶ月</SelectItem>
-            <SelectItem value="6m">過去6ヶ月</SelectItem>
-            <SelectItem value="1y">過去1年</SelectItem>
-            <SelectItem value="all">全期間</SelectItem>
-            <SelectItem value="custom">カスタム</SelectItem>
-          </SelectContent>
-        </Select>
-        {period === 'month' && (
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[130px]">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
+            <SelectTrigger className="w-[120px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {monthOptions.map((m) => {
-                const [y, mo] = m.split('-');
-                return (
-                  <SelectItem key={m} value={m}>
-                    {y}年{Number(mo)}月
-                  </SelectItem>
-                );
-              })}
+              <SelectItem value="month">単月</SelectItem>
+              <SelectItem value="3m">過去3ヶ月</SelectItem>
+              <SelectItem value="6m">過去6ヶ月</SelectItem>
+              <SelectItem value="1y">過去1年</SelectItem>
+              <SelectItem value="all">全期間</SelectItem>
+              <SelectItem value="custom">カスタム</SelectItem>
             </SelectContent>
           </Select>
-        )}
-
-        <InstructorMultiSelect
-          instructors={programOptions}
-          selected={selectedPrograms}
-          onChange={(v) => { setSelectedPrograms(v); if (v.length === 0) setTappedProgram(null); }}
-          label="プログラム"
-          labelUnit="件"
-          searchPlaceholder="プログラム名で検索..."
-        />
-        <InstructorMultiSelect
-          instructors={instructorOptions}
-          selected={selectedInstructors}
-          onChange={setSelectedInstructors}
-        />
-        {hasAnyFilter && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs gap-1 px-2 text-muted-foreground"
-            onClick={handleClearAll}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            クリア
-          </Button>
-        )}
-      </div>
-
-      {period === 'custom' && (
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={customFrom}
-            onChange={(e) => setCustomFrom(e.target.value)}
-            className="border rounded px-2 py-1.5 text-base bg-background"
-          />
-          <span className="text-sm text-muted-foreground">〜</span>
-          <input
-            type="date"
-            value={customTo}
-            onChange={(e) => setCustomTo(e.target.value)}
-            className="border rounded px-2 py-1.5 text-base bg-background"
-          />
+          {period === 'month' && (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((m) => {
+                  const [y, mo] = m.split('-');
+                  return (
+                    <SelectItem key={m} value={m}>
+                      {y}年{Number(mo)}月
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          )}
+          {period === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="border rounded px-2 py-1.5 text-base bg-background"
+              />
+              <span className="text-sm text-muted-foreground">〜</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="border rounded px-2 py-1.5 text-base bg-background"
+              />
+            </div>
+          )}
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <InstructorMultiSelect
+            instructors={programOptions}
+            selected={selectedPrograms}
+            onChange={(v) => { setSelectedPrograms(v); if (v.length === 0) setTappedProgram(null); }}
+            label="プログラム"
+            labelUnit="件"
+            searchPlaceholder="プログラム名で検索..."
+          />
+          <InstructorMultiSelect
+            instructors={instructorOptions}
+            selected={selectedInstructors}
+            onChange={setSelectedInstructors}
+          />
+          {hasAnyFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs gap-1 px-2 text-muted-foreground"
+              onClick={handleClearAll}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              クリア
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* フィルターチップ */}
       {tappedStudio && (

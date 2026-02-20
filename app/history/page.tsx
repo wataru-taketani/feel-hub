@@ -168,67 +168,71 @@ export default function HistoryPage() {
 
         <TabsContent value="history">
           <div className="space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Select value={periodMode} onValueChange={(v) => handlePeriodModeChange(v as PeriodMode)}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="month">単月</SelectItem>
-                  <SelectItem value="3m">過去3ヶ月</SelectItem>
-                  <SelectItem value="6m">過去6ヶ月</SelectItem>
-                  <SelectItem value="1y">過去1年</SelectItem>
-                  <SelectItem value="all">全期間</SelectItem>
-                  <SelectItem value="custom">カスタム</SelectItem>
-                </SelectContent>
-              </Select>
-              {periodMode === 'month' && (
-                <Select value={selectedMonth} onValueChange={handleMonthChange}>
-                  <SelectTrigger className="w-[130px]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Select value={periodMode} onValueChange={(v) => handlePeriodModeChange(v as PeriodMode)}>
+                  <SelectTrigger className="w-[120px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {monthOptions.map((m) => {
-                      const [y, mo] = m.split('-');
-                      return (
-                        <SelectItem key={m} value={m}>
-                          {y}年{Number(mo)}月
-                        </SelectItem>
-                      );
-                    })}
+                    <SelectItem value="month">単月</SelectItem>
+                    <SelectItem value="3m">過去3ヶ月</SelectItem>
+                    <SelectItem value="6m">過去6ヶ月</SelectItem>
+                    <SelectItem value="1y">過去1年</SelectItem>
+                    <SelectItem value="all">全期間</SelectItem>
+                    <SelectItem value="custom">カスタム</SelectItem>
                   </SelectContent>
                 </Select>
-              )}
-              {periodMode === 'custom' && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                    className="border rounded px-2 py-1.5 text-base bg-background"
-                  />
-                  <span className="text-sm text-muted-foreground">〜</span>
-                  <input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                    className="border rounded px-2 py-1.5 text-base bg-background"
-                  />
-                </div>
-              )}
-              <InstructorMultiSelect
-                instructors={programOptions}
-                selected={selectedPrograms}
-                onChange={setSelectedPrograms}
-                label="プログラム"
-                labelUnit="件"
-                searchPlaceholder="プログラム名で検索..."
-              />
-              <InstructorMultiSelect
-                instructors={instructorOptions}
-                selected={selectedInstructors}
-                onChange={setSelectedInstructors}
-              />
+                {periodMode === 'month' && (
+                  <Select value={selectedMonth} onValueChange={handleMonthChange}>
+                    <SelectTrigger className="w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((m) => {
+                        const [y, mo] = m.split('-');
+                        return (
+                          <SelectItem key={m} value={m}>
+                            {y}年{Number(mo)}月
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+                {periodMode === 'custom' && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={customFrom}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                      className="border rounded px-2 py-1.5 text-base bg-background"
+                    />
+                    <span className="text-sm text-muted-foreground">〜</span>
+                    <input
+                      type="date"
+                      value={customTo}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                      className="border rounded px-2 py-1.5 text-base bg-background"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <InstructorMultiSelect
+                  instructors={programOptions}
+                  selected={selectedPrograms}
+                  onChange={setSelectedPrograms}
+                  label="プログラム"
+                  labelUnit="件"
+                  searchPlaceholder="プログラム名で検索..."
+                />
+                <InstructorMultiSelect
+                  instructors={instructorOptions}
+                  selected={selectedInstructors}
+                  onChange={setSelectedInstructors}
+                />
+              </div>
             </div>
 
             {/* 統計サマリー */}
