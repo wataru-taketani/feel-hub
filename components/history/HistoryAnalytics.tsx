@@ -29,16 +29,24 @@ interface StatsData {
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
 
-type PeriodPreset = '3m' | '6m' | '1y' | 'all' | 'custom';
+type PeriodPreset = 'month' | '3m' | '6m' | '1y' | 'all' | 'custom';
 
 function getPeriodDates(preset: PeriodPreset): { from: string; to: string } | null {
-  if (preset === 'all' || preset === 'custom') return null;
+  if (preset === 'all' || preset === 'custom' || preset === 'month') return null;
 
   const now = new Date();
   const to = now.toISOString().slice(0, 10);
   const months = preset === '3m' ? 3 : preset === '6m' ? 6 : 12;
   const from = new Date(now.getFullYear(), now.getMonth() - months, now.getDate() + 1);
   return { from: from.toISOString().slice(0, 10), to };
+}
+
+function getMonthRange(month: string): { from: string; to: string } {
+  const [y, m] = month.split('-').map(Number);
+  const from = `${y}-${String(m).padStart(2, '0')}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const to = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { from, to };
 }
 
 const INITIAL_SHOW = 10;
@@ -119,8 +127,22 @@ export default function HistoryAnalytics() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodPreset>('all');
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+
+  // 月選択オプション（2年前〜今月）
+  const monthOptions: string[] = [];
+  {
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthOptions.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+  }
 
   // 検索フィルター（テキスト入力用）
   const [programInput, setProgramInput] = useState('');
@@ -190,7 +212,11 @@ export default function HistoryAnalytics() {
       setDetailExpanded(false);
       try {
         const params = new URLSearchParams({ program: tappedProgram });
-        if (period === 'custom') {
+        if (period === 'month') {
+          const range = getMonthRange(selectedMonth);
+          params.set('from', range.from);
+          params.set('to', range.to);
+        } else if (period === 'custom') {
           if (customFrom) params.set('from', customFrom);
           if (customTo) params.set('to', customTo);
         } else {
@@ -210,7 +236,7 @@ export default function HistoryAnalytics() {
       }
     };
     fetchDetail();
-  }, [tappedProgram, period, customFrom, customTo]);
+  }, [tappedProgram, period, selectedMonth, customFrom, customTo]);
 
   // スタジオ詳細レコード取得
   useEffect(() => {
@@ -224,7 +250,11 @@ export default function HistoryAnalytics() {
       setStudioDetailExpanded(false);
       try {
         const params = new URLSearchParams({ store: tappedStudio });
-        if (period === 'custom') {
+        if (period === 'month') {
+          const range = getMonthRange(selectedMonth);
+          params.set('from', range.from);
+          params.set('to', range.to);
+        } else if (period === 'custom') {
           if (customFrom) params.set('from', customFrom);
           if (customTo) params.set('to', customTo);
         } else {
@@ -244,7 +274,7 @@ export default function HistoryAnalytics() {
       }
     };
     fetchStudioDetail();
-  }, [tappedStudio, period, customFrom, customTo]);
+  }, [tappedStudio, period, selectedMonth, customFrom, customTo]);
 
   // 実際にAPIに送る値: タップ優先、なければテキスト入力
   const effectiveProgram = tappedProgram || programFilter;
@@ -255,7 +285,11 @@ export default function HistoryAnalytics() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (period === 'custom') {
+      if (period === 'month') {
+        const range = getMonthRange(selectedMonth);
+        params.set('from', range.from);
+        params.set('to', range.to);
+      } else if (period === 'custom') {
         if (customFrom) params.set('from', customFrom);
         if (customTo) params.set('to', customTo);
       } else {
@@ -284,7 +318,7 @@ export default function HistoryAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, [period, customFrom, customTo, effectiveProgram, effectiveInstructor, effectiveStudio, splitInstructor]);
+  }, [period, selectedMonth, customFrom, customTo, effectiveProgram, effectiveInstructor, effectiveStudio, splitInstructor]);
 
   useEffect(() => {
     fetchStats();
@@ -328,10 +362,11 @@ export default function HistoryAnalytics() {
       {/* フィルター */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
-          <SelectTrigger className="w-[130px]">
+          <SelectTrigger className="w-[120px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="month">単月</SelectItem>
             <SelectItem value="3m">過去3ヶ月</SelectItem>
             <SelectItem value="6m">過去6ヶ月</SelectItem>
             <SelectItem value="1y">過去1年</SelectItem>
@@ -339,6 +374,23 @@ export default function HistoryAnalytics() {
             <SelectItem value="custom">カスタム</SelectItem>
           </SelectContent>
         </Select>
+        {period === 'month' && (
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((m) => {
+                const [y, mo] = m.split('-');
+                return (
+                  <SelectItem key={m} value={m}>
+                    {y}年{Number(mo)}月
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        )}
 
         {!tappedProgram && (
           <SuggestInput

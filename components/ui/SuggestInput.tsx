@@ -44,7 +44,7 @@ export default function SuggestInput({ value, onChange, suggestions, placeholder
           onFocus={() => setOpen(true)}
           placeholder={placeholder}
           className={cn(
-            'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-base md:text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             value && 'pr-7',
             className
           )}
