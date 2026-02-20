@@ -14,6 +14,16 @@ import InstructorMultiSelect from '@/components/lessons/InstructorMultiSelect';
 import type { AttendanceRecord } from '@/types';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
+type PeriodMode = 'month' | '3m' | '6m' | '1y' | 'all' | 'custom';
+
+function getPeriodDates(mode: PeriodMode): { from: string; to: string } | null {
+  if (mode === 'all' || mode === 'custom' || mode === 'month') return null;
+  const now = new Date();
+  const to = now.toISOString().slice(0, 10);
+  const months = mode === '3m' ? 3 : mode === '6m' ? 6 : 12;
+  const from = new Date(now.getFullYear(), now.getMonth() - months, now.getDate() + 1);
+  return { from: from.toISOString().slice(0, 10), to };
+}
 
 export default function HistoryPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -23,15 +33,32 @@ export default function HistoryPage() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
 
-  const fetchHistory = useCallback(async (month: string) => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/history?month=${month}`);
+      const params = new URLSearchParams();
+      if (periodMode === 'month') {
+        params.set('month', selectedMonth);
+      } else if (periodMode === 'custom') {
+        if (customFrom) params.set('from', customFrom);
+        if (customTo) params.set('to', customTo);
+      } else if (periodMode !== 'all') {
+        const dates = getPeriodDates(periodMode);
+        if (dates) {
+          params.set('from', dates.from);
+          params.set('to', dates.to);
+        }
+      }
+      const qs = params.toString();
+      const res = await fetch(`/api/history${qs ? `?${qs}` : ''}`);
       const data = await res.json();
       setRecords(data.records || []);
     } catch {
@@ -39,11 +66,12 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [periodMode, selectedMonth, customFrom, customTo]);
 
   useEffect(() => {
-    fetchHistory(selectedMonth);
-  }, [selectedMonth, fetchHistory]);
+    if (periodMode === 'custom' && (!customFrom || !customTo)) return;
+    fetchHistory();
+  }, [periodMode, selectedMonth, customFrom, customTo, fetchHistory]);
 
   useEffect(() => {
     fetch('/api/programs')
@@ -62,13 +90,20 @@ export default function HistoryPage() {
         setSyncMessage(data.error || '同期に失敗しました');
       } else {
         setSyncMessage(`${data.synced}件の履歴を同期しました（${data.monthsFetched}ヶ月分）`);
-        fetchHistory(selectedMonth);
+        fetchHistory();
       }
     } catch {
       setSyncMessage('通信エラーが発生しました');
     } finally {
       setSyncing(false);
     }
+  };
+
+  // 期間モード変更時にフィルタをリセット
+  const handlePeriodModeChange = (mode: PeriodMode) => {
+    setSelectedPrograms([]);
+    setSelectedInstructors([]);
+    setPeriodMode(mode);
   };
 
   // 月変更時にフィルタをリセット
@@ -140,21 +175,53 @@ export default function HistoryPage() {
         <TabsContent value="history">
           <div className="space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={selectedMonth} onValueChange={handleMonthChange}>
-                <SelectTrigger className="w-[130px]">
+              <Select value={periodMode} onValueChange={(v) => handlePeriodModeChange(v as PeriodMode)}>
+                <SelectTrigger className="w-[120px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {monthOptions.map((m) => {
-                    const [y, mo] = m.split('-');
-                    return (
-                      <SelectItem key={m} value={m}>
-                        {y}年{Number(mo)}月
-                      </SelectItem>
-                    );
-                  })}
+                  <SelectItem value="month">単月</SelectItem>
+                  <SelectItem value="3m">過去3ヶ月</SelectItem>
+                  <SelectItem value="6m">過去6ヶ月</SelectItem>
+                  <SelectItem value="1y">過去1年</SelectItem>
+                  <SelectItem value="all">全期間</SelectItem>
+                  <SelectItem value="custom">カスタム</SelectItem>
                 </SelectContent>
               </Select>
+              {periodMode === 'month' && (
+                <Select value={selectedMonth} onValueChange={handleMonthChange}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((m) => {
+                      const [y, mo] = m.split('-');
+                      return (
+                        <SelectItem key={m} value={m}>
+                          {y}年{Number(mo)}月
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+              {periodMode === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="border rounded px-2 py-1 text-sm bg-background"
+                  />
+                  <span className="text-sm text-muted-foreground">〜</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="border rounded px-2 py-1 text-sm bg-background"
+                  />
+                </div>
+              )}
               <InstructorMultiSelect
                 instructors={programOptions}
                 selected={selectedPrograms}
@@ -208,7 +275,7 @@ export default function HistoryPage() {
                     <p>条件に一致する履歴はありません</p>
                   ) : (
                     <>
-                      <p>この月の受講履歴はありません</p>
+                      <p>{periodMode === 'month' ? 'この月の' : 'この期間の'}受講履歴はありません</p>
                       <p className="text-xs mt-1">「同期」ボタンでFEELCYCLEから取得できます</p>
                     </>
                   )}
@@ -219,8 +286,16 @@ export default function HistoryPage() {
                 <CardHeader>
                   <CardTitle className="text-base">
                     {(() => {
-                      const [y, m] = selectedMonth.split('-');
-                      return `${y}年${Number(m)}月`;
+                      if (periodMode === 'month') {
+                        const [y, m] = selectedMonth.split('-');
+                        return `${y}年${Number(m)}月`;
+                      }
+                      if (periodMode === '3m') return '過去3ヶ月';
+                      if (periodMode === '6m') return '過去6ヶ月';
+                      if (periodMode === '1y') return '過去1年';
+                      if (periodMode === 'all') return '全期間';
+                      if (periodMode === 'custom' && customFrom && customTo) return `${customFrom} 〜 ${customTo}`;
+                      return 'カスタム期間';
                     })()}
                   </CardTitle>
                 </CardHeader>
