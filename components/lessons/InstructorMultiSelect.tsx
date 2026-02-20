@@ -43,7 +43,7 @@ export default function InstructorMultiSelect({ instructors, selected, onChange,
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-64 p-0" align="start" side="bottom" avoidCollisions>
+      <PopoverContent className="w-64 p-0" align="start" side="bottom" avoidCollisions collisionPadding={16}>
         <Command
           filter={(value, search) =>
             value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
@@ -60,7 +60,7 @@ export default function InstructorMultiSelect({ instructors, selected, onChange,
             </div>
           )}
 
-          <CommandList className="max-h-[40vh]">
+          <CommandList className="max-h-[30vh]">
             <CommandEmpty>該当なし</CommandEmpty>
             <CommandGroup>
               {instructors.map((ir) => (
