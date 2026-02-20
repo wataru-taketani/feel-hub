@@ -31,8 +31,22 @@ export async function GET(request: NextRequest) {
 
   if (from) query = query.gte('shift_date', from);
   if (to) query = query.lte('shift_date', to);
-  if (program) query = query.ilike('program_name', `%${program}%`);
-  if (instructor) query = query.ilike('instructor_name', `%${instructor}%`);
+  if (program) {
+    const programs = program.split(',').filter(Boolean);
+    if (programs.length === 1) {
+      query = query.ilike('program_name', `%${programs[0]}%`);
+    } else {
+      query = query.in('program_name', programs);
+    }
+  }
+  if (instructor) {
+    const instructors = instructor.split(',').filter(Boolean);
+    if (instructors.length === 1) {
+      query = query.ilike('instructor_name', `%${instructors[0]}%`);
+    } else {
+      query = query.in('instructor_name', instructors);
+    }
+  }
   if (studio) query = query.ilike('store_name', `%${studio}%`);
 
   const { data, error } = await query;

@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, RotateCcw, X, Loader2 } from 'lucide-react';
-import SuggestInput from '@/components/ui/SuggestInput';
+import InstructorMultiSelect from '@/components/lessons/InstructorMultiSelect';
 
 type HistoryRecord = {
   shiftDate: string;
@@ -144,24 +144,19 @@ export default function HistoryAnalytics() {
     }
   }
 
-  // 検索フィルター（テキスト入力用）
-  const [programInput, setProgramInput] = useState('');
-  const [instructorInput, setInstructorInput] = useState('');
-  // デバウンス後の実際のフィルター値
-  const [programFilter, setProgramFilter] = useState('');
-  const [instructorFilter, setInstructorFilter] = useState('');
-
-  // タップで設定されたフィルター（完全一致）
+  // フィルター（InstructorMultiSelect）
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
+  // タップで設定されたフィルター（詳細レコード表示用）
   const [tappedProgram, setTappedProgram] = useState<string | null>(null);
-  const [tappedInstructor, setTappedInstructor] = useState<string | null>(null);
   const [tappedStudio, setTappedStudio] = useState<string | null>(null);
 
   const [splitInstructor, setSplitInstructor] = useState(false);
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
 
-  // サジェスト候補（初回ロード時にキャッシュ）
-  const [programSuggestions, setProgramSuggestions] = useState<string[]>([]);
-  const [instructorSuggestions, setInstructorSuggestions] = useState<string[]>([]);
+  // 選択候補（初回ロード時にキャッシュ）
+  const [programOptions, setProgramOptions] = useState<string[]>([]);
+  const [instructorOptions, setInstructorOptions] = useState<string[]>([]);
 
   // プログラム詳細レコード
   const [detailRecords, setDetailRecords] = useState<HistoryRecord[]>([]);
@@ -179,26 +174,6 @@ export default function HistoryAnalytics() {
       .then(setProgramColors)
       .catch(() => {});
   }, []);
-
-  // デバウンス: programInput
-  useEffect(() => {
-    const timer = setTimeout(() => setProgramFilter(programInput), 300);
-    return () => clearTimeout(timer);
-  }, [programInput]);
-
-  // デバウンス: instructorInput
-  useEffect(() => {
-    const timer = setTimeout(() => setInstructorFilter(instructorInput), 300);
-    return () => clearTimeout(timer);
-  }, [instructorInput]);
-
-  // タップフィルターが設定されたら入力欄をクリア
-  useEffect(() => {
-    if (tappedProgram) setProgramInput('');
-  }, [tappedProgram]);
-  useEffect(() => {
-    if (tappedInstructor) setInstructorInput('');
-  }, [tappedInstructor]);
 
   // プログラム詳細レコード取得
   useEffect(() => {
@@ -276,9 +251,9 @@ export default function HistoryAnalytics() {
     fetchStudioDetail();
   }, [tappedStudio, period, selectedMonth, customFrom, customTo]);
 
-  // 実際にAPIに送る値: タップ優先、なければテキスト入力
-  const effectiveProgram = tappedProgram || programFilter;
-  const effectiveInstructor = tappedInstructor || instructorFilter;
+  // 実際にAPIに送る値
+  const effectiveProgram = selectedPrograms.join(',');
+  const effectiveInstructor = selectedInstructors.join(',');
   const effectiveStudio = tappedStudio || '';
 
   const fetchStats = useCallback(async () => {
@@ -308,10 +283,10 @@ export default function HistoryAnalytics() {
       const data = await res.json();
       setStats(data);
 
-      // フィルタ未適用時にサジェスト候補を更新
+      // フィルタ未適用時に選択候補を更新
       if (!effectiveProgram && !effectiveInstructor) {
-        setProgramSuggestions((data.programRanking || []).map((r: RankingItem) => r.name));
-        setInstructorSuggestions((data.instructorRanking || []).map((r: RankingItem) => r.name));
+        setProgramOptions((data.programRanking || []).map((r: RankingItem) => r.name));
+        setInstructorOptions((data.instructorRanking || []).map((r: RankingItem) => r.name));
       }
     } catch {
       setStats(null);
@@ -329,30 +304,28 @@ export default function HistoryAnalytics() {
 
   const handleTapProgram = useCallback((name: string) => {
     setTappedProgram(name);
+    setSelectedPrograms(prev => prev.includes(name) ? prev : [name]);
   }, []);
 
   const handleTapInstructor = useCallback((name: string) => {
-    setTappedInstructor(name);
+    setSelectedInstructors(prev => prev.includes(name) ? prev : [name]);
   }, []);
 
   const handleTapStudio = useCallback((name: string) => {
     setTappedStudio(name);
   }, []);
 
-  const hasActiveFilter = !!(tappedProgram || tappedInstructor || tappedStudio);
+  const hasActiveFilter = !!(selectedPrograms.length > 0 || selectedInstructors.length > 0 || tappedStudio);
 
-  const hasAnyFilter = period !== 'all' || !!programInput || !!instructorInput || !!tappedProgram || !!tappedInstructor || !!tappedStudio || splitInstructor;
+  const hasAnyFilter = period !== 'all' || selectedPrograms.length > 0 || selectedInstructors.length > 0 || !!tappedStudio || splitInstructor;
 
   const handleClearAll = useCallback(() => {
     setPeriod('all');
     setCustomFrom('');
     setCustomTo('');
-    setProgramInput('');
-    setInstructorInput('');
-    setProgramFilter('');
-    setInstructorFilter('');
+    setSelectedPrograms([]);
+    setSelectedInstructors([]);
     setTappedProgram(null);
-    setTappedInstructor(null);
     setTappedStudio(null);
     setSplitInstructor(false);
   }, []);
@@ -392,24 +365,19 @@ export default function HistoryAnalytics() {
           </Select>
         )}
 
-        {!tappedProgram && (
-          <SuggestInput
-            value={programInput}
-            onChange={setProgramInput}
-            suggestions={programSuggestions}
-            placeholder="プログラム..."
-            className="w-[120px]"
-          />
-        )}
-        {!tappedInstructor && (
-          <SuggestInput
-            value={instructorInput}
-            onChange={setInstructorInput}
-            suggestions={instructorSuggestions}
-            placeholder="IR..."
-            className="w-[100px]"
-          />
-        )}
+        <InstructorMultiSelect
+          instructors={programOptions}
+          selected={selectedPrograms}
+          onChange={(v) => { setSelectedPrograms(v); if (v.length === 0) setTappedProgram(null); }}
+          label="プログラム"
+          labelUnit="件"
+          searchPlaceholder="プログラム名で検索..."
+        />
+        <InstructorMultiSelect
+          instructors={instructorOptions}
+          selected={selectedInstructors}
+          onChange={setSelectedInstructors}
+        />
         {hasAnyFilter && (
           <Button
             variant="ghost"
@@ -441,18 +409,10 @@ export default function HistoryAnalytics() {
         </div>
       )}
 
-      {/* タップフィルターチップ */}
-      {hasActiveFilter && (
+      {/* フィルターチップ */}
+      {tappedStudio && (
         <div className="flex flex-wrap items-center gap-2">
-          {tappedProgram && (
-            <FilterChip label={tappedProgram} onClear={() => setTappedProgram(null)} />
-          )}
-          {tappedInstructor && (
-            <FilterChip label={tappedInstructor} onClear={() => setTappedInstructor(null)} />
-          )}
-          {tappedStudio && (
-            <FilterChip label={tappedStudio} onClear={() => setTappedStudio(null)} />
-          )}
+          <FilterChip label={tappedStudio} onClear={() => setTappedStudio(null)} />
         </div>
       )}
 
