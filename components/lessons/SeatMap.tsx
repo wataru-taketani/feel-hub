@@ -197,10 +197,10 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               className={`absolute flex items-center justify-center rounded-full ${
                 multiSelect
                   ? isMultiSelected
-                    ? 'bg-yellow-100 border-2 border-yellow-400 text-yellow-800 cursor-pointer'
+                    ? 'bg-yellow-200 border-2 border-yellow-500 text-yellow-900 cursor-pointer'
                     : 'bg-white border-2 border-gray-400 text-gray-700 cursor-pointer'
                   : isPreferred && !isSelected && bike.status === 1
-                    ? cn('bg-yellow-100 border-2 border-yellow-400 text-yellow-800', interactive && 'cursor-pointer active:bg-yellow-200')
+                    ? cn('bg-yellow-200 border-2 border-yellow-500 text-yellow-900', interactive && 'cursor-pointer active:bg-yellow-200')
                     : bikeStyle(bike.status, !!interactive, isSelected)
               }`}
               style={{
@@ -223,7 +223,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         <div className="flex items-center gap-3">
           {multiSelect ? (
             <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-400 bg-yellow-100" />
+              <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-500 bg-yellow-200" />
               選択中
             </span>
           ) : (
@@ -244,7 +244,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               )}
               {preferredSet.size > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-400 bg-yellow-100" />
+                  <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-500 bg-yellow-200" />
                   おすすめ
                 </span>
               )}
