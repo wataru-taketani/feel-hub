@@ -234,7 +234,7 @@ export default function FilterBar({
                   value={filters.programSearch}
                   onChange={(e) => update({ programSearch: e.target.value })}
                   placeholder="プログラム名で検索"
-                  className="h-9 pl-8 text-sm"
+                  className="h-9 pl-8"
                 />
               </div>
             </div>

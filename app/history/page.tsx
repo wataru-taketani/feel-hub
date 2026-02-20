@@ -205,14 +205,14 @@ export default function HistoryPage() {
                     type="date"
                     value={customFrom}
                     onChange={(e) => setCustomFrom(e.target.value)}
-                    className="border rounded px-2 py-1 text-sm bg-background"
+                    className="border rounded px-2 py-1.5 text-base bg-background"
                   />
                   <span className="text-sm text-muted-foreground">〜</span>
                   <input
                     type="date"
                     value={customTo}
                     onChange={(e) => setCustomTo(e.target.value)}
-                    className="border rounded px-2 py-1 text-sm bg-background"
+                    className="border rounded px-2 py-1.5 text-base bg-background"
                   />
                 </div>
               )}
