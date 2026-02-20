@@ -141,7 +141,7 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
     return (
       <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-12 text-center">
         <CalendarDays className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-        <p className="text-muted-foreground">レッスンが見つかりません</p>
+        <p className="text-sm text-muted-foreground">レッスンが見つかりません</p>
       </div>
     );
   }

@@ -268,7 +268,7 @@ export default function HistoryPage() {
               </div>
             ) : filteredRecords.length === 0 ? (
               <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">
+                <CardContent className="pt-6 text-center text-sm text-muted-foreground">
                   {records.length > 0 ? (
                     <p>条件に一致する履歴はありません</p>
                   ) : (

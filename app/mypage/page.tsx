@@ -357,7 +357,7 @@ function MypageContent() {
                 会員情報
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">会員名</span>
                 <span className="font-medium">{data.mypage.displayName || '—'}</span>
@@ -414,8 +414,8 @@ function MypageContent() {
                   {data.tickets.map((t, i) => (
                     <div key={i} className="border rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium">{t.name}</p>
-                        <Badge variant="secondary" className="text-lg">
+                        <p className="text-sm font-medium">{t.name}</p>
+                        <Badge variant="secondary" className="text-sm font-bold">
                           {t.totalCount}枚
                         </Badge>
                       </div>

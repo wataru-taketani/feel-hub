@@ -171,7 +171,7 @@ export default function LessonDetailModal({
                 {effectiveIsFull ? (
                   <Badge variant="destructive" className="text-xs">満席</Badge>
                 ) : (
-                  <span className="text-green-700 font-medium">残り {effectiveAvailableSlots} 席</span>
+                  <span className="text-sm text-green-700 font-medium">残り {effectiveAvailableSlots} 席</span>
                 )}
               </div>
               {isReserved && (
