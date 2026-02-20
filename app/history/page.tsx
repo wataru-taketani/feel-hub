@@ -99,17 +99,11 @@ export default function HistoryPage() {
     }
   };
 
-  // 期間モード変更時にフィルタをリセット
   const handlePeriodModeChange = (mode: PeriodMode) => {
-    setSelectedPrograms([]);
-    setSelectedInstructors([]);
     setPeriodMode(mode);
   };
 
-  // 月変更時にフィルタをリセット
   const handleMonthChange = (month: string) => {
-    setSelectedPrograms([]);
-    setSelectedInstructors([]);
     setSelectedMonth(month);
   };
 
