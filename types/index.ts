@@ -28,7 +28,7 @@ export interface FilterPreset {
   id: string;
   filters: {
     studios: string[];
-    programSearch: string;
+    programs: string[];
     instructors: string[];
     ticketFilter: 'ALL' | 'NORMAL' | 'ADDITIONAL';
   };

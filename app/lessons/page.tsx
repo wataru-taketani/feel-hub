@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Loader2, Star } from "lucide-react";
-import type { Lesson } from "@/types";
-import { matchesProgram, parseHomeStoreToStudio } from "@/lib/lessonUtils";
+import type { Lesson, FilterPreset } from "@/types";
+import { parseHomeStoreToStudio } from "@/lib/lessonUtils";
 import { cn } from "@/lib/utils";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useFilterPresets } from "@/hooks/useFilterPresets";
@@ -20,7 +20,7 @@ const LOCALSTORAGE_KEY = 'feelHub_defaultStudio';
 
 const DEFAULT_FILTERS: FilterState = {
   studios: [],
-  programSearch: "",
+  programs: [],
   instructors: [],
   ticketFilter: "ALL",
   bookmarkOnly: false,
@@ -158,7 +158,10 @@ export default function LessonsPage() {
     if (preset) {
       const studios = preset.filters.studios || [];
       setDefaultStudios(studios);
-      setFilters({ ...preset.filters, bookmarkOnly: false });
+      // 旧形式 programSearch → 新形式 programs に変換
+      const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
+      const programs = pf.programs || [];
+      setFilters({ ...pf, programs, bookmarkOnly: false });
       prevStudiosRef.current = studios;
       fetchLessons(studios);
       return;
@@ -228,6 +231,15 @@ export default function LessonsPage() {
     }
   }, [fetchLessons]);
 
+  // 全プログラム名を全レッスンから抽出
+  const allPrograms = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of allLessons) {
+      if (l.programName) set.add(l.programName);
+    }
+    return [...set].sort();
+  }, [allLessons]);
+
   // 全インストラクターを全レッスンから抽出（Wイントラはカンマ区切りで分割）
   const allInstructors = useMemo(() => {
     const set = new Set<string>();
@@ -244,7 +256,7 @@ export default function LessonsPage() {
   const filteredLessons = useMemo(() => {
     return allLessons.filter((lesson) => {
       if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio)) return false;
-      if (!matchesProgram(lesson.programName, filters.programSearch)) return false;
+      if (filters.programs.length > 0 && !filters.programs.includes(lesson.programName)) return false;
       if (filters.instructors.length > 0) {
         const lessonIRs = lesson.instructor.split(", ");
         if (!filters.instructors.some((ir) => lessonIRs.includes(ir))) return false;
@@ -253,7 +265,7 @@ export default function LessonsPage() {
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
       return true;
     });
-  }, [allLessons, filters.studios, filters.programSearch, filters.instructors, filters.ticketFilter]);
+  }, [allLessons, filters.studios, filters.programs, filters.instructors, filters.ticketFilter]);
 
   // 固定行用: 予約済み（全スタジオ）
   const reservedLessons = useMemo(() =>
@@ -272,8 +284,10 @@ export default function LessonsPage() {
   // プリセット読み込み
   const handleLoadPreset = useCallback(() => {
     if (preset) {
+      const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
       setFilters({
-        ...preset.filters,
+        ...pf,
+        programs: pf.programs || [],
         bookmarkOnly: false,
       });
     }
@@ -289,7 +303,7 @@ export default function LessonsPage() {
   const handleSavePreset = useCallback(() => {
     savePreset({
       studios: filters.studios,
-      programSearch: filters.programSearch,
+      programs: filters.programs,
       instructors: filters.instructors,
       ticketFilter: filters.ticketFilter,
     });
@@ -321,6 +335,7 @@ export default function LessonsPage() {
       onOpenChange={setFilterOpen}
       filters={filters}
       onChange={setFilters}
+      allPrograms={allPrograms}
       allInstructors={allInstructors}
       preset={preset}
       onLoadPreset={handleLoadPreset}

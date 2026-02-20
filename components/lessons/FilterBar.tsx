@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { RotateCcw, Star, Search, SlidersHorizontal, ChevronDown, X, MapPin, User, Save, Check, Trash2 } from 'lucide-react';
+import { RotateCcw, Star, SlidersHorizontal, ChevronDown, X, MapPin, User, Music, Save, Check, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import StudioMultiSelect from './StudioMultiSelect';
@@ -13,7 +12,7 @@ import type { FilterPreset } from '@/types';
 
 export interface FilterState {
   studios: string[];
-  programSearch: string;
+  programs: string[];
   instructors: string[];
   ticketFilter: 'ALL' | 'NORMAL' | 'ADDITIONAL';
   bookmarkOnly: boolean;
@@ -24,7 +23,7 @@ function filtersMatchPreset(filters: FilterState, preset: FilterPreset): boolean
   const pf = preset.filters;
   return (
     [...filters.studios].sort().join(',') === [...pf.studios].sort().join(',') &&
-    filters.programSearch === pf.programSearch &&
+    [...filters.programs].sort().join(',') === [...(pf.programs || [])].sort().join(',') &&
     [...filters.instructors].sort().join(',') === [...pf.instructors].sort().join(',') &&
     filters.ticketFilter === pf.ticketFilter
   );
@@ -36,7 +35,7 @@ function presetSummary(preset: FilterPreset): string {
   const f = preset.filters;
   parts.push(f.studios.length > 0 ? f.studios.join(', ') : '全スタジオ');
   if (f.instructors.length > 0) parts.push(f.instructors.join(', '));
-  if (f.programSearch) parts.push(`"${f.programSearch}"`);
+  if (f.programs && f.programs.length > 0) parts.push(f.programs.join(', '));
   if (f.ticketFilter === 'NORMAL') parts.push('通常チケット');
   if (f.ticketFilter === 'ADDITIONAL') parts.push('ADDチケット');
   return parts.join(' / ');
@@ -45,6 +44,7 @@ function presetSummary(preset: FilterPreset): string {
 interface FilterBarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
+  allPrograms: string[];
   allInstructors: string[];
   preset: FilterPreset | null;
   onSavePreset: () => void;
@@ -64,6 +64,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export default function FilterBar({
   filters,
   onChange,
+  allPrograms,
   allInstructors,
   preset,
   onSavePreset,
@@ -81,7 +82,7 @@ export default function FilterBar({
   const reset = () =>
     onChange({
       studios: [],
-      programSearch: '',
+      programs: [],
       instructors: [],
       ticketFilter: 'ALL',
       bookmarkOnly: false,
@@ -90,7 +91,7 @@ export default function FilterBar({
   // フィルタ件数（ブックマーク除外）
   const activeCount =
     (filters.studios.length > 0 ? 1 : 0) +
-    (filters.programSearch ? 1 : 0) +
+    (filters.programs.length > 0 ? 1 : 0) +
     (filters.instructors.length > 0 ? 1 : 0) +
     (filters.ticketFilter !== 'ALL' ? 1 : 0);
 
@@ -111,7 +112,22 @@ export default function FilterBar({
           </button>
         </Badge>
       ))}
-      {filters.studios.length > 0 && filters.instructors.length > 0 && (
+      {filters.studios.length > 0 && (filters.programs.length > 0 || filters.instructors.length > 0) && (
+        <span className="text-muted-foreground/40 text-xs">|</span>
+      )}
+      {filters.programs.map((p) => (
+        <Badge key={`p-${p}`} variant="outline" className="gap-1 pr-1 text-xs h-6 border-purple-200 text-purple-700">
+          <Music className="h-3 w-3" />
+          {p}
+          <button
+            onClick={() => update({ programs: filters.programs.filter((x) => x !== p) })}
+            className="rounded-full hover:bg-muted p-0.5"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+      {(filters.studios.length > 0 || filters.programs.length > 0) && filters.instructors.length > 0 && (
         <span className="text-muted-foreground/40 text-xs">|</span>
       )}
       {filters.instructors.map((ir) => (
@@ -128,7 +144,7 @@ export default function FilterBar({
       ))}
     </>
   );
-  const hasChips = filters.studios.length > 0 || filters.instructors.length > 0;
+  const hasChips = filters.studios.length > 0 || filters.programs.length > 0 || filters.instructors.length > 0;
 
   return (
     <div className="space-y-2">
@@ -225,18 +241,17 @@ export default function FilterBar({
               </div>
             </div>
 
-            {/* セクション2: プログラム検索 */}
+            {/* セクション2: プログラム */}
             <div className="p-3 space-y-2">
               <SectionLabel>プログラム</SectionLabel>
-              <div className="relative max-w-sm">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <Input
-                  value={filters.programSearch}
-                  onChange={(e) => update({ programSearch: e.target.value })}
-                  placeholder="プログラム名で検索"
-                  className="h-9 pl-8"
-                />
-              </div>
+              <InstructorMultiSelect
+                instructors={allPrograms}
+                selected={filters.programs}
+                onChange={(programs) => update({ programs })}
+                label="プログラム"
+                labelUnit="件"
+                searchPlaceholder="プログラム名で検索..."
+              />
             </div>
 
             {/* セクション3: チケット */}
