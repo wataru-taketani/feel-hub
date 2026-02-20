@@ -197,10 +197,12 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               className={`absolute flex items-center justify-center rounded-full ${
                 multiSelect
                   ? isMultiSelected
-                    ? 'bg-white border-2 border-gray-400 text-gray-700 ring-2 ring-yellow-400 cursor-pointer'
+                    ? 'bg-yellow-100 border-2 border-yellow-400 text-yellow-800 cursor-pointer'
                     : 'bg-white border-2 border-gray-400 text-gray-700 cursor-pointer'
-                  : bikeStyle(bike.status, !!interactive, isSelected)
-              } ${!multiSelect && isPreferred && !isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+                  : isPreferred && !isSelected && bike.status === 1
+                    ? cn('bg-yellow-100 border-2 border-yellow-400 text-yellow-800', interactive && 'cursor-pointer active:bg-yellow-200')
+                    : bikeStyle(bike.status, !!interactive, isSelected)
+              }`}
               style={{
                 left: `${(bike.x / data.mapWidth) * 100}%`,
                 top: `${(bike.y / data.mapHeight) * 100}%`,
@@ -211,9 +213,6 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               onClick={() => handleBikeClick(bikeNo, bike.status)}
             >
               <span className="text-[10px] font-bold leading-none">{bikeNo}</span>
-              {(isMultiSelected || (isPreferred && !isMultiSelected)) && (
-                <span className="absolute -top-1 -right-1 text-[8px] text-yellow-400 leading-none">★</span>
-              )}
             </div>
           );
         })}
@@ -224,7 +223,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         <div className="flex items-center gap-3">
           {multiSelect ? (
             <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded-full border-2 border-gray-400 ring-2 ring-yellow-400 bg-white" />
+              <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-400 bg-yellow-100" />
               選択中
             </span>
           ) : (
@@ -245,7 +244,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
               )}
               {preferredSet.size > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full border-2 border-gray-400 ring-2 ring-yellow-400 bg-white" />
+                  <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-400 bg-yellow-100" />
                   おすすめ
                 </span>
               )}
