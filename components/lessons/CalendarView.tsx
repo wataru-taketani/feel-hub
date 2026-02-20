@@ -139,9 +139,16 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
 
   if (dates.length === 0) {
     return (
-      <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-12 text-center">
-        <CalendarDays className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-        <p className="text-sm text-muted-foreground">レッスンが見つかりません</p>
+      <div className="space-y-2">
+        <div className="flex items-center gap-1">
+          {toolbarLeft}
+          <div className="flex-1" />
+          {middleContent}
+        </div>
+        <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-12 text-center">
+          <CalendarDays className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">レッスンが見つかりません</p>
+        </div>
       </div>
     );
   }
