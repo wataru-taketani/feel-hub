@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LinkIcon, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { LinkIcon, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell, BellOff } from 'lucide-react';
 import type { MypageInfo, ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
 import type { AttendanceRecord } from '@/types';
 import StudioTab from '@/components/mypage/StudioTab';
@@ -54,6 +55,11 @@ function MypageContent() {
   const [joinedMonth, setJoinedMonth] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // LINE通知
+  const [lineLinked, setLineLinked] = useState(false);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
 
   // 履歴タブ
   const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
@@ -105,6 +111,9 @@ function MypageContent() {
           const [y, m] = profileData.profile.joinedAt.split('-');
           setJoinedYear(y);
           setJoinedMonth(m);
+        }
+        if (profileData?.profile?.lineUserId) {
+          setLineLinked(true);
         }
 
         setProgramColors(programsData);
@@ -222,6 +231,26 @@ function MypageContent() {
       setSyncMessage('通信エラーが発生しました');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // LINE通知解除
+  const handleUnlinkLine = async () => {
+    setUnlinking(true);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineUserId: null }),
+      });
+      if (res.ok) {
+        setLineLinked(false);
+        setShowUnlinkConfirm(false);
+      }
+    } catch {
+      // エラー時はモーダルを閉じない
+    } finally {
+      setUnlinking(false);
     }
   };
 
@@ -499,11 +528,61 @@ function MypageContent() {
                 満席レッスンに空きが出たときにLINEで通知を受け取れます。
                 レッスン一覧で満席レッスンをタップして「空き通知」を登録してください。
               </p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-xs text-[#06C755] font-medium">LINE連携済み</span>
-              </div>
+              {lineLinked ? (
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-xs text-[#06C755] font-medium">LINE連携済み</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground"
+                    onClick={() => setShowUnlinkConfirm(true)}
+                  >
+                    <BellOff className="h-3.5 w-3.5 mr-1" />
+                    通知を解除
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <span className="text-xs text-muted-foreground">LINE通知は無効です。再度有効にするにはLINEで再ログインしてください。</span>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* LINE通知解除確認モーダル */}
+          <Dialog open={showUnlinkConfirm} onOpenChange={setShowUnlinkConfirm}>
+            <DialogContent className="max-w-xs">
+              <DialogHeader>
+                <DialogTitle>LINE通知を解除</DialogTitle>
+                <DialogDescription>
+                  LINE通知を解除すると、空き通知やキャンセル待ちの通知が届かなくなります。再度LINEでログインすると通知を再開できます。
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setShowUnlinkConfirm(false)}
+                  disabled={unlinking}
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleUnlinkLine}
+                  disabled={unlinking}
+                >
+                  {unlinking ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : null}
+                  解除する
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* スタジオタブ */}
