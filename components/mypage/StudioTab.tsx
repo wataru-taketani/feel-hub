@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -127,14 +127,23 @@ export default function StudioTab({ programColors }: StudioTabProps) {
       .map(s => s.name);
   })();
 
-  // エリア順の場合のグループ判定
-  const getAreaLabel = (studio: string, index: number): string | null => {
-    if (sortMode !== 'area') return null;
-    const area = studioAreaMap[studio];
-    if (index === 0) return area;
-    const prevArea = studioAreaMap[sortedStudios[index - 1]];
-    return area !== prevArea ? area : null;
-  };
+  // レンダリング用グループ: count順は1グループ、エリア順はエリアごと
+  const studioGroups = (() => {
+    if (sortMode === 'count') {
+      return [{ area: null as string | null, studios: sortedStudios }];
+    }
+    const groups: { area: string | null; studios: string[] }[] = [];
+    for (const studio of sortedStudios) {
+      const area = studioAreaMap[studio];
+      const last = groups[groups.length - 1];
+      if (last && last.area === area) {
+        last.studios.push(studio);
+      } else {
+        groups.push({ area, studios: [studio] });
+      }
+    }
+    return groups;
+  })();
 
   // スタジオ展開時
   const handleExpand = useCallback(async (studio: string) => {
@@ -256,176 +265,178 @@ export default function StudioTab({ programColors }: StudioTabProps) {
         </Button>
       </div>
 
-      {sortedStudios.map((studio, index) => {
-        const count = rankingMap[studio] || 0;
-        const isExpanded = expandedStudio === studio;
-        const favSeats = preferences[studio];
-        const areaLabel = getAreaLabel(studio, index);
+      {studioGroups.map((group) => (
+        <div key={group.area || 'all'}>
+          {group.area && (
+            <p className="text-xs font-medium text-muted-foreground mb-1 px-1">{group.area}</p>
+          )}
+          <Card className="overflow-hidden">
+            {group.studios.map((studio, index) => {
+              const count = rankingMap[studio] || 0;
+              const isExpanded = expandedStudio === studio;
+              const favSeats = preferences[studio];
 
-        return (
-          <div key={studio}>
-            {areaLabel && (
-              <p className="text-xs font-medium text-muted-foreground mt-2 mb-1 px-1">{areaLabel}</p>
-            )}
-            <Card className="overflow-hidden">
-              {/* ヘッダー行 */}
-              <button
-                className="w-full text-left p-3 active:bg-muted/50 transition-colors"
-                onClick={() => handleExpand(studio)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{formatStudio(studio)}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {count > 0 ? `${count}回` : '—'}
-                      </Badge>
+              return (
+                <div key={studio}>
+                  {index > 0 && <Separator />}
+                  {/* ヘッダー行 */}
+                  <button
+                    className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
+                    onClick={() => handleExpand(studio)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium text-sm">{formatStudio(studio)}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {count > 0 ? `${count}回` : '—'}
+                        </Badge>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      )}
                     </div>
-                    <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
-                      <Star className="h-3 w-3 text-yellow-500" />
-                      <span>
-                        {favSeats && favSeats.length > 0
-                          ? favSeats.map(s => `#${s}`).join(' ')
-                          : '未設定'}
-                      </span>
-                    </div>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                </div>
-              </button>
+                  </button>
 
-              {/* 展開コンテンツ */}
-              {isExpanded && (
-                <CardContent className="pt-0 pb-3 space-y-3">
-                  <Separator />
+                  {/* 展開コンテンツ */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 space-y-3">
+                      <Separator />
 
-                  {/* おすすめバイク番号 */}
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-muted-foreground">おすすめバイク番号</p>
-                    {!showSeatMap ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full h-8 text-xs"
-                        onClick={() => handleShowSeatMap(studio)}
-                        disabled={seatMapLoading}
-                      >
-                        {seatMapLoading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                        ) : (
-                          <Star className="h-3.5 w-3.5 mr-1" />
-                        )}
-                        おすすめバイクを選択
-                      </Button>
-                    ) : (
-                      <div className="space-y-2">
-                        {seatMapSidHash && (
-                          <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
-                            <SeatMap
-                              sidHash={seatMapSidHash}
-                              multiSelect
-                              selectedSeats={selectedSeats}
-                              onSelectedSeatsChange={setSelectedSeats}
-                            />
-                          </Suspense>
-                        )}
-                        <div className="flex gap-2">
+                      {/* おすすめバイク（展開時のみ表示） */}
+                      {favSeats && favSeats.length > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Star className="h-3 w-3 text-yellow-500" />
+                          <span>{favSeats.map(s => `#${s}`).join(' ')}</span>
+                        </div>
+                      )}
+
+                      {/* おすすめバイク選択 */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">おすすめバイク番号</p>
+                        {!showSeatMap ? (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 h-8 text-xs"
-                            onClick={() => setShowSeatMap(false)}
+                            className="w-full h-8 text-xs"
+                            onClick={() => handleShowSeatMap(studio)}
+                            disabled={seatMapLoading}
                           >
-                            閉じる
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="flex-1 h-8 text-xs"
-                            onClick={() => handleSavePreferences(studio)}
-                            disabled={saving}
-                          >
-                            {saving ? (
+                            {seatMapLoading ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
                             ) : (
-                              <Save className="h-3.5 w-3.5 mr-1" />
+                              <Star className="h-3.5 w-3.5 mr-1" />
                             )}
-                            保存
+                            おすすめバイクを選択
                           </Button>
-                        </div>
-                      </div>
-                    )}
-                    {saveMessage && (
-                      <p className={`text-xs ${saveMessage === '保存しました' ? 'text-green-600' : 'text-red-600'}`}>
-                        {saveMessage}
-                      </p>
-                    )}
-                  </div>
-
-                  {recentLoading ? (
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-16 w-full" />
-                    </div>
-                  ) : (
-                    <>
-                      {/* よく使う席 */}
-                      {seatCounts.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground">よく使うバイク</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {seatCounts.map(({ seat, count: c }) => (
-                              <Badge key={seat} variant="outline" className="text-xs">
-                                #{seat}（{c}回）
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 最近の受講 */}
-                      {recentRecords.length > 0 && (
-                        <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground">最近の受講</p>
-                          <div className="space-y-1">
-                            {recentRecords.map((r) => (
-                              <div key={r.id} className="flex items-center gap-1.5 text-xs">
-                                <span className="text-muted-foreground w-12 shrink-0">
-                                  {r.shiftDate.slice(5)}
-                                </span>
-                                {programColors[r.programName] ? (
-                                  <span
-                                    className="inline-block px-1 py-0.5 rounded text-[10px] font-medium leading-none"
-                                    style={{
-                                      backgroundColor: programColors[r.programName].colorCode,
-                                      color: programColors[r.programName].textColor,
-                                    }}
-                                  >
-                                    {r.programName}
-                                  </span>
+                        ) : (
+                          <div className="space-y-2">
+                            {seatMapSidHash && (
+                              <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                                <SeatMap
+                                  sidHash={seatMapSidHash}
+                                  multiSelect
+                                  selectedSeats={selectedSeats}
+                                  onSelectedSeatsChange={setSelectedSeats}
+                                />
+                              </Suspense>
+                            )}
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 h-8 text-xs"
+                                onClick={() => setShowSeatMap(false)}
+                              >
+                                閉じる
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1 h-8 text-xs"
+                                onClick={() => handleSavePreferences(studio)}
+                                disabled={saving}
+                              >
+                                {saving ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
                                 ) : (
-                                  <span className="font-medium">{r.programName}</span>
+                                  <Save className="h-3.5 w-3.5 mr-1" />
                                 )}
-                                <span className="text-muted-foreground truncate">{r.instructorName}</span>
-                                {r.sheetNo && (
-                                  <span className="ml-auto shrink-0 text-muted-foreground">#{r.sheetNo}</span>
-                                )}
-                              </div>
-                            ))}
+                                保存
+                              </Button>
+                            </div>
                           </div>
+                        )}
+                        {saveMessage && (
+                          <p className={`text-xs ${saveMessage === '保存しました' ? 'text-green-600' : 'text-red-600'}`}>
+                            {saveMessage}
+                          </p>
+                        )}
+                      </div>
+
+                      {recentLoading ? (
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-16 w-full" />
                         </div>
+                      ) : (
+                        <>
+                          {/* よく使う席 */}
+                          {seatCounts.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-muted-foreground">よく使うバイク</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {seatCounts.map(({ seat, count: c }) => (
+                                  <Badge key={seat} variant="outline" className="text-xs">
+                                    #{seat}（{c}回）
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 最近の受講 */}
+                          {recentRecords.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-muted-foreground">最近の受講</p>
+                              <div className="space-y-1">
+                                {recentRecords.map((r) => (
+                                  <div key={r.id} className="flex items-center gap-1.5 text-xs">
+                                    <span className="text-muted-foreground w-12 shrink-0">
+                                      {r.shiftDate.slice(5)}
+                                    </span>
+                                    {programColors[r.programName] ? (
+                                      <span
+                                        className="inline-block px-1 py-0.5 rounded text-[10px] font-medium leading-none"
+                                        style={{
+                                          backgroundColor: programColors[r.programName].colorCode,
+                                          color: programColors[r.programName].textColor,
+                                        }}
+                                      >
+                                        {r.programName}
+                                      </span>
+                                    ) : (
+                                      <span className="font-medium">{r.programName}</span>
+                                    )}
+                                    <span className="text-muted-foreground truncate">{r.instructorName}</span>
+                                    {r.sheetNo && (
+                                      <span className="ml-auto shrink-0 text-muted-foreground">#{r.sheetNo}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
-                    </>
+                    </div>
                   )}
-                </CardContent>
-              )}
-            </Card>
-          </div>
-        );
-      })}
+                </div>
+              );
+            })}
+          </Card>
+        </div>
+      ))}
     </div>
   );
 }
