@@ -353,9 +353,12 @@ export default function StudioTab({ programColors }: StudioTabProps) {
 
     return (
       <div className={isClosed ? 'bg-muted' : ''}>
-        <button
-          className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
-          onClick={() => handleExpand(s.abbreviation)}
+        <div
+          className={`w-full text-left py-2.5 px-3 ${isClosed ? '' : 'cursor-pointer active:bg-muted/50 transition-colors'}`}
+          onClick={isClosed ? undefined : () => handleExpand(s.abbreviation)}
+          role={isClosed ? undefined : 'button'}
+          tabIndex={isClosed ? undefined : 0}
+          onKeyDown={isClosed ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') handleExpand(s.abbreviation); }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
@@ -366,20 +369,22 @@ export default function StudioTab({ programColors }: StudioTabProps) {
                 {count > 0 ? `${count}回` : '—'}
               </Badge>
               {isClosed && count > 0 && (
-                <Badge className="text-xs bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">
+                <Badge variant="outline" className="text-xs">
                   閉店
                 </Badge>
               )}
             </div>
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            {!isClosed && (
+              isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              )
             )}
           </div>
-        </button>
+        </div>
 
-        {isExpanded && (
+        {isExpanded && !isClosed && (
           <div className="px-3 pb-3 space-y-3">
             <Separator />
 
