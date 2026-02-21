@@ -11,7 +11,7 @@ const BASE_URL = 'https://m.feelcycle.com';
 
 // 一時デバッグ用: 受講履歴APIの生レスポンスフィールドを返す
 export async function GET() {
-  const userId = 'd3fa0f31-d102-49ab-a4b2-5927233be467';
+  const userId = '20b93fa1-e64a-4e30-b834-dacdeb7c7721';
 
   const { data: sessionRow } = await supabaseAdmin
     .from('feelcycle_sessions')
