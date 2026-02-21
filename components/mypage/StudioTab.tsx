@@ -61,6 +61,8 @@ export default function StudioTab({ programColors }: StudioTabProps) {
   // 正規化名 → 元の store_name（API呼び出し用）
   const [storeNameMap, setStoreNameMap] = useState<Record<string, string>>({});
   const [preferences, setPreferences] = useState<Record<string, string[]>>({});
+  const [activeStudios, setActiveStudios] = useState<Set<string>>(new Set());
+  const [closedStudios, setClosedStudios] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('count');
   const [expandedStudio, setExpandedStudio] = useState<string | null>(null);
@@ -102,6 +104,15 @@ export default function StudioTab({ programColors }: StudioTabProps) {
         setRankingMap(map);
         setStoreNameMap(nameMap);
         setPreferences(prefsData.preferences || {});
+
+        // 現在営業中スタジオ
+        const actives = new Set<string>((statsData.activeStudios || []) as string[]);
+        setActiveStudios(actives);
+
+        // 受講履歴にあるが STUDIO_REGIONS にないスタジオ = 閉店スタジオ
+        const allStudioSet = new Set(getAllStudiosInAreaOrder());
+        const closed = Object.keys(map).filter(s => !allStudioSet.has(s));
+        setClosedStudios(closed);
       } catch {
         // ignore
       } finally {
@@ -111,17 +122,18 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     fetchData();
   }, []);
 
-  // ソート済みスタジオリスト
+  // ソート済みスタジオリスト（STUDIO_REGIONS + 閉店スタジオ）
   const sortedStudios = (() => {
     if (sortMode === 'area') {
+      // エリア順: STUDIO_REGIONS順、閉店スタジオは別グループなのでここには含めない
       return allStudios;
     }
-    // 受講回数順: 回数 desc、0回は末尾にエリア順で並べる
-    const withCount = allStudios.map(s => ({ name: s, count: rankingMap[s] || 0 }));
+    // 受講回数順: 全スタジオ（STUDIO_REGIONS + 閉店）を回数desc
+    const all = [...allStudios, ...closedStudios];
+    const withCount = all.map(s => ({ name: s, count: rankingMap[s] || 0 }));
     return withCount
       .sort((a, b) => {
         if (a.count !== b.count) return b.count - a.count;
-        // 同じ回数ならエリア順（allStudios の index）
         return allStudios.indexOf(a.name) - allStudios.indexOf(b.name);
       })
       .map(s => s.name);
@@ -141,6 +153,10 @@ export default function StudioTab({ programColors }: StudioTabProps) {
       } else {
         groups.push({ area, studios: [studio] });
       }
+    }
+    // エリア順の場合、閉店スタジオを末尾に追加
+    if (closedStudios.length > 0) {
+      groups.push({ area: '閉店', studios: closedStudios });
     }
     return groups;
   })();
@@ -275,6 +291,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
               const count = rankingMap[studio] || 0;
               const isExpanded = expandedStudio === studio;
               const favSeats = preferences[studio];
+              const isClosed = activeStudios.size > 0 && !activeStudios.has(studio);
 
               return (
                 <div key={studio}>
@@ -286,10 +303,15 @@ export default function StudioTab({ programColors }: StudioTabProps) {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-medium text-sm">{formatStudio(studio)}</span>
+                        <span className={`font-medium text-sm ${isClosed ? 'text-muted-foreground' : ''}`}>{formatStudio(studio)}</span>
                         <Badge variant="secondary" className="text-xs">
                           {count > 0 ? `${count}回` : '—'}
                         </Badge>
+                        {isClosed && count > 0 && (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            閉店
+                          </Badge>
+                        )}
                       </div>
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />

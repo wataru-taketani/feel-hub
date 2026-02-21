@@ -88,10 +88,18 @@ export async function GET(request: NextRequest) {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
 
+  // lessons テーブルから現在営業中のスタジオ一覧を取得
+  const { data: lessonStudios } = await supabaseAdmin
+    .from('lessons')
+    .select('studio')
+    .gte('date', new Date().toISOString().slice(0, 10));
+  const activeStudios = [...new Set((lessonStudios || []).map(l => l.studio as string))];
+
   return NextResponse.json({
     totalLessons: rows.length,
     programRanking: toRanking(programCounts),
     instructorRanking: toRanking(instructorCounts),
     studioRanking: toRanking(studioCounts),
+    activeStudios,
   });
 }

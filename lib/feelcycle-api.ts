@@ -68,6 +68,7 @@ export interface HistoryRecord {
   endTime: string;
   storeName: string;
   instructorName: string;
+  instructorIds: number[];
   programName: string;
   sheetNo: string;
   ticketName: string;
@@ -363,10 +364,13 @@ export async function getLessonHistory(
 
   return list.map((h) => {
     // instructor_name_list は [{id, name}] 形式の配列
-    const instructors = (h.instructor_name_list || []) as { name: string }[];
+    const instructors = (h.instructor_name_list || []) as { id?: number; name: string }[];
     const instructorName = Array.isArray(instructors)
       ? instructors.map(t => t.name).join(', ')
       : String(instructors);
+    const instructorIds = Array.isArray(instructors)
+      ? instructors.map(t => t.id).filter((id): id is number => typeof id === 'number')
+      : [];
 
     return {
       shiftDate: String(h.shift_date || '').replace(/\//g, '-'),
@@ -374,6 +378,7 @@ export async function getLessonHistory(
       endTime: String(h.ls_et || '').slice(0, 5),
       storeName: String(h.store_name || ''),
       instructorName,
+      instructorIds,
       programName: String(h.iname || ''),
       sheetNo: String(h.sheet_no || ''),
       ticketName: String(h.ticket_name || ''),

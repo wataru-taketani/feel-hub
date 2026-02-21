@@ -23,6 +23,7 @@ export async function upsertHistory(
     end_time: r.endTime,
     store_name: r.storeName,
     instructor_name: r.instructorName,
+    instructor_ids: r.instructorIds.length > 0 ? r.instructorIds : null,
     program_name: r.programName,
     sheet_no: r.sheetNo || null,
     ticket_name: r.ticketName || null,
