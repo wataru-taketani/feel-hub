@@ -114,3 +114,23 @@ export interface SeatPreference {
   studio: string;
   seatNumbers: string[];
 }
+
+// グループ
+export interface Group {
+  id: string;
+  name: string;
+  createdBy: string;
+  inviteCode: string;
+  memberCount: number;
+  isCreator: boolean;
+  createdAt: string;
+}
+
+// グループメンバー
+export interface GroupMember {
+  userId: string;
+  displayName: string | null;
+  linePictureUrl: string | null;
+  role: 'creator' | 'member';
+  joinedAt: string;
+}

@@ -35,8 +35,14 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // 認証が必要なルートの保護
-  const protectedPaths = ['/mypage', '/history', '/settings'];
+  const protectedPaths = ['/mypage', '/history', '/settings', '/groups'];
   const isProtected = protectedPaths.some((p) => request.nextUrl.pathname.startsWith(p));
+
+  // /groups/invite/* は未認証でもアクセス可（招待ページ）
+  const isInvitePage = request.nextUrl.pathname.startsWith('/groups/invite');
+  if (isInvitePage) {
+    return supabaseResponse;
+  }
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
