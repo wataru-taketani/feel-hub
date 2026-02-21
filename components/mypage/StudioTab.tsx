@@ -352,7 +352,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     const isClosed = !s.is_active;
 
     return (
-      <div className={isClosed ? 'bg-muted/30 opacity-50' : ''}>
+      <div className={isClosed ? 'bg-muted/50 opacity-30' : ''}>
         <button
           className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
           onClick={() => handleExpand(s.abbreviation)}
