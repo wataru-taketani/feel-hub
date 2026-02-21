@@ -352,7 +352,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     const isClosed = !s.is_active;
 
     return (
-      <div className={isClosed ? 'opacity-40' : ''}>
+      <div className={isClosed ? 'bg-muted/30 opacity-50' : ''}>
         <button
           className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
           onClick={() => handleExpand(s.abbreviation)}
@@ -365,6 +365,11 @@ export default function StudioTab({ programColors }: StudioTabProps) {
               <Badge variant="secondary" className="text-xs">
                 {count > 0 ? `${count}回` : '—'}
               </Badge>
+              {isClosed && count > 0 && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  閉店
+                </Badge>
+              )}
             </div>
             {isExpanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
