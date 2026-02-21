@@ -130,6 +130,36 @@ export const handler: Handler = async (event, context) => {
       }
 
       console.log(`Saved ${saved}/${lessons.length} lessons to Supabase`);
+
+      // programsテーブルを同期（新規追加 + 色情報の更新）
+      try {
+        const programMap = new Map<string, { colorCode: string; textColor: string }>();
+        for (const l of lessons) {
+          if (l.programName && l.colorCode && !programMap.has(l.programName)) {
+            programMap.set(l.programName, { colorCode: l.colorCode, textColor: l.textColor || '#FFFFFF' });
+          }
+        }
+
+        if (programMap.size > 0) {
+          const programRows = [...programMap.entries()].map(([name, colors]) => ({
+            program_name: name,
+            color_code: colors.colorCode,
+            text_color: colors.textColor,
+          }));
+
+          const { error: progError } = await supabase
+            .from('programs')
+            .upsert(programRows, { onConflict: 'program_name' });
+
+          if (progError) {
+            console.error('Programs sync error:', progError);
+          } else {
+            console.log(`Synced ${programRows.length} programs`);
+          }
+        }
+      } catch (progSyncError) {
+        console.error('Programs sync error (continuing):', progSyncError);
+      }
     } catch (dbError) {
       console.error('Database error (continuing):', dbError);
     }
