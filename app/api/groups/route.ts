@@ -18,7 +18,7 @@ export async function GET() {
   }
 
   // 自分が参加しているグループ一覧を取得
-  const { data: memberships, error: memError } = await supabase
+  const { data: memberships, error: memError } = await supabaseAdmin
     .from('group_members')
     .select('group_id, role')
     .eq('user_id', user.id);
@@ -35,7 +35,7 @@ export async function GET() {
   const roleMap = Object.fromEntries(memberships.map((m) => [m.group_id, m.role]));
 
   // グループ情報を取得
-  const { data: groups, error: grpError } = await supabase
+  const { data: groups, error: grpError } = await supabaseAdmin
     .from('groups')
     .select('*')
     .in('id', groupIds)
@@ -45,7 +45,7 @@ export async function GET() {
     return NextResponse.json({ error: grpError.message }, { status: 500 });
   }
 
-  // メンバー数を取得（service_roleでカウント）
+  // メンバー数を取得
   const { data: counts } = await supabaseAdmin
     .from('group_members')
     .select('group_id')
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   const inviteCode = generateInviteCode();
 
   // グループ作成
-  const { data: group, error: createError } = await supabase
+  const { data: group, error: createError } = await supabaseAdmin
     .from('groups')
     .insert({
       name,
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 作成者をメンバーに追加
-  const { error: memberError } = await supabase
+  const { error: memberError } = await supabaseAdmin
     .from('group_members')
     .insert({
       group_id: group.id,
