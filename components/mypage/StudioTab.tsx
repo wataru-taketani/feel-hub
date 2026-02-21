@@ -105,13 +105,13 @@ export default function StudioTab({ programColors }: StudioTabProps) {
         setStoreNameMap(nameMap);
         setPreferences(prefsData.preferences || {});
 
-        // 現在営業中スタジオ
+        // 現在営業中スタジオ（lessonsテーブルにレッスンがあるスタジオ）
         const actives = new Set<string>((statsData.activeStudios || []) as string[]);
         setActiveStudios(actives);
 
-        // 受講履歴にあるが STUDIO_REGIONS にないスタジオ = 閉店スタジオ
+        // 受講履歴にあるが activeStudios にも STUDIO_REGIONS にもないスタジオ = 閉店スタジオ
         const allStudioSet = new Set(getAllStudiosInAreaOrder());
-        const closed = Object.keys(map).filter(s => !allStudioSet.has(s));
+        const closed = Object.keys(map).filter(s => !allStudioSet.has(s) && !actives.has(s));
         setClosedStudios(closed);
       } catch {
         // ignore
