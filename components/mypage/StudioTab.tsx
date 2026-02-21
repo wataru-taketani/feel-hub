@@ -352,21 +352,21 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     const isClosed = !s.is_active;
 
     return (
-      <div className={isClosed ? 'bg-muted/50 opacity-30' : ''}>
+      <div className={isClosed ? 'bg-muted' : ''}>
         <button
           className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
           onClick={() => handleExpand(s.abbreviation)}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-medium text-sm">
+              <span className={`font-medium text-sm ${isClosed ? 'text-muted-foreground' : ''}`}>
                 {s.name}（{s.abbreviation}）
               </span>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className={`text-xs ${isClosed ? 'opacity-60' : ''}`}>
                 {count > 0 ? `${count}回` : '—'}
               </Badge>
               {isClosed && count > 0 && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">
+                <Badge className="text-xs bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800">
                   閉店
                 </Badge>
               )}
@@ -545,8 +545,8 @@ export default function StudioTab({ programColors }: StudioTabProps) {
               <Fragment key={item.kind === 'header' ? `h-${item.label}` : item.studio.abbreviation}>
                 {i > 0 && item.kind === 'studio' && <Separator />}
                 {item.kind === 'header' ? (
-                  <div className={`px-3 py-1 bg-muted/40 ${i > 0 ? 'border-t' : ''}`}>
-                    <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+                  <div className={`px-3 py-1.5 bg-muted ${i > 0 ? 'border-t' : ''}`}>
+                    <p className="text-xs font-semibold text-foreground">{item.label}</p>
                   </div>
                 ) : (
                   renderStudioRow(item.studio)
