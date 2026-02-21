@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,10 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { LinkIcon, MapPin, Ticket, User, Loader2, Save, RefreshCw, Bell, BellOff } from 'lucide-react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { LinkIcon, Ticket, User, Loader2, Save, Bell, BellOff, Plus, Users, Crown } from 'lucide-react';
 import type { MypageInfo, ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
-import type { AttendanceRecord } from '@/types';
+import type { Group } from '@/types';
 import StudioTab from '@/components/mypage/StudioTab';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
@@ -39,6 +40,7 @@ export default function MypagePage() {
 }
 
 function MypageContent() {
+  const router = useRouter();
   const [data, setData] = useState<MypageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,17 +63,20 @@ function MypageContent() {
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
 
-  // 履歴タブ
-  const [historyRecords, setHistoryRecords] = useState<AttendanceRecord[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
+  // プログラムカラー
   const [programColors, setProgramColors] = useState<ProgramColorMap>({});
+
+  // スタジオタブ
+  const [studioTabShown, setStudioTabShown] = useState(false);
+
+  // グループタブ
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // マイページデータ取得（自動再認証対応）
   const fetchMypage = useCallback(async (retried = false): Promise<MypageData> => {
@@ -157,40 +162,30 @@ function MypageContent() {
     }
   };
 
-  // 履歴取得
-  const fetchHistory = useCallback(async (month: string) => {
-    setHistoryLoading(true);
+  // グループ取得
+  const fetchGroups = useCallback(async () => {
+    setGroupsLoading(true);
     try {
-      const res = await fetch(`/api/history?month=${month}`);
+      const res = await fetch('/api/groups');
       const d = await res.json();
-      setHistoryRecords(d.records || []);
+      setGroups(d.groups || []);
     } catch {
-      setHistoryRecords([]);
+      setGroups([]);
     } finally {
-      setHistoryLoading(false);
+      setGroupsLoading(false);
     }
   }, []);
 
-  // スタジオタブ表示フラグ
-  const [studioTabShown, setStudioTabShown] = useState(false);
-
   // タブ切り替えハンドラ
   const handleTabChange = useCallback((value: string) => {
-    if (value === 'history' && !historyLoaded) {
-      setHistoryLoaded(true);
-      fetchHistory(selectedMonth);
+    if (value === 'groups' && !groupsLoaded) {
+      setGroupsLoaded(true);
+      fetchGroups();
     }
     if (value === 'studios') {
       setStudioTabShown(true);
     }
-  }, [historyLoaded, selectedMonth, fetchHistory]);
-
-  // 月変更時に再取得
-  useEffect(() => {
-    if (historyLoaded) {
-      fetchHistory(selectedMonth);
-    }
-  }, [selectedMonth, historyLoaded, fetchHistory]);
+  }, [groupsLoaded, fetchGroups]);
 
   // 入会年月保存
   const handleSaveJoined = async () => {
@@ -214,23 +209,34 @@ function MypageContent() {
     }
   };
 
-  // 履歴同期
-  const handleSync = async () => {
-    setSyncing(true);
-    setSyncMessage(null);
+  // グループ作成
+  const handleCreateGroup = async () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+
+    setCreating(true);
+    setCreateError(null);
+
     try {
-      const res = await fetch('/api/history/sync', { method: 'POST' });
+      const res = await fetch('/api/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
       const d = await res.json();
+
       if (!res.ok) {
-        setSyncMessage(d.error || '同期に失敗しました');
-      } else {
-        setSyncMessage(`${d.synced}件の履歴を同期しました（${d.monthsFetched}ヶ月分）`);
-        fetchHistory(selectedMonth);
+        setCreateError(d.error || '作成に失敗しました');
+        return;
       }
+
+      setShowCreateDialog(false);
+      setNewGroupName('');
+      router.push(`/groups/${d.group.id}`);
     } catch {
-      setSyncMessage('通信エラーが発生しました');
+      setCreateError('通信エラーが発生しました');
     } finally {
-      setSyncing(false);
+      setCreating(false);
     }
   };
 
@@ -258,19 +264,6 @@ function MypageContent() {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: currentYear - 2011 }, (_, i) => String(2012 + i));
   const months12 = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
-
-  // 履歴月選択オプション（2年前〜今月）
-  const monthOptions: string[] = [];
-  const now = new Date();
-  for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    monthOptions.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
-
-  // 履歴統計
-  const totalLessons = historyRecords.length;
-  const uniqueInstructors = new Set(historyRecords.map((r) => r.instructorName)).size;
-  const uniquePrograms = new Set(historyRecords.map((r) => r.programName)).size;
 
   if (loading) {
     return (
@@ -374,7 +367,7 @@ function MypageContent() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">概要</TabsTrigger>
           <TabsTrigger value="studios">スタジオ</TabsTrigger>
-          <TabsTrigger value="history">履歴</TabsTrigger>
+          <TabsTrigger value="groups">グループ</TabsTrigger>
         </TabsList>
 
         {/* 概要タブ: 会員情報 + チケット + 入会年月設定 */}
@@ -590,122 +583,102 @@ function MypageContent() {
           {studioTabShown && <StudioTab programColors={programColors} />}
         </TabsContent>
 
-        {/* 履歴タブ */}
-        <TabsContent value="history" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((m) => {
-                  const [y, mo] = m.split('-');
-                  return (
-                    <SelectItem key={m} value={m}>
-                      {y}年{Number(mo)}月
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-              {syncing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              同期
+        {/* グループタブ */}
+        <TabsContent value="groups" className="space-y-4">
+          <div className="flex items-center justify-end">
+            <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              作成
             </Button>
           </div>
 
-          {syncMessage && (
-            <p className="text-sm text-muted-foreground bg-muted p-2 rounded">{syncMessage}</p>
-          )}
-
-          {/* 統計サマリー */}
-          {!historyLoading && historyRecords.length > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <p className="text-2xl font-bold">{totalLessons}</p>
-                  <p className="text-xs text-muted-foreground">レッスン数</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <p className="text-2xl font-bold">{uniqueInstructors}</p>
-                  <p className="text-xs text-muted-foreground">インストラクター</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4 text-center">
-                  <p className="text-2xl font-bold">{uniquePrograms}</p>
-                  <p className="text-xs text-muted-foreground">プログラム</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* 履歴リスト */}
-          {historyLoading ? (
+          {groupsLoading ? (
             <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
+              {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-20 w-full" />
               ))}
             </div>
-          ) : historyRecords.length === 0 ? (
+          ) : groups.length === 0 ? (
             <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground">
-                <p>この月の受講履歴はありません</p>
-                <p className="text-xs mt-1">「同期」ボタンでFEELCYCLEから取得できます</p>
+              <CardContent className="pt-6 text-center">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">グループを作成して仲間を招待しましょう</p>
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  {(() => {
-                    const [y, m] = selectedMonth.split('-');
-                    return `${y}年${Number(m)}月`;
-                  })()}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {historyRecords.map((r, i) => (
-                  <div key={r.id}>
-                    {i > 0 && <Separator className="my-2" />}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="text-sm">
-                          {programColors[r.programName] ? (
-                            <span
-                              className="inline-block px-1.5 py-0.5 rounded text-xs font-medium"
-                              style={{
-                                backgroundColor: programColors[r.programName].colorCode,
-                                color: programColors[r.programName].textColor,
-                              }}
-                            >
-                              {r.programName}
-                            </span>
-                          ) : (
-                            <span className="font-medium">{r.programName}</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {r.shiftDate} {r.startTime}〜{r.endTime} / {r.instructorName}
-                        </p>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="h-3 w-3 flex-shrink-0" />
-                          <span>{r.storeName}</span>
-                          {r.sheetNo && <Badge variant="outline" className="text-xs ml-1">{r.sheetNo}</Badge>}
-                        </div>
+            <div className="space-y-3">
+              {groups.map((group) => (
+                <Card
+                  key={group.id}
+                  className="active:bg-accent/50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/groups/${group.id}`)}
+                >
+                  <CardContent className="py-4 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium truncate">{group.name}</p>
+                        {group.isCreator && (
+                          <Badge variant="secondary" className="shrink-0 text-xs">
+                            <Crown className="h-3 w-3 mr-0.5" />
+                            作成者
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+                        <Users className="h-3.5 w-3.5" />
+                        <span className="text-sm">{group.memberCount}人</span>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
+
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>グループを作成</DialogTitle>
+                <DialogDescription>グループ名を入力してください（50文字以内）</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                {createError && (
+                  <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md border border-red-200">
+                    {createError}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="group-name">グループ名</Label>
+                  <Input
+                    id="group-name"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    maxLength={50}
+                    placeholder="例: FEEL仲間"
+                    disabled={creating}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex-row gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowCreateDialog(false)}
+                  disabled={creating}
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleCreateGroup}
+                  disabled={creating || !newGroupName.trim()}
+                >
+                  {creating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                  作成
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>

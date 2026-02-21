@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { User, LogOut, BookOpen, CalendarDays, Users } from 'lucide-react';
+import { User, LogOut, BookOpen, CalendarDays } from 'lucide-react';
 
 export default function Header() {
   const { user, loading, logout } = useAuthContext();
@@ -38,12 +38,6 @@ export default function Header() {
                 <Link href="/history">
                   <BookOpen className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">履歴</span>
-                </Link>
-              </Button>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/groups">
-                  <Users className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">グループ</span>
                 </Link>
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowLogoutDialog(true)}>
