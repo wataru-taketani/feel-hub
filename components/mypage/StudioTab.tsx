@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, ChevronDown, Star, Loader2, ArrowUpDown, Save } from 'lucide-react';
-import { formatStudio, STUDIO_REGIONS } from '@/lib/lessonUtils';
 import type { AttendanceRecord } from '@/types';
 
 const SeatMap = lazy(() => import('@/components/lessons/SeatMap'));
@@ -19,53 +18,39 @@ interface StudioRanking {
   count: number;
 }
 
+interface StudioMaster {
+  store_id: string;
+  name: string;
+  abbreviation: string;
+  area: string | null;
+  prefecture: string | null;
+  is_active: boolean;
+}
+
 interface StudioTabProps {
   programColors: ProgramColorMap;
 }
 
-// store_name から略称部分を除去: "銀座（GNZ）" or "銀座(GNZ)" → "銀座"
-function stripStoreAbbr(storeName: string): string {
-  return storeName.replace(/[（(].*[）)]$/, '').trim();
+// store_name から略称コードを抽出: "銀座（GNZ）" or "銀座(GNZ)" → "GNZ"
+function extractAbbr(storeName: string): string {
+  const match = storeName.match(/[（(]([^）)]+)[）)]/);
+  return match ? match[1] : '';
 }
 
-// STUDIO_REGIONS からフラットなスタジオ名リスト（エリア順）を生成
-function getAllStudiosInAreaOrder(): string[] {
-  const studios: string[] = [];
-  for (const region of STUDIO_REGIONS) {
-    for (const pref of region.prefectures) {
-      for (const s of pref.studios) {
-        studios.push(s);
-      }
-    }
-  }
-  return studios;
-}
-
-// スタジオ → エリア名のマップ
-function getStudioAreaMap(): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const region of STUDIO_REGIONS) {
-    for (const pref of region.prefectures) {
-      for (const s of pref.studios) {
-        map[s] = region.area;
-      }
-    }
-  }
-  return map;
-}
+const AREA_ORDER = ['北海道・東北', '関東', '東海・関西', '中国・四国・九州'];
 
 type SortMode = 'count' | 'area';
 
 export default function StudioTab({ programColors }: StudioTabProps) {
-  const [rankingMap, setRankingMap] = useState<Record<string, number>>({});
-  // 正規化名 → 元の store_name（API呼び出し用）
-  const [storeNameMap, setStoreNameMap] = useState<Record<string, string>>({});
+  const [studioMasters, setStudioMasters] = useState<StudioMaster[]>([]);
+  // abbreviation → 受講回数
+  const [rankingByAbbr, setRankingByAbbr] = useState<Record<string, number>>({});
+  // abbreviation → 元の store_name（API呼び出し用）
+  const [storeNameByAbbr, setStoreNameByAbbr] = useState<Record<string, string>>({});
   const [preferences, setPreferences] = useState<Record<string, string[]>>({});
-  // lessonsテーブルから取得した営業中スタジオ（STUDIO_REGIONS順にソート済み）
-  const [activeStudioList, setActiveStudioList] = useState<string[]>([]);
-  const [closedStudios, setClosedStudios] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('count');
+  // expandedStudio は abbreviation で管理
   const [expandedStudio, setExpandedStudio] = useState<string | null>(null);
 
   // 展開中スタジオの詳細
@@ -81,44 +66,43 @@ export default function StudioTab({ programColors }: StudioTabProps) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const studioAreaMap = getStudioAreaMap();
+  // abbreviation → StudioMaster lookup
+  const studioByAbbr = useMemo(() => {
+    const map = new Map<string, StudioMaster>();
+    for (const s of studioMasters) {
+      map.set(s.abbreviation, s);
+    }
+    return map;
+  }, [studioMasters]);
 
   // 初回データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, prefsRes] = await Promise.all([
+        const [studiosRes, statsRes, prefsRes] = await Promise.all([
+          fetch('/api/studios'),
           fetch('/api/history/stats'),
           fetch('/api/seat-preferences'),
         ]);
+        const studiosData = await studiosRes.json();
         const statsData = await statsRes.json();
         const prefsData = await prefsRes.json();
-        const map: Record<string, number> = {};
+
+        setStudioMasters(studiosData.studios || []);
+
+        // abbreviation → 受講回数・元 store_name
+        const ranking: Record<string, number> = {};
         const nameMap: Record<string, string> = {};
         for (const item of (statsData.studioRanking || []) as StudioRanking[]) {
-          // store_name は「銀座（GNZ）」or「銀座(GNZ)」形式 → 「銀座」に正規化
-          const normalized = stripStoreAbbr(item.name);
-          map[normalized] = (map[normalized] || 0) + item.count;
-          nameMap[normalized] = item.name; // 元のstore_name を保持
+          const abbr = extractAbbr(item.name);
+          if (abbr) {
+            ranking[abbr] = (ranking[abbr] || 0) + item.count;
+            nameMap[abbr] = item.name;
+          }
         }
-        setRankingMap(map);
-        setStoreNameMap(nameMap);
+        setRankingByAbbr(ranking);
+        setStoreNameByAbbr(nameMap);
         setPreferences(prefsData.preferences || {});
-
-        // 現在営業中スタジオ（lessonsテーブルにレッスンがあるスタジオ）
-        const actives = new Set<string>((statsData.activeStudios || []) as string[]);
-
-        // STUDIO_REGIONS順にソートし、未知のスタジオは末尾に追加
-        const regionOrder = getAllStudiosInAreaOrder();
-        const ordered = [
-          ...regionOrder.filter(s => actives.has(s)),
-          ...[...actives].filter(s => !regionOrder.includes(s)).sort(),
-        ];
-        setActiveStudioList(ordered);
-
-        // 受講履歴にあるが activeStudios にないスタジオ = 閉店スタジオ
-        const closed = Object.keys(map).filter(s => !actives.has(s));
-        setClosedStudios(closed);
       } catch {
         // ignore
       } finally {
@@ -128,71 +112,104 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     fetchData();
   }, []);
 
-  // ソート済みスタジオリスト（activeStudioList + 閉店スタジオ）
-  const sortedStudios = (() => {
-    if (sortMode === 'area') {
-      return activeStudioList;
-    }
-    // 受講回数順: 全スタジオ（営業中 + 閉店）を回数desc
-    const all = [...activeStudioList, ...closedStudios];
-    const withCount = all.map(s => ({ name: s, count: rankingMap[s] || 0 }));
-    return withCount
-      .sort((a, b) => {
-        if (a.count !== b.count) return b.count - a.count;
-        return activeStudioList.indexOf(a.name) - activeStudioList.indexOf(b.name);
-      })
-      .map(s => s.name);
-  })();
+  // 表示用スタジオリスト: active + 閉店（履歴あり）
+  const { activeStudios, closedWithHistory } = useMemo(() => {
+    const active = studioMasters.filter((s) => s.is_active);
+    const closed: StudioMaster[] = [];
 
-  // レンダリング用グループ: count順は1グループ、エリア順はエリアごと
-  const studioGroups = (() => {
+    // DB上 is_active=false で受講履歴あり
+    for (const s of studioMasters) {
+      if (!s.is_active && rankingByAbbr[s.abbreviation]) {
+        closed.push(s);
+      }
+    }
+    // 受講履歴にあるがDBに存在しないスタジオ
+    for (const [abbr, count] of Object.entries(rankingByAbbr)) {
+      if (count > 0 && !studioMasters.some((s) => s.abbreviation === abbr)) {
+        const storeName = storeNameByAbbr[abbr] || '';
+        const name = storeName.replace(/[（(].*[）)]$/, '').trim() || abbr;
+        closed.push({
+          store_id: '',
+          name,
+          abbreviation: abbr,
+          area: null,
+          prefecture: null,
+          is_active: false,
+        });
+      }
+    }
+
+    return { activeStudios: active, closedWithHistory: closed };
+  }, [studioMasters, rankingByAbbr, storeNameByAbbr]);
+
+  // レンダリング用グループ
+  const studioGroups = useMemo(() => {
     if (sortMode === 'count') {
-      return [{ area: null as string | null, studios: sortedStudios }];
+      const all = [...activeStudios, ...closedWithHistory];
+      all.sort((a, b) => {
+        const ca = rankingByAbbr[a.abbreviation] || 0;
+        const cb = rankingByAbbr[b.abbreviation] || 0;
+        return cb - ca;
+      });
+      return [{ area: null as string | null, studios: all }];
     }
-    const groups: { area: string | null; studios: string[] }[] = [];
-    const otherStudios: string[] = [];
-    for (const studio of sortedStudios) {
-      const area = studioAreaMap[studio];
-      if (!area) {
-        otherStudios.push(studio);
-        continue;
-      }
-      const last = groups[groups.length - 1];
-      if (last && last.area === area) {
-        last.studios.push(studio);
+
+    // エリア順
+    const grouped = new Map<string, StudioMaster[]>();
+    const other: StudioMaster[] = [];
+
+    for (const s of activeStudios) {
+      if (s.area) {
+        if (!grouped.has(s.area)) grouped.set(s.area, []);
+        grouped.get(s.area)!.push(s);
       } else {
-        groups.push({ area, studios: [studio] });
+        other.push(s);
       }
     }
-    if (otherStudios.length > 0) {
-      groups.push({ area: 'その他', studios: otherStudios });
+
+    const groups: { area: string | null; studios: StudioMaster[] }[] = [];
+    for (const area of AREA_ORDER) {
+      if (grouped.has(area)) {
+        groups.push({ area, studios: grouped.get(area)! });
+      }
     }
-    // エリア順の場合、閉店スタジオを末尾に追加
-    if (closedStudios.length > 0) {
-      groups.push({ area: '閉店', studios: closedStudios });
+    // AREA_ORDER にないエリア
+    for (const [area, studios] of grouped) {
+      if (!AREA_ORDER.includes(area)) {
+        groups.push({ area, studios });
+      }
+    }
+    if (other.length > 0) {
+      groups.push({ area: 'その他', studios: other });
+    }
+    if (closedWithHistory.length > 0) {
+      groups.push({ area: '閉店', studios: closedWithHistory });
     }
     return groups;
-  })();
+  }, [sortMode, activeStudios, closedWithHistory, rankingByAbbr]);
 
   // スタジオ展開時
-  const handleExpand = useCallback(async (studio: string) => {
-    if (expandedStudio === studio) {
+  const handleExpand = useCallback(async (abbr: string) => {
+    if (expandedStudio === abbr) {
       setExpandedStudio(null);
       setShowSeatMap(false);
       return;
     }
-    setExpandedStudio(studio);
+    const studio = studioByAbbr.get(abbr);
+    const studioName = studio?.name || abbr;
+
+    setExpandedStudio(abbr);
     setRecentLoading(true);
     setRecentRecords([]);
     setSeatCounts([]);
     setSaveMessage(null);
     setShowSeatMap(false);
     setSeatMapSidHash(null);
-    setSelectedSeats(preferences[studio] || []);
+    setSelectedSeats(preferences[studioName] || []);
 
     try {
       // store_name は元の形式（銀座（GNZ） or 銀座(GNZ)）で検索
-      const storeName = storeNameMap[studio] || studio;
+      const storeName = storeNameByAbbr[abbr] || `${studioName}（${abbr}）`;
       const res = await fetch(`/api/history?store=${encodeURIComponent(storeName)}`);
       const data = await res.json();
       const records: AttendanceRecord[] = data.records || [];
@@ -215,10 +232,10 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     } finally {
       setRecentLoading(false);
     }
-  }, [expandedStudio, preferences, storeNameMap]);
+  }, [expandedStudio, preferences, storeNameByAbbr, studioByAbbr]);
 
   // SeatMap 表示トグル
-  const handleShowSeatMap = async (studio: string) => {
+  const handleShowSeatMap = async (studioName: string) => {
     if (showSeatMap) {
       setShowSeatMap(false);
       return;
@@ -226,7 +243,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     setSeatMapLoading(true);
     setSeatMapSidHash(null);
     try {
-      const res = await fetch(`/api/seatmap/find-sid?studio=${encodeURIComponent(studio)}`);
+      const res = await fetch(`/api/seatmap/find-sid?studio=${encodeURIComponent(studioName)}`);
       const data = await res.json();
       if (data.sidHash) {
         setSeatMapSidHash(data.sidHash);
@@ -242,22 +259,22 @@ export default function StudioTab({ programColors }: StudioTabProps) {
   };
 
   // おすすめバイク保存
-  const handleSavePreferences = async (studio: string) => {
+  const handleSavePreferences = async (studioName: string) => {
     setSaving(true);
     setSaveMessage(null);
     try {
       const res = await fetch('/api/seat-preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studio, seatNumbers: selectedSeats }),
+        body: JSON.stringify({ studio: studioName, seatNumbers: selectedSeats }),
       });
       if (!res.ok) throw new Error();
       setPreferences(prev => {
         const next = { ...prev };
         if (selectedSeats.length === 0) {
-          delete next[studio];
+          delete next[studioName];
         } else {
-          next[studio] = [...selectedSeats];
+          next[studioName] = [...selectedSeats];
         }
         return next;
       });
@@ -300,23 +317,25 @@ export default function StudioTab({ programColors }: StudioTabProps) {
             <p className="text-xs font-medium text-muted-foreground mb-1 px-1">{group.area}</p>
           )}
           <Card className="overflow-hidden">
-            {group.studios.map((studio, index) => {
-              const count = rankingMap[studio] || 0;
-              const isExpanded = expandedStudio === studio;
-              const favSeats = preferences[studio];
-              const isClosed = activeStudioList.length > 0 && !activeStudioList.includes(studio);
+            {group.studios.map((s, index) => {
+              const count = rankingByAbbr[s.abbreviation] || 0;
+              const isExpanded = expandedStudio === s.abbreviation;
+              const favSeats = preferences[s.name];
+              const isClosed = !s.is_active;
 
               return (
-                <div key={studio}>
+                <div key={s.abbreviation}>
                   {index > 0 && <Separator />}
                   {/* ヘッダー行 */}
                   <button
                     className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
-                    onClick={() => handleExpand(studio)}
+                    onClick={() => handleExpand(s.abbreviation)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className={`font-medium text-sm ${isClosed ? 'text-muted-foreground' : ''}`}>{formatStudio(studio)}</span>
+                        <span className={`font-medium text-sm ${isClosed ? 'text-muted-foreground' : ''}`}>
+                          {s.name}（{s.abbreviation}）
+                        </span>
                         <Badge variant="secondary" className="text-xs">
                           {count > 0 ? `${count}回` : '—'}
                         </Badge>
@@ -343,7 +362,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
                       {favSeats && favSeats.length > 0 && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Star className="h-3 w-3 text-yellow-500" />
-                          <span>{favSeats.map(s => `#${s}`).join(' ')}</span>
+                          <span>{favSeats.map(seat => `#${seat}`).join(' ')}</span>
                         </div>
                       )}
 
@@ -355,7 +374,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
                             variant="outline"
                             size="sm"
                             className="w-full h-8 text-xs"
-                            onClick={() => handleShowSeatMap(studio)}
+                            onClick={() => handleShowSeatMap(s.name)}
                             disabled={seatMapLoading}
                           >
                             {seatMapLoading ? (
@@ -389,7 +408,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
                               <Button
                                 size="sm"
                                 className="flex-1 h-8 text-xs"
-                                onClick={() => handleSavePreferences(studio)}
+                                onClick={() => handleSavePreferences(s.name)}
                                 disabled={saving}
                               >
                                 {saving ? (

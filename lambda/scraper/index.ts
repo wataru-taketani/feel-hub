@@ -26,6 +26,7 @@ interface LessonData {
   ticketType: TicketType;
   colorCode: string;
   storeId: string;
+  abbreviation: string;
   sidHash: string;
   lessonPeriod: number;
   lessonStatus: number;
@@ -130,6 +131,50 @@ export const handler: Handler = async (event, context) => {
       }
 
       console.log(`Saved ${saved}/${lessons.length} lessons to Supabase`);
+
+      // studiosテーブルを同期
+      try {
+        const studioMap = new Map<string, { storeId: string; name: string; abbreviation: string }>();
+        for (const l of lessons) {
+          if (l.storeId && l.abbreviation && !studioMap.has(l.storeId)) {
+            studioMap.set(l.storeId, {
+              storeId: l.storeId,
+              name: l.studio,
+              abbreviation: l.abbreviation,
+            });
+          }
+        }
+
+        if (studioMap.size > 0) {
+          // 全件 inactive 化
+          await supabase
+            .from('studios')
+            .update({ is_active: false, updated_at: new Date().toISOString() })
+            .neq('store_id', '');
+
+          // 見つかったスタジオを active で upsert
+          const studioRows = [...studioMap.values()].map((s) => ({
+            store_id: s.storeId,
+            name: s.name,
+            abbreviation: s.abbreviation,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          }));
+
+          for (let i = 0; i < studioRows.length; i += 100) {
+            const batch = studioRows.slice(i, i + 100);
+            const { error: studioError } = await supabase
+              .from('studios')
+              .upsert(batch, { onConflict: 'store_id' });
+            if (studioError) {
+              console.error('Studios upsert error:', studioError);
+            }
+          }
+          console.log(`Synced ${studioRows.length} studios`);
+        }
+      } catch (studioSyncError) {
+        console.error('Studios sync error (continuing):', studioSyncError);
+      }
 
       // programsテーブルを同期（新規追加 + 色情報の更新）
       try {
@@ -251,13 +296,16 @@ async function fetchStudioLessons(
 
     const lessons: LessonData[] = [];
     let studioName = '';
+    let studioAbbr = '';
 
     for (const day of json.lesson_list) {
       const date = `${day.lesson_date.substring(0, 4)}-${day.lesson_date.substring(4, 6)}-${day.lesson_date.substring(6, 8)}`;
 
       for (const s of day.schedule) {
         if (!studioName) {
-          studioName = s.store_name.replace(/（.*）/, '');
+          studioName = s.store_name.replace(/[（(].*[）)]$/, '').trim();
+          const abbrMatch = s.store_name.match(/[（(]([^）)]+)[）)]/);
+          studioAbbr = abbrMatch ? abbrMatch[1] : '';
         }
 
         lessons.push({
@@ -272,6 +320,7 @@ async function fetchStudioLessons(
           ticketType: parseTicketType(s.custom_icon_list),
           colorCode: s.ibgcol || '',
           storeId: s.store_id,
+          abbreviation: studioAbbr,
           sidHash: s.sid_hash,
           lessonPeriod: s.lesson_period,
           lessonStatus: s.status,
