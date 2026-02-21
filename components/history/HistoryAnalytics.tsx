@@ -147,8 +147,7 @@ export default function HistoryAnalytics() {
   // フィルター（InstructorMultiSelect）
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
-  // タップで設定されたフィルター（詳細レコード表示用）
-  const [tappedProgram, setTappedProgram] = useState<string | null>(null);
+  // タップで設定されたフィルター
   const [tappedStudio, setTappedStudio] = useState<string | null>(null);
 
   const [splitInstructor, setSplitInstructor] = useState(false);
@@ -158,15 +157,10 @@ export default function HistoryAnalytics() {
   const [programOptions, setProgramOptions] = useState<string[]>([]);
   const [instructorOptions, setInstructorOptions] = useState<string[]>([]);
 
-  // プログラム詳細レコード
-  const [detailRecords, setDetailRecords] = useState<HistoryRecord[]>([]);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailExpanded, setDetailExpanded] = useState(false);
-
-  // スタジオ詳細レコード
-  const [studioDetailRecords, setStudioDetailRecords] = useState<HistoryRecord[]>([]);
-  const [studioDetailLoading, setStudioDetailLoading] = useState(false);
-  const [studioDetailExpanded, setStudioDetailExpanded] = useState(false);
+  // フィルタ条件付きレコード一覧
+  const [filteredRecords, setFilteredRecords] = useState<HistoryRecord[]>([]);
+  const [filteredLoading, setFilteredLoading] = useState(false);
+  const [filteredExpanded, setFilteredExpanded] = useState(false);
 
   useEffect(() => {
     fetch('/api/programs')
@@ -175,56 +169,20 @@ export default function HistoryAnalytics() {
       .catch(() => {});
   }, []);
 
-  // プログラム詳細レコード取得
-  useEffect(() => {
-    if (!tappedProgram) {
-      setDetailRecords([]);
-      setDetailExpanded(false);
-      return;
-    }
-    const fetchDetail = async () => {
-      setDetailLoading(true);
-      setDetailExpanded(false);
-      try {
-        const params = new URLSearchParams({ program: tappedProgram });
-        if (period === 'month') {
-          const range = getMonthRange(selectedMonth);
-          params.set('from', range.from);
-          params.set('to', range.to);
-        } else if (period === 'custom') {
-          if (customFrom) params.set('from', customFrom);
-          if (customTo) params.set('to', customTo);
-        } else {
-          const dates = getPeriodDates(period);
-          if (dates) {
-            params.set('from', dates.from);
-            params.set('to', dates.to);
-          }
-        }
-        const res = await fetch(`/api/history?${params.toString()}`);
-        const data = await res.json();
-        setDetailRecords(data.records || []);
-      } catch {
-        setDetailRecords([]);
-      } finally {
-        setDetailLoading(false);
-      }
-    };
-    fetchDetail();
-  }, [tappedProgram, period, selectedMonth, customFrom, customTo]);
+  // フィルタ条件付きレコード取得（プログラム・インストラクター・スタジオのいずれかが指定時）
+  const hasActiveFilter = selectedPrograms.length > 0 || selectedInstructors.length > 0 || !!tappedStudio;
 
-  // スタジオ詳細レコード取得
   useEffect(() => {
-    if (!tappedStudio) {
-      setStudioDetailRecords([]);
-      setStudioDetailExpanded(false);
+    if (!hasActiveFilter) {
+      setFilteredRecords([]);
+      setFilteredExpanded(false);
       return;
     }
-    const fetchStudioDetail = async () => {
-      setStudioDetailLoading(true);
-      setStudioDetailExpanded(false);
+    const fetchFiltered = async () => {
+      setFilteredLoading(true);
+      setFilteredExpanded(false);
       try {
-        const params = new URLSearchParams({ store: tappedStudio });
+        const params = new URLSearchParams();
         if (period === 'month') {
           const range = getMonthRange(selectedMonth);
           params.set('from', range.from);
@@ -239,17 +197,20 @@ export default function HistoryAnalytics() {
             params.set('to', dates.to);
           }
         }
+        if (selectedPrograms.length > 0) params.set('program', selectedPrograms.join(','));
+        if (selectedInstructors.length > 0) params.set('instructor', selectedInstructors.join(','));
+        if (tappedStudio) params.set('store', tappedStudio);
         const res = await fetch(`/api/history?${params.toString()}`);
         const data = await res.json();
-        setStudioDetailRecords(data.records || []);
+        setFilteredRecords(data.records || []);
       } catch {
-        setStudioDetailRecords([]);
+        setFilteredRecords([]);
       } finally {
-        setStudioDetailLoading(false);
+        setFilteredLoading(false);
       }
     };
-    fetchStudioDetail();
-  }, [tappedStudio, period, selectedMonth, customFrom, customTo]);
+    fetchFiltered();
+  }, [hasActiveFilter, selectedPrograms, selectedInstructors, tappedStudio, period, selectedMonth, customFrom, customTo]);
 
   // 実際にAPIに送る値
   const effectiveProgram = selectedPrograms.join(',');
@@ -303,21 +264,18 @@ export default function HistoryAnalytics() {
   const uniquePrograms = useMemo(() => stats?.programRanking.length ?? 0, [stats]);
 
   const handleTapProgram = useCallback((name: string) => {
-    setTappedProgram(name);
-    setSelectedPrograms(prev => prev.includes(name) ? prev : [name]);
+    setSelectedPrograms(prev => prev.includes(name) ? prev : [...prev, name]);
   }, []);
 
   const handleTapInstructor = useCallback((name: string) => {
-    setSelectedInstructors(prev => prev.includes(name) ? prev : [name]);
+    setSelectedInstructors(prev => prev.includes(name) ? prev : [...prev, name]);
   }, []);
 
   const handleTapStudio = useCallback((name: string) => {
     setTappedStudio(name);
   }, []);
 
-  const hasActiveFilter = !!(selectedPrograms.length > 0 || selectedInstructors.length > 0 || tappedStudio);
-
-  const hasAnyFilter = period !== 'all' || selectedPrograms.length > 0 || selectedInstructors.length > 0 || !!tappedStudio || splitInstructor;
+  const hasAnyFilter = period !== 'all' || hasActiveFilter || splitInstructor;
 
   const handleClearAll = useCallback(() => {
     setPeriod('all');
@@ -325,7 +283,6 @@ export default function HistoryAnalytics() {
     setCustomTo('');
     setSelectedPrograms([]);
     setSelectedInstructors([]);
-    setTappedProgram(null);
     setTappedStudio(null);
     setSplitInstructor(false);
   }, []);
@@ -387,7 +344,7 @@ export default function HistoryAnalytics() {
           <InstructorMultiSelect
             instructors={programOptions}
             selected={selectedPrograms}
-            onChange={(v) => { setSelectedPrograms(v); if (v.length === 0) setTappedProgram(null); }}
+            onChange={setSelectedPrograms}
             label="プログラム"
             labelUnit="件"
             searchPlaceholder="プログラム名で検索..."
@@ -486,78 +443,47 @@ export default function HistoryAnalytics() {
             </CardContent>
           </Card>
 
-          {/* プログラム詳細レコード */}
-          {tappedProgram && (
+          {/* 条件付き受講履歴一覧 */}
+          {hasActiveFilter && (
             <Card>
               <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  {programColors[tappedProgram] ? (
-                    <span
-                      className="inline-block px-1.5 py-0.5 rounded text-xs font-medium"
-                      style={{
-                        backgroundColor: programColors[tappedProgram].colorCode,
-                        color: programColors[tappedProgram].textColor,
-                      }}
-                    >
-                      {tappedProgram}
-                    </span>
-                  ) : (
-                    <span className="text-sm font-medium">{tappedProgram}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground">受講履歴</span>
-                </div>
-                {detailLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : detailRecords.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-2">レコードなし</p>
-                ) : (
-                  <>
-                    <div className="space-y-0.5">
-                      {(detailExpanded ? detailRecords : detailRecords.slice(0, INITIAL_SHOW)).map((r, i) => (
-                        <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-3">
-                          <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
-                          <span className="truncate flex-1">{r.instructorName}</span>
-                          <span className="text-muted-foreground text-xs whitespace-nowrap">{r.storeName}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {detailRecords.length > INITIAL_SHOW && (
-                      <button
-                        className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-0.5"
-                        onClick={() => setDetailExpanded(!detailExpanded)}
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="text-sm font-medium">受講履歴</span>
+                  {selectedPrograms.map((p) => (
+                    programColors[p] ? (
+                      <span
+                        key={p}
+                        className="inline-block px-1.5 py-0.5 rounded text-xs font-medium"
+                        style={{ backgroundColor: programColors[p].colorCode, color: programColors[p].textColor }}
                       >
-                        {detailExpanded ? '閉じる' : `もっと見る（全${detailRecords.length}件）`}
-                        <ChevronDown className={`h-3 w-3 transition-transform ${detailExpanded ? 'rotate-180' : ''}`} />
-                      </button>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* スタジオ詳細レコード */}
-          {tappedStudio && (
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-medium">{tappedStudio}</span>
-                  <span className="text-xs text-muted-foreground">受講履歴</span>
+                        {p}
+                      </span>
+                    ) : (
+                      <Badge key={p} variant="secondary" className="text-xs">{p}</Badge>
+                    )
+                  ))}
+                  {selectedInstructors.map((ir) => (
+                    <Badge key={ir} variant="outline" className="text-xs">{ir}</Badge>
+                  ))}
+                  {tappedStudio && (
+                    <Badge variant="outline" className="text-xs">{tappedStudio}</Badge>
+                  )}
+                  {!filteredLoading && filteredRecords.length > 0 && (
+                    <span className="text-xs text-muted-foreground">{filteredRecords.length}件</span>
+                  )}
                 </div>
-                {studioDetailLoading ? (
+                {filteredLoading ? (
                   <div className="flex justify-center py-4">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
-                ) : studioDetailRecords.length === 0 ? (
+                ) : filteredRecords.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-2">レコードなし</p>
                 ) : (
                   <>
-                    {/* バイクNo.分布 */}
-                    {(() => {
+                    {/* バイクNo.分布（スタジオ指定時） */}
+                    {tappedStudio && (() => {
                       const bikeCounts: Record<string, number> = {};
-                      for (const r of studioDetailRecords) {
+                      for (const r of filteredRecords) {
                         if (r.sheetNo) {
                           const key = `#${r.sheetNo}`;
                           bikeCounts[key] = (bikeCounts[key] || 0) + 1;
@@ -580,24 +506,38 @@ export default function HistoryAnalytics() {
                       );
                     })()}
                     <div className="space-y-0.5">
-                      {(studioDetailExpanded ? studioDetailRecords : studioDetailRecords.slice(0, INITIAL_SHOW)).map((r, i) => (
+                      {(filteredExpanded ? filteredRecords : filteredRecords.slice(0, INITIAL_SHOW)).map((r, i) => (
                         <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-2">
                           <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
-                          <span className="truncate flex-1">{r.programName}</span>
-                          <span className="truncate text-xs text-muted-foreground">{r.instructorName}</span>
+                          {selectedPrograms.length !== 1 && (
+                            programColors[r.programName] ? (
+                              <span
+                                className="inline-block px-1 py-0.5 rounded text-[10px] font-medium shrink-0"
+                                style={{ backgroundColor: programColors[r.programName].colorCode, color: programColors[r.programName].textColor }}
+                              >
+                                {r.programName}
+                              </span>
+                            ) : (
+                              <span className="text-xs shrink-0">{r.programName}</span>
+                            )
+                          )}
+                          <span className="truncate flex-1">{r.instructorName}</span>
+                          {!tappedStudio && (
+                            <span className="text-muted-foreground text-xs whitespace-nowrap">{r.storeName}</span>
+                          )}
                           {r.sheetNo && (
                             <span className="text-xs font-medium whitespace-nowrap">#{r.sheetNo}</span>
                           )}
                         </div>
                       ))}
                     </div>
-                    {studioDetailRecords.length > INITIAL_SHOW && (
+                    {filteredRecords.length > INITIAL_SHOW && (
                       <button
                         className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-0.5"
-                        onClick={() => setStudioDetailExpanded(!studioDetailExpanded)}
+                        onClick={() => setFilteredExpanded(!filteredExpanded)}
                       >
-                        {studioDetailExpanded ? '閉じる' : `もっと見る（全${studioDetailRecords.length}件）`}
-                        <ChevronDown className={`h-3 w-3 transition-transform ${studioDetailExpanded ? 'rotate-180' : ''}`} />
+                        {filteredExpanded ? '閉じる' : `もっと見る（全${filteredRecords.length}件）`}
+                        <ChevronDown className={`h-3 w-3 transition-transform ${filteredExpanded ? 'rotate-180' : ''}`} />
                       </button>
                     )}
                   </>

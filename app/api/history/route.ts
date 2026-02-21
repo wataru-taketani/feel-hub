@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
   const month = searchParams.get('month'); // YYYY-MM
   const from = searchParams.get('from');   // YYYY-MM-DD
   const to = searchParams.get('to');       // YYYY-MM-DD
-  const program = searchParams.get('program'); // exact match
+  const program = searchParams.get('program'); // exact match or comma-separated
+  const instructor = searchParams.get('instructor'); // exact match or comma-separated
   const store = searchParams.get('store');     // exact match
 
   let query = supabaseAdmin
@@ -40,7 +41,14 @@ export async function GET(request: NextRequest) {
 
   if (from) query = query.gte('shift_date', from);
   if (to) query = query.lte('shift_date', to);
-  if (program) query = query.eq('program_name', program);
+  if (program) {
+    const programs = program.split(',').filter(Boolean);
+    query = programs.length === 1 ? query.eq('program_name', programs[0]) : query.in('program_name', programs);
+  }
+  if (instructor) {
+    const instructors = instructor.split(',').filter(Boolean);
+    query = instructors.length === 1 ? query.eq('instructor_name', instructors[0]) : query.in('instructor_name', instructors);
+  }
   if (store) query = query.eq('store_name', store);
 
   const { data, error } = await query;
