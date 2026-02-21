@@ -61,7 +61,8 @@ export default function StudioTab({ programColors }: StudioTabProps) {
   // 正規化名 → 元の store_name（API呼び出し用）
   const [storeNameMap, setStoreNameMap] = useState<Record<string, string>>({});
   const [preferences, setPreferences] = useState<Record<string, string[]>>({});
-  const [activeStudios, setActiveStudios] = useState<Set<string>>(new Set());
+  // lessonsテーブルから取得した営業中スタジオ（STUDIO_REGIONS順にソート済み）
+  const [activeStudioList, setActiveStudioList] = useState<string[]>([]);
   const [closedStudios, setClosedStudios] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('count');
@@ -80,7 +81,6 @@ export default function StudioTab({ programColors }: StudioTabProps) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const allStudios = getAllStudiosInAreaOrder();
   const studioAreaMap = getStudioAreaMap();
 
   // 初回データ取得
@@ -107,11 +107,17 @@ export default function StudioTab({ programColors }: StudioTabProps) {
 
         // 現在営業中スタジオ（lessonsテーブルにレッスンがあるスタジオ）
         const actives = new Set<string>((statsData.activeStudios || []) as string[]);
-        setActiveStudios(actives);
 
-        // 受講履歴にあるが activeStudios にも STUDIO_REGIONS にもないスタジオ = 閉店スタジオ
-        const allStudioSet = new Set(getAllStudiosInAreaOrder());
-        const closed = Object.keys(map).filter(s => !allStudioSet.has(s) && !actives.has(s));
+        // STUDIO_REGIONS順にソートし、未知のスタジオは末尾に追加
+        const regionOrder = getAllStudiosInAreaOrder();
+        const ordered = [
+          ...regionOrder.filter(s => actives.has(s)),
+          ...[...actives].filter(s => !regionOrder.includes(s)).sort(),
+        ];
+        setActiveStudioList(ordered);
+
+        // 受講履歴にあるが activeStudios にないスタジオ = 閉店スタジオ
+        const closed = Object.keys(map).filter(s => !actives.has(s));
         setClosedStudios(closed);
       } catch {
         // ignore
@@ -122,19 +128,18 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     fetchData();
   }, []);
 
-  // ソート済みスタジオリスト（STUDIO_REGIONS + 閉店スタジオ）
+  // ソート済みスタジオリスト（activeStudioList + 閉店スタジオ）
   const sortedStudios = (() => {
     if (sortMode === 'area') {
-      // エリア順: STUDIO_REGIONS順、閉店スタジオは別グループなのでここには含めない
-      return allStudios;
+      return activeStudioList;
     }
-    // 受講回数順: 全スタジオ（STUDIO_REGIONS + 閉店）を回数desc
-    const all = [...allStudios, ...closedStudios];
+    // 受講回数順: 全スタジオ（営業中 + 閉店）を回数desc
+    const all = [...activeStudioList, ...closedStudios];
     const withCount = all.map(s => ({ name: s, count: rankingMap[s] || 0 }));
     return withCount
       .sort((a, b) => {
         if (a.count !== b.count) return b.count - a.count;
-        return allStudios.indexOf(a.name) - allStudios.indexOf(b.name);
+        return activeStudioList.indexOf(a.name) - activeStudioList.indexOf(b.name);
       })
       .map(s => s.name);
   })();
@@ -145,14 +150,22 @@ export default function StudioTab({ programColors }: StudioTabProps) {
       return [{ area: null as string | null, studios: sortedStudios }];
     }
     const groups: { area: string | null; studios: string[] }[] = [];
+    const otherStudios: string[] = [];
     for (const studio of sortedStudios) {
       const area = studioAreaMap[studio];
+      if (!area) {
+        otherStudios.push(studio);
+        continue;
+      }
       const last = groups[groups.length - 1];
       if (last && last.area === area) {
         last.studios.push(studio);
       } else {
         groups.push({ area, studios: [studio] });
       }
+    }
+    if (otherStudios.length > 0) {
+      groups.push({ area: 'その他', studios: otherStudios });
     }
     // エリア順の場合、閉店スタジオを末尾に追加
     if (closedStudios.length > 0) {
@@ -291,7 +304,7 @@ export default function StudioTab({ programColors }: StudioTabProps) {
               const count = rankingMap[studio] || 0;
               const isExpanded = expandedStudio === studio;
               const favSeats = preferences[studio];
-              const isClosed = activeStudios.size > 0 && !activeStudios.has(studio);
+              const isClosed = activeStudioList.length > 0 && !activeStudioList.includes(studio);
 
               return (
                 <div key={studio}>
