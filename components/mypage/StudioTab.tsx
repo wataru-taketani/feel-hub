@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense, Fragment } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,19 +38,31 @@ function extractAbbr(storeName: string): string {
 }
 
 const AREA_ORDER = ['北海道・東北', '関東', '東海・関西', '中国・四国・九州'];
+const PREFECTURE_ORDER = [
+  '北海道',
+  '埼玉県', '千葉県', '東京都', '神奈川県',
+  '岐阜県', '愛知県', '京都府', '大阪府', '兵庫県',
+  '広島県', '香川県', '福岡県',
+];
+
+type CardItem =
+  | { kind: 'header'; label: string }
+  | { kind: 'studio'; studio: StudioMaster };
+
+interface StudioGroup {
+  label: string | null;
+  items: CardItem[];
+}
 
 type SortMode = 'count' | 'area';
 
 export default function StudioTab({ programColors }: StudioTabProps) {
   const [studioMasters, setStudioMasters] = useState<StudioMaster[]>([]);
-  // abbreviation → 受講回数
   const [rankingByAbbr, setRankingByAbbr] = useState<Record<string, number>>({});
-  // abbreviation → 元の store_name（API呼び出し用）
   const [storeNameByAbbr, setStoreNameByAbbr] = useState<Record<string, string>>({});
   const [preferences, setPreferences] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('count');
-  // expandedStudio は abbreviation で管理
   const [expandedStudio, setExpandedStudio] = useState<string | null>(null);
 
   // 展開中スタジオの詳細
@@ -66,7 +78,6 @@ export default function StudioTab({ programColors }: StudioTabProps) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  // abbreviation → StudioMaster lookup
   const studioByAbbr = useMemo(() => {
     const map = new Map<string, StudioMaster>();
     for (const s of studioMasters) {
@@ -90,7 +101,6 @@ export default function StudioTab({ programColors }: StudioTabProps) {
 
         setStudioMasters(studiosData.studios || []);
 
-        // abbreviation → 受講回数・元 store_name
         const ranking: Record<string, number> = {};
         const nameMap: Record<string, string> = {};
         for (const item of (statsData.studioRanking || []) as StudioRanking[]) {
@@ -112,18 +122,14 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     fetchData();
   }, []);
 
-  // 表示用スタジオリスト: active + 閉店（履歴あり）
-  const { activeStudios, closedWithHistory } = useMemo(() => {
-    const active = studioMasters.filter((s) => s.is_active);
+  // 閉店（履歴あり）スタジオ
+  const closedWithHistory = useMemo(() => {
     const closed: StudioMaster[] = [];
-
-    // DB上 is_active=false で受講履歴あり
     for (const s of studioMasters) {
       if (!s.is_active && rankingByAbbr[s.abbreviation]) {
         closed.push(s);
       }
     }
-    // 受講履歴にあるがDBに存在しないスタジオ
     for (const [abbr, count] of Object.entries(rankingByAbbr)) {
       if (count > 0 && !studioMasters.some((s) => s.abbreviation === abbr)) {
         const storeName = storeNameByAbbr[abbr] || '';
@@ -138,55 +144,108 @@ export default function StudioTab({ programColors }: StudioTabProps) {
         });
       }
     }
-
-    return { activeStudios: active, closedWithHistory: closed };
+    return closed;
   }, [studioMasters, rankingByAbbr, storeNameByAbbr]);
 
   // レンダリング用グループ
-  const studioGroups = useMemo(() => {
+  const studioGroups = useMemo((): StudioGroup[] => {
+    const activeStudios = studioMasters.filter((s) => s.is_active);
+
     if (sortMode === 'count') {
-      const all = [...activeStudios, ...closedWithHistory];
-      all.sort((a, b) => {
-        const ca = rankingByAbbr[a.abbreviation] || 0;
-        const cb = rankingByAbbr[b.abbreviation] || 0;
-        return cb - ca;
-      });
-      return [{ area: null as string | null, studios: all }];
+      // 受講済み（回数desc）+ 未受講
+      const attended = [...activeStudios, ...closedWithHistory]
+        .filter((s) => rankingByAbbr[s.abbreviation] > 0)
+        .sort((a, b) => (rankingByAbbr[b.abbreviation] || 0) - (rankingByAbbr[a.abbreviation] || 0));
+      const unattended = activeStudios.filter((s) => !rankingByAbbr[s.abbreviation]);
+
+      const groups: StudioGroup[] = [];
+      if (attended.length > 0) {
+        groups.push({
+          label: '受講済み',
+          items: attended.map((s) => ({ kind: 'studio', studio: s })),
+        });
+      }
+      if (unattended.length > 0) {
+        groups.push({
+          label: '未受講',
+          items: unattended.map((s) => ({ kind: 'studio', studio: s })),
+        });
+      }
+      return groups;
     }
 
-    // エリア順
-    const grouped = new Map<string, StudioMaster[]>();
+    // エリア順 + 都道府県仕切り
+    const groups: StudioGroup[] = [];
+    const areaMap = new Map<string, StudioMaster[]>();
     const other: StudioMaster[] = [];
 
     for (const s of activeStudios) {
       if (s.area) {
-        if (!grouped.has(s.area)) grouped.set(s.area, []);
-        grouped.get(s.area)!.push(s);
+        if (!areaMap.has(s.area)) areaMap.set(s.area, []);
+        areaMap.get(s.area)!.push(s);
       } else {
         other.push(s);
       }
     }
 
-    const groups: { area: string | null; studios: StudioMaster[] }[] = [];
     for (const area of AREA_ORDER) {
-      if (grouped.has(area)) {
-        groups.push({ area, studios: grouped.get(area)! });
+      const areaStudios = areaMap.get(area);
+      if (!areaStudios) continue;
+
+      // 都道府県でグループ化（PREFECTURE_ORDER順）
+      const prefMap = new Map<string, StudioMaster[]>();
+      const noPref: StudioMaster[] = [];
+      for (const s of areaStudios) {
+        if (s.prefecture) {
+          if (!prefMap.has(s.prefecture)) prefMap.set(s.prefecture, []);
+          prefMap.get(s.prefecture)!.push(s);
+        } else {
+          noPref.push(s);
+        }
       }
+
+      const items: CardItem[] = [];
+      for (const pref of PREFECTURE_ORDER) {
+        const studios = prefMap.get(pref);
+        if (!studios) continue;
+        items.push({ kind: 'header', label: pref });
+        for (const s of studios) items.push({ kind: 'studio', studio: s });
+      }
+      // PREFECTURE_ORDER にない都道府県
+      for (const [pref, studios] of prefMap) {
+        if (!PREFECTURE_ORDER.includes(pref)) {
+          items.push({ kind: 'header', label: pref });
+          for (const s of studios) items.push({ kind: 'studio', studio: s });
+        }
+      }
+      for (const s of noPref) items.push({ kind: 'studio', studio: s });
+
+      groups.push({ label: area, items });
     }
+
     // AREA_ORDER にないエリア
-    for (const [area, studios] of grouped) {
+    for (const [area, studios] of areaMap) {
       if (!AREA_ORDER.includes(area)) {
-        groups.push({ area, studios });
+        groups.push({
+          label: area,
+          items: studios.map((s) => ({ kind: 'studio', studio: s })),
+        });
       }
     }
     if (other.length > 0) {
-      groups.push({ area: 'その他', studios: other });
+      groups.push({
+        label: 'その他',
+        items: other.map((s) => ({ kind: 'studio', studio: s })),
+      });
     }
     if (closedWithHistory.length > 0) {
-      groups.push({ area: '閉店', studios: closedWithHistory });
+      groups.push({
+        label: '閉店',
+        items: closedWithHistory.map((s) => ({ kind: 'studio', studio: s })),
+      });
     }
     return groups;
-  }, [sortMode, activeStudios, closedWithHistory, rankingByAbbr]);
+  }, [sortMode, studioMasters, closedWithHistory, rankingByAbbr]);
 
   // スタジオ展開時
   const handleExpand = useCallback(async (abbr: string) => {
@@ -208,7 +267,6 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     setSelectedSeats(preferences[studioName] || []);
 
     try {
-      // store_name は元の形式（銀座（GNZ） or 銀座(GNZ)）で検索
       const storeName = storeNameByAbbr[abbr] || `${studioName}（${abbr}）`;
       const res = await fetch(`/api/history?store=${encodeURIComponent(storeName)}`);
       const data = await res.json();
@@ -286,6 +344,167 @@ export default function StudioTab({ programColors }: StudioTabProps) {
     }
   };
 
+  // スタジオ行レンダリング
+  const renderStudioRow = (s: StudioMaster) => {
+    const count = rankingByAbbr[s.abbreviation] || 0;
+    const isExpanded = expandedStudio === s.abbreviation;
+    const favSeats = preferences[s.name];
+    const isClosed = !s.is_active;
+
+    return (
+      <div className={isClosed ? 'opacity-40' : ''}>
+        <button
+          className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
+          onClick={() => handleExpand(s.abbreviation)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-medium text-sm">
+                {s.name}（{s.abbreviation}）
+              </span>
+              <Badge variant="secondary" className="text-xs">
+                {count > 0 ? `${count}回` : '—'}
+              </Badge>
+            </div>
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            )}
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="px-3 pb-3 space-y-3">
+            <Separator />
+
+            {favSeats && favSeats.length > 0 && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Star className="h-3 w-3 text-yellow-500" />
+                <span>{favSeats.map(seat => `#${seat}`).join(' ')}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">おすすめバイク番号</p>
+              {!showSeatMap ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs"
+                  onClick={() => handleShowSeatMap(s.name)}
+                  disabled={seatMapLoading}
+                >
+                  {seatMapLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  ) : (
+                    <Star className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  おすすめバイクを選択
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  {seatMapSidHash && (
+                    <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                      <SeatMap
+                        sidHash={seatMapSidHash}
+                        multiSelect
+                        selectedSeats={selectedSeats}
+                        onSelectedSeatsChange={setSelectedSeats}
+                      />
+                    </Suspense>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-8 text-xs"
+                      onClick={() => setShowSeatMap(false)}
+                    >
+                      閉じる
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 h-8 text-xs"
+                      onClick={() => handleSavePreferences(s.name)}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                      ) : (
+                        <Save className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      保存
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {saveMessage && (
+                <p className={`text-xs ${saveMessage === '保存しました' ? 'text-green-600' : 'text-red-600'}`}>
+                  {saveMessage}
+                </p>
+              )}
+            </div>
+
+            {recentLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <>
+                {seatCounts.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">よく使うバイク</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {seatCounts.map(({ seat, count: c }) => (
+                        <Badge key={seat} variant="outline" className="text-xs">
+                          #{seat}（{c}回）
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {recentRecords.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">最近の受講</p>
+                    <div className="space-y-1">
+                      {recentRecords.map((r) => (
+                        <div key={r.id} className="flex items-center gap-1.5 text-xs">
+                          <span className="text-muted-foreground w-12 shrink-0">
+                            {r.shiftDate.slice(5)}
+                          </span>
+                          {programColors[r.programName] ? (
+                            <span
+                              className="inline-block px-1 py-0.5 rounded text-[10px] font-medium leading-none"
+                              style={{
+                                backgroundColor: programColors[r.programName].colorCode,
+                                color: programColors[r.programName].textColor,
+                              }}
+                            >
+                              {r.programName}
+                            </span>
+                          ) : (
+                            <span className="font-medium">{r.programName}</span>
+                          )}
+                          <span className="text-muted-foreground truncate">{r.instructorName}</span>
+                          {r.sheetNo && (
+                            <span className="ml-auto shrink-0 text-muted-foreground">#{r.sheetNo}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -312,182 +531,23 @@ export default function StudioTab({ programColors }: StudioTabProps) {
       </div>
 
       {studioGroups.map((group) => (
-        <div key={group.area || 'all'}>
-          {group.area && (
-            <p className="text-xs font-medium text-muted-foreground mb-1 px-1">{group.area}</p>
+        <div key={group.label || 'all'}>
+          {group.label && (
+            <p className="text-xs font-medium text-muted-foreground mb-1 px-1">{group.label}</p>
           )}
           <Card className="overflow-hidden">
-            {group.studios.map((s, index) => {
-              const count = rankingByAbbr[s.abbreviation] || 0;
-              const isExpanded = expandedStudio === s.abbreviation;
-              const favSeats = preferences[s.name];
-              const isClosed = !s.is_active;
-
-              return (
-                <div key={s.abbreviation}>
-                  {index > 0 && <Separator />}
-                  {/* ヘッダー行 */}
-                  <button
-                    className="w-full text-left py-2.5 px-3 active:bg-muted/50 transition-colors"
-                    onClick={() => handleExpand(s.abbreviation)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`font-medium text-sm ${isClosed ? 'text-muted-foreground' : ''}`}>
-                          {s.name}（{s.abbreviation}）
-                        </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {count > 0 ? `${count}回` : '—'}
-                        </Badge>
-                        {isClosed && count > 0 && (
-                          <Badge variant="outline" className="text-xs text-muted-foreground">
-                            閉店
-                          </Badge>
-                        )}
-                      </div>
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      )}
-                    </div>
-                  </button>
-
-                  {/* 展開コンテンツ */}
-                  {isExpanded && (
-                    <div className="px-3 pb-3 space-y-3">
-                      <Separator />
-
-                      {/* おすすめバイク（展開時のみ表示） */}
-                      {favSeats && favSeats.length > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Star className="h-3 w-3 text-yellow-500" />
-                          <span>{favSeats.map(seat => `#${seat}`).join(' ')}</span>
-                        </div>
-                      )}
-
-                      {/* おすすめバイク選択 */}
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-muted-foreground">おすすめバイク番号</p>
-                        {!showSeatMap ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-8 text-xs"
-                            onClick={() => handleShowSeatMap(s.name)}
-                            disabled={seatMapLoading}
-                          >
-                            {seatMapLoading ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                            ) : (
-                              <Star className="h-3.5 w-3.5 mr-1" />
-                            )}
-                            おすすめバイクを選択
-                          </Button>
-                        ) : (
-                          <div className="space-y-2">
-                            {seatMapSidHash && (
-                              <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
-                                <SeatMap
-                                  sidHash={seatMapSidHash}
-                                  multiSelect
-                                  selectedSeats={selectedSeats}
-                                  onSelectedSeatsChange={setSelectedSeats}
-                                />
-                              </Suspense>
-                            )}
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 h-8 text-xs"
-                                onClick={() => setShowSeatMap(false)}
-                              >
-                                閉じる
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="flex-1 h-8 text-xs"
-                                onClick={() => handleSavePreferences(s.name)}
-                                disabled={saving}
-                              >
-                                {saving ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                                ) : (
-                                  <Save className="h-3.5 w-3.5 mr-1" />
-                                )}
-                                保存
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                        {saveMessage && (
-                          <p className={`text-xs ${saveMessage === '保存しました' ? 'text-green-600' : 'text-red-600'}`}>
-                            {saveMessage}
-                          </p>
-                        )}
-                      </div>
-
-                      {recentLoading ? (
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-16 w-full" />
-                        </div>
-                      ) : (
-                        <>
-                          {/* よく使う席 */}
-                          {seatCounts.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-muted-foreground">よく使うバイク</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {seatCounts.map(({ seat, count: c }) => (
-                                  <Badge key={seat} variant="outline" className="text-xs">
-                                    #{seat}（{c}回）
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 最近の受講 */}
-                          {recentRecords.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-muted-foreground">最近の受講</p>
-                              <div className="space-y-1">
-                                {recentRecords.map((r) => (
-                                  <div key={r.id} className="flex items-center gap-1.5 text-xs">
-                                    <span className="text-muted-foreground w-12 shrink-0">
-                                      {r.shiftDate.slice(5)}
-                                    </span>
-                                    {programColors[r.programName] ? (
-                                      <span
-                                        className="inline-block px-1 py-0.5 rounded text-[10px] font-medium leading-none"
-                                        style={{
-                                          backgroundColor: programColors[r.programName].colorCode,
-                                          color: programColors[r.programName].textColor,
-                                        }}
-                                      >
-                                        {r.programName}
-                                      </span>
-                                    ) : (
-                                      <span className="font-medium">{r.programName}</span>
-                                    )}
-                                    <span className="text-muted-foreground truncate">{r.instructorName}</span>
-                                    {r.sheetNo && (
-                                      <span className="ml-auto shrink-0 text-muted-foreground">#{r.sheetNo}</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {group.items.map((item, i) => (
+              <Fragment key={item.kind === 'header' ? `h-${item.label}` : item.studio.abbreviation}>
+                {i > 0 && item.kind === 'studio' && <Separator />}
+                {item.kind === 'header' ? (
+                  <div className={`px-3 py-1 bg-muted/40 ${i > 0 ? 'border-t' : ''}`}>
+                    <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+                  </div>
+                ) : (
+                  renderStudioRow(item.studio)
+                )}
+              </Fragment>
+            ))}
           </Card>
         </div>
       ))}
