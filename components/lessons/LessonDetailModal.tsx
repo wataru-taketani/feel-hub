@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send } from 'lucide-react';
 import { formatStudio, formatDate } from '@/lib/lessonUtils';
 
 const SeatMap = lazy(() => import('@/components/lessons/SeatMap'));
@@ -18,6 +18,12 @@ export interface ReserveApiResult {
   sheetNo?: string;
   needsManualConfirm?: boolean;
   confirmReason?: string;
+}
+
+interface GroupInfo {
+  id: string;
+  name: string;
+  memberCount: number;
 }
 
 interface LessonDetailModalProps {
@@ -34,6 +40,8 @@ interface LessonDetailModalProps {
   onReserve?: (sidHash: string, sheetNo: string) => Promise<ReserveApiResult>;
   waitlistAutoReserve?: boolean;
   onToggleAutoReserve?: (lessonId: string) => void;
+  groups?: GroupInfo[];
+  onInviteGroup?: (groupId: string, lesson: Lesson) => Promise<{ sent: number; total: number }>;
 }
 
 export default function LessonDetailModal({
@@ -50,6 +58,8 @@ export default function LessonDetailModal({
   onReserve,
   waitlistAutoReserve,
   onToggleAutoReserve,
+  groups,
+  onInviteGroup,
 }: LessonDetailModalProps) {
   const [autoReserve, setAutoReserve] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
@@ -62,6 +72,11 @@ export default function LessonDetailModal({
   const [realAvailable, setRealAvailable] = useState<{ available: number; total: number } | null>(null);
   // お気に入り席
   const [preferredSeats, setPreferredSeats] = useState<string[]>([]);
+  // グループ誘い機能
+  const [inviteStep, setInviteStep] = useState<'idle' | 'select' | 'confirm' | 'sending' | 'done'>('idle');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ sent: number; total: number } | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   // モーダル表示時にお気に入り席を取得
   useEffect(() => {
@@ -136,6 +151,10 @@ export default function LessonDetailModal({
       setShowReadOnlySeatMap(false);
       setRealAvailable(null);
       setPreferredSeats([]);
+      setInviteStep('idle');
+      setSelectedGroupId(null);
+      setInviteResult(null);
+      setInviteError(null);
     }
     onOpenChange(o);
   };
@@ -185,6 +204,146 @@ export default function LessonDetailModal({
             </div>
           </DialogDescription>
         </DialogHeader>
+
+        {/* グループ誘い機能（予約済み + グループ所属時） */}
+        {isReserved && groups && groups.length > 0 && onInviteGroup && (
+          <div className="pt-2 border-t">
+            {inviteStep === 'idle' && !inviteResult && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  if (groups.length === 1) {
+                    setSelectedGroupId(groups[0].id);
+                    setInviteStep('confirm');
+                  } else {
+                    setSelectedGroupId(groups[0].id);
+                    setInviteStep('select');
+                  }
+                }}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                グループメンバーを誘う
+              </Button>
+            )}
+
+            {inviteStep === 'select' && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">通知するグループを選択</p>
+                <div className="space-y-2">
+                  {groups.map((g) => (
+                    <label
+                      key={g.id}
+                      className="flex items-center gap-3 p-2 rounded-lg border cursor-pointer active:bg-accent/50"
+                    >
+                      <input
+                        type="radio"
+                        name="invite-group"
+                        checked={selectedGroupId === g.id}
+                        onChange={() => setSelectedGroupId(g.id)}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm flex-1">{g.name}</span>
+                      <span className="text-xs text-muted-foreground">{g.memberCount}人</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setInviteStep('idle');
+                      setSelectedGroupId(null);
+                    }}
+                  >
+                    戻る
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setInviteStep('confirm')}
+                    disabled={!selectedGroupId}
+                  >
+                    次へ
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {inviteStep === 'confirm' && selectedGroupId && (
+              <div className="p-3 bg-muted rounded-lg space-y-2">
+                <p className="text-sm font-medium">
+                  {groups.find((g) => g.id === selectedGroupId)?.name}のメンバーに通知しますか？
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      if (groups.length === 1) {
+                        setInviteStep('idle');
+                        setSelectedGroupId(null);
+                      } else {
+                        setInviteStep('select');
+                      }
+                    }}
+                  >
+                    戻る
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={async () => {
+                      setInviteStep('sending');
+                      setInviteError(null);
+                      try {
+                        const result = await onInviteGroup(selectedGroupId, lesson);
+                        setInviteResult(result);
+                        setInviteStep('done');
+                      } catch {
+                        setInviteError('通知の送信に失敗しました');
+                        setInviteStep('idle');
+                        setSelectedGroupId(null);
+                      }
+                    }}
+                  >
+                    <Send className="h-4 w-4 mr-1" />
+                    送信
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {inviteStep === 'sending' && (
+              <div className="flex items-center justify-center gap-2 py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">送信中...</span>
+              </div>
+            )}
+
+            {inviteResult && (
+              <div className="p-3 rounded-lg text-sm bg-green-50 text-green-800 border border-green-200">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{inviteResult.sent}人に通知しました{inviteResult.sent < inviteResult.total ? `（LINE未連携: ${inviteResult.total - inviteResult.sent}人）` : ''}</span>
+                </div>
+              </div>
+            )}
+
+            {inviteError && (
+              <div className="p-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{inviteError}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 予約結果表示 */}
         {reserveResult && (

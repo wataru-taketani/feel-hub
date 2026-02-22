@@ -237,6 +237,8 @@ function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [hasLineUserId, setHasLineUserId] = useState(false);
   const [modalIsReserved, setModalIsReserved] = useState(false);
+  // グループ
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; memberCount: number }>>([]);
 
   // 共有: キャンセル待ち解除ダイアログ
   const [removeTarget, setRemoveTarget] = useState<WaitlistItem | null>(null);
@@ -247,6 +249,17 @@ function Dashboard() {
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.profile?.lineUserId) setHasLineUserId(true);
+      })
+      .catch(() => {});
+    // グループ一覧取得
+    fetch('/api/groups')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.groups) {
+          setGroups(data.groups.map((g: { id: string; name: string; memberCount: number }) => ({
+            id: g.id, name: g.name, memberCount: g.memberCount,
+          })));
+        }
       })
       .catch(() => {});
   }, []);
@@ -286,6 +299,23 @@ function Dashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sidHash, sheetNo }),
     });
+    return res.json();
+  }, []);
+
+  const handleInviteGroup = useCallback(async (groupId: string, lesson: Lesson): Promise<{ sent: number; total: number }> => {
+    const res = await fetch(`/api/groups/${groupId}/invite-lesson`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        programName: lesson.programName,
+        date: lesson.date,
+        startTime: lesson.startTime,
+        endTime: lesson.endTime,
+        instructor: lesson.instructor,
+        studio: lesson.studio,
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to invite');
     return res.json();
   }, []);
 
@@ -493,6 +523,8 @@ function Dashboard() {
         onReserve={handleReserve}
         waitlistAutoReserve={selectedLesson ? getAutoReserve(selectedLesson.id) : false}
         onToggleAutoReserve={toggleAutoReserve}
+        groups={groups}
+        onInviteGroup={handleInviteGroup}
       />
 
       {/* 共有: キャンセル待ち解除ダイアログ */}

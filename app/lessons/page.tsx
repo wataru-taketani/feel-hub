@@ -53,6 +53,8 @@ export default function LessonsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [hasLineUserId, setHasLineUserId] = useState(false);
   const [hasFcSession, setHasFcSession] = useState(false);
+  // グループ
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; memberCount: number }>>([]);
 
   const handleTapLesson = useCallback((lesson: Lesson) => {
     setSelectedLesson(lesson);
@@ -65,6 +67,23 @@ export default function LessonsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sidHash, sheetNo }),
     });
+    return res.json();
+  }, []);
+
+  const handleInviteGroup = useCallback(async (groupId: string, lesson: Lesson): Promise<{ sent: number; total: number }> => {
+    const res = await fetch(`/api/groups/${groupId}/invite-lesson`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        programName: lesson.programName,
+        date: lesson.date,
+        startTime: lesson.startTime,
+        endTime: lesson.endTime,
+        instructor: lesson.instructor,
+        studio: lesson.studio,
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to invite');
     return res.json();
   }, []);
 
@@ -101,7 +120,8 @@ export default function LessonsPage() {
     Promise.all([
       fetch('/api/profile').then(res => res.ok ? res.json() : null).catch(() => null),
       fetch('/api/dashboard').then(res => res.ok ? res.json() : null).catch(() => null),
-    ]).then(([profileData, dashboardData]) => {
+      fetch('/api/groups').then(res => res.ok ? res.json() : null).catch(() => null),
+    ]).then(([profileData, dashboardData, groupsData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);
       if (profileData?.profile?.homeStore) {
         profileHomeStore.current = parseHomeStoreToStudio(profileData.profile.homeStore);
@@ -122,6 +142,11 @@ export default function LessonsPage() {
         }
         setReservedMap(map);
         reservedStudiosRef.current = [...studioSet];
+      }
+      if (groupsData?.groups) {
+        setGroups(groupsData.groups.map((g: { id: string; name: string; memberCount: number }) => ({
+          id: g.id, name: g.name, memberCount: g.memberCount,
+        })));
       }
       setProfileLoaded(true);
     });
@@ -405,6 +430,8 @@ export default function LessonsPage() {
           onReserve={handleReserve}
           waitlistAutoReserve={selectedLesson ? getAutoReserve(selectedLesson.id) : false}
           onToggleAutoReserve={toggleAutoReserve}
+          groups={groups}
+          onInviteGroup={handleInviteGroup}
         />
         {/* スタジオ選択ダイアログ */}
         <StudioSelectDialog
