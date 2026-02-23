@@ -11,19 +11,26 @@ const supabaseAdmin = createAdminClient(
 
 const BASE_URL = 'https://m.feelcycle.com';
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'not auth' }, { status: 401 });
 
+  // クエリパラメータでユーザーID指定可能（デバッグ用）
+  const url = new URL(request.url);
+  const targetUserId = url.searchParams.get('uid') || user.id;
+
   const { data: sessionRow } = await supabaseAdmin
     .from('feelcycle_sessions')
     .select('session_encrypted, expires_at')
-    .eq('user_id', user.id)
+    .eq('user_id', targetUserId)
     .single();
 
-  if (!sessionRow || new Date(sessionRow.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'no fc session or expired' }, { status: 400 });
+  if (!sessionRow) {
+    return NextResponse.json({ error: 'no fc session for user ' + targetUserId }, { status: 400 });
+  }
+  if (new Date(sessionRow.expires_at) < new Date()) {
+    return NextResponse.json({ error: 'fc session expired for user ' + targetUserId }, { status: 400 });
   }
 
   let session: FeelcycleSession;
@@ -44,8 +51,6 @@ export async function GET() {
     'Referer': `${BASE_URL}/mypage/rental-subscription`,
   };
 
-  const results: Record<string, unknown> = {};
-
   // POST /api/rental_item/select（空payload = 初期データロード）
   try {
     const res = await fetch(`${BASE_URL}/api/rental_item/select`, {
@@ -53,28 +58,9 @@ export async function GET() {
       headers,
       body: JSON.stringify({}),
     });
-    const text = await res.text();
-    let body: unknown;
-    try { body = JSON.parse(text); } catch { body = text.slice(0, 1000); }
-    results.rentalItemSelect = { status: res.status, body };
+    const body = await res.json();
+    return NextResponse.json({ targetUserId, status: res.status, body });
   } catch (e) {
-    results.rentalItemSelect = { error: String(e) };
+    return NextResponse.json({ targetUserId, error: String(e) }, { status: 500 });
   }
-
-  // POST /api/rental_item/quit（情報取得のみ確認）
-  try {
-    const res = await fetch(`${BASE_URL}/api/rental_item/quit`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({}),
-    });
-    const text = await res.text();
-    let body: unknown;
-    try { body = JSON.parse(text); } catch { body = text.slice(0, 1000); }
-    results.rentalItemQuit = { status: res.status, body };
-  } catch (e) {
-    results.rentalItemQuit = { error: String(e) };
-  }
-
-  return NextResponse.json(results);
 }
