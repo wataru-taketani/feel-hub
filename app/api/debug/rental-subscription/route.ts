@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/crypto';
+import type { FeelcycleSession } from '@/lib/feelcycle-api';
 
 const supabaseAdmin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,18 +16,23 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'not auth' }, { status: 401 });
 
-  // FCセッション取得
-  const { data: profile } = await supabaseAdmin
-    .from('user_profiles')
-    .select('fc_session_data')
-    .eq('id', user.id)
+  // FCセッション取得（feelcycle_sessionsテーブルから）
+  const { data: sessionRow } = await supabaseAdmin
+    .from('feelcycle_sessions')
+    .select('session_encrypted, expires_at')
+    .eq('user_id', user.id)
     .single();
 
-  if (!profile?.fc_session_data) {
-    return NextResponse.json({ error: 'no fc session' }, { status: 400 });
+  if (!sessionRow || new Date(sessionRow.expires_at) < new Date()) {
+    return NextResponse.json({ error: 'no fc session or expired' }, { status: 400 });
   }
 
-  const session = profile.fc_session_data as { laravelSession: string; xsrfToken: string; csrfToken: string };
+  let session: FeelcycleSession;
+  try {
+    session = JSON.parse(decrypt(sessionRow.session_encrypted));
+  } catch {
+    return NextResponse.json({ error: 'decrypt failed' }, { status: 500 });
+  }
 
   const headers: Record<string, string> = {
     'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
