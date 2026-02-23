@@ -53,7 +53,54 @@ export async function GET(request: NextRequest) {
       headers,
       body: JSON.stringify({}),
     });
-    const body = await res.json();
+    const text = await res.text();
+    let body: unknown;
+    try { body = JSON.parse(text); } catch { body = text.slice(0, 500); }
+
+    if (res.status === 401 || res.status === 302 || res.status === 403) {
+      // セッション切れ → 再認証を試みる
+      const { data: creds } = await supabaseAdmin
+        .from('feelcycle_credentials')
+        .select('email_encrypted, password_encrypted')
+        .eq('user_id', targetUserId)
+        .single();
+
+      if (!creds) {
+        return NextResponse.json({ targetUserId, error: 'session expired, no credentials', fcStatus: res.status }, { status: 400 });
+      }
+
+      // 動的import で再認証
+      const { login } = await import('@/lib/feelcycle-api');
+      const email = decrypt(creds.email_encrypted);
+      const password = decrypt(creds.password_encrypted);
+      const newSession = await login(email, password);
+
+      // 新セッション保存
+      const { encrypt } = await import('@/lib/crypto');
+      await supabaseAdmin
+        .from('feelcycle_sessions')
+        .upsert({
+          user_id: targetUserId,
+          session_encrypted: encrypt(JSON.stringify(newSession)),
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        });
+
+      // 再試行
+      const retryHeaders = {
+        ...headers,
+        'X-XSRF-TOKEN': newSession.xsrfToken,
+        'X-CSRF-TOKEN': newSession.csrfToken,
+        'Cookie': `XSRF-TOKEN=${encodeURIComponent(newSession.xsrfToken)}; laravel_session=${newSession.laravelSession}`,
+      };
+      const res2 = await fetch(`${BASE_URL}/api/rental_item/select`, {
+        method: 'POST',
+        headers: retryHeaders,
+        body: JSON.stringify({}),
+      });
+      const body2 = await res2.json();
+      return NextResponse.json({ targetUserId, status: res2.status, body: body2, reauthed: true });
+    }
+
     return NextResponse.json({ targetUserId, status: res.status, body });
   } catch (e) {
     return NextResponse.json({ targetUserId, error: String(e) }, { status: 500 });
