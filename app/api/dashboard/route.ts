@@ -58,10 +58,11 @@ export async function GET() {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  const [mypageResult, ticketsResult, historyResult] = await Promise.allSettled([
+  const [mypageResult, ticketsResult, historyResult, rentalResult] = await Promise.allSettled([
     getMypageWithReservations(fcSession),
     getTickets(fcSession),
     getLessonHistory(fcSession, currentMonth),
+    fetchRentalSubscription(fcSession),
   ]);
 
   if (mypageResult.status === 'rejected') {
@@ -146,6 +147,12 @@ export async function GET() {
     })
   );
 
+  // レンタルサブスク情報
+  let rentalSubscriptions: { name: string; availableCount: number; availableCountFlg: boolean }[] = [];
+  if (rentalResult.status === 'fulfilled' && rentalResult.value) {
+    rentalSubscriptions = rentalResult.value;
+  }
+
   return NextResponse.json({
     reservations: enrichedReservations,
     memberSummary: {
@@ -161,5 +168,41 @@ export async function GET() {
       currentMonth,
     },
     tickets,
+    rentalSubscriptions,
   });
+}
+
+const BASE_URL = 'https://m.feelcycle.com';
+
+async function fetchRentalSubscription(
+  session: FeelcycleSession
+): Promise<{ name: string; availableCount: number; availableCountFlg: boolean }[]> {
+  const res = await fetch(`${BASE_URL}/api/rental_item/select`, {
+    method: 'POST',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-XSRF-TOKEN': session.xsrfToken,
+      'X-CSRF-TOKEN': session.csrfToken,
+      'Cookie': `XSRF-TOKEN=${encodeURIComponent(session.xsrfToken)}; laravel_session=${session.laravelSession}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  const list = (data.current_contract_rental_item_list || []) as {
+    name: string;
+    available_count: number;
+    available_count_flg: number;
+  }[];
+
+  return list.map((item) => ({
+    name: item.name,
+    availableCount: item.available_count,
+    availableCountFlg: item.available_count_flg === 1,
+  }));
 }

@@ -35,6 +35,7 @@ interface DashboardData {
     currentMonth: string;
   };
   tickets: TicketInfo[];
+  rentalSubscriptions: { name: string; availableCount: number; availableCountFlg: boolean }[];
 }
 
 function formatDateWithDay(dateStr: string): string {
@@ -452,11 +453,11 @@ function Dashboard() {
         onTapRemove={setRemoveTarget}
       />
 
-      {/* サブスク残 + チケット */}
+      {/* マンスリー情報 + チケット */}
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">今月の受講</CardTitle>
+            <CardTitle className="text-base">マンスリー情報</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -464,7 +465,17 @@ function Dashboard() {
             </div>
             {sub.limit != null && (
               <p className="text-xs text-muted-foreground mt-1">
-                サブスク残: {sub.limit - sub.used}/{sub.limit}
+                レッスン残: {sub.limit - sub.used}/{sub.limit}
+              </p>
+            )}
+            {data.rentalSubscriptions.filter(r => r.availableCountFlg).map((r, i) => (
+              <p key={i} className="text-xs text-muted-foreground mt-1">
+                レンタル残: {r.availableCount}
+              </p>
+            ))}
+            {data.rentalSubscriptions.filter(r => r.availableCountFlg).length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                レンタル残: ー
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
