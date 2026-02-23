@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/crypto';
 import type { FeelcycleSession } from '@/lib/feelcycle-api';
@@ -11,14 +10,11 @@ const supabaseAdmin = createAdminClient(
 
 const BASE_URL = 'https://m.feelcycle.com';
 
-export async function GET(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'not auth' }, { status: 401 });
-
-  // クエリパラメータでユーザーID指定可能（デバッグ用）
-  const url = new URL(request.url);
-  const targetUserId = url.searchParams.get('uid') || user.id;
+export async function GET(request: NextRequest) {
+  const targetUserId = request.nextUrl.searchParams.get('uid');
+  if (!targetUserId) {
+    return NextResponse.json({ error: 'uid required' }, { status: 400 });
+  }
 
   const { data: sessionRow } = await supabaseAdmin
     .from('feelcycle_sessions')
@@ -27,10 +23,10 @@ export async function GET(request: Request) {
     .single();
 
   if (!sessionRow) {
-    return NextResponse.json({ error: 'no fc session for user ' + targetUserId }, { status: 400 });
+    return NextResponse.json({ error: 'no fc session' }, { status: 400 });
   }
   if (new Date(sessionRow.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'fc session expired for user ' + targetUserId }, { status: 400 });
+    return NextResponse.json({ error: 'fc session expired' }, { status: 400 });
   }
 
   let session: FeelcycleSession;
@@ -51,7 +47,6 @@ export async function GET(request: Request) {
     'Referer': `${BASE_URL}/mypage/rental-subscription`,
   };
 
-  // POST /api/rental_item/select（空payload = 初期データロード）
   try {
     const res = await fetch(`${BASE_URL}/api/rental_item/select`, {
       method: 'POST',
