@@ -460,9 +460,9 @@ function Dashboard() {
             <CardTitle className="text-base">マンスリー情報</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {sub.total ?? sub.used}<span className="text-sm font-normal text-muted-foreground">回</span>
-            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              受講数: {sub.total ?? sub.used}回
+            </p>
             {sub.limit != null && (
               <p className="text-xs text-muted-foreground mt-1">
                 レッスン残: {sub.limit - sub.used}/{sub.limit}
