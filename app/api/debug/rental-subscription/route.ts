@@ -39,49 +39,61 @@ export async function GET() {
     'X-XSRF-TOKEN': session.xsrfToken,
     'X-CSRF-TOKEN': session.csrfToken,
     'Cookie': `XSRF-TOKEN=${encodeURIComponent(session.xsrfToken)}; laravel_session=${session.laravelSession}`,
-    'Accept': 'application/json',
-    'Referer': `${BASE_URL}/mypage/rental-subscription`,
+    'Accept': 'text/html',
+    'Referer': `${BASE_URL}/mypage`,
   };
 
   const results: Record<string, unknown> = {};
 
-  // 1. /api/user/mypage の生レスポンス全体をダンプ（レンタル関連フィールド探索）
+  // 1. /mypage/rental-subscription のHTML全文を取得
   try {
-    const res = await fetch(`${BASE_URL}/api/user/mypage`, { method: 'POST', headers });
-    const body = await res.json();
-    // reservation_status は大きいので除外
-    const { reservation_status, ...rest } = body;
-    results.mypageRaw = {
-      status: res.status,
-      keys: Object.keys(body),
-      data: rest,
-      reservationCount: Array.isArray(reservation_status) ? reservation_status.length : 0,
-    };
+    const res = await fetch(`${BASE_URL}/mypage/rental-subscription`, { headers });
+    const html = await res.text();
+    results.html = html;
+
+    // scriptタグのsrc属性を抽出
+    const scriptSrcs = html.match(/src="([^"]+\.js[^"]*)"/g) || [];
+    results.scripts = scriptSrcs;
   } catch (e) {
-    results.mypageRaw = { error: String(e) };
+    results.html = { error: String(e) };
   }
 
-  // 2. /mypage/rental-subscription のHTMLページを取得してAPI呼び出しを特定
-  try {
-    const htmlHeaders = { ...headers, Accept: 'text/html' };
-    const res = await fetch(`${BASE_URL}/mypage/rental-subscription`, { headers: htmlHeaders });
-    const html = await res.text();
-    // APIエンドポイントっぽいURLを抽出
-    const apiMatches = html.match(/["']\/api\/[^"']+["']/g) || [];
-    // axiosやfetch呼び出しパターンを抽出
-    const fetchMatches = html.match(/(?:axios|fetch|post|get)\s*\(\s*["'][^"']+["']/gi) || [];
-    results.htmlPage = {
-      status: res.status,
-      length: html.length,
-      apiEndpoints: [...new Set(apiMatches)],
-      fetchCalls: [...new Set(fetchMatches)],
-      // rental関連のテキスト抽出
-      rentalSnippets: html.match(/.{0,80}rental.{0,80}/gi) || [],
-      subscriptionSnippets: html.match(/.{0,80}subscription.{0,80}/gi) || [],
-    };
-  } catch (e) {
-    results.htmlPage = { error: String(e) };
+  // 2. JSバンドルの中からAPIエンドポイントを探す
+  const scriptUrls: string[] = [];
+  const htmlStr = results.html as string;
+  if (typeof htmlStr === 'string') {
+    const matches = htmlStr.matchAll(/src="([^"]+\.js[^"]*)"/g);
+    for (const m of matches) {
+      let url = m[1];
+      if (url.startsWith('/')) url = BASE_URL + url;
+      scriptUrls.push(url);
+    }
   }
+
+  // 各JSバンドルから rental/subscription 関連のコードを探す
+  const jsFindings: Record<string, unknown>[] = [];
+  for (const url of scriptUrls) {
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': headers['User-Agent'] } });
+      const js = await res.text();
+      // rental/subscription関連の文字列を探す
+      const rentalMatches = js.match(/.{0,100}rental.{0,100}/gi) || [];
+      const subscMatches = js.match(/.{0,100}subscription.{0,100}/gi) || [];
+      const apiMatches = js.match(/.{0,100}\/api\/[^\s"'`]{3,60}.{0,30}/gi) || [];
+      if (rentalMatches.length > 0 || subscMatches.length > 0) {
+        jsFindings.push({
+          url,
+          size: js.length,
+          rentalMatches: rentalMatches.slice(0, 20),
+          subscMatches: subscMatches.slice(0, 20),
+          apiMatches: apiMatches.slice(0, 30),
+        });
+      }
+    } catch (e) {
+      jsFindings.push({ url, error: String(e) });
+    }
+  }
+  results.jsFindings = jsFindings;
 
   return NextResponse.json(results);
 }
