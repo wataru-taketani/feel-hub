@@ -39,61 +39,72 @@ export async function GET() {
     'X-XSRF-TOKEN': session.xsrfToken,
     'X-CSRF-TOKEN': session.csrfToken,
     'Cookie': `XSRF-TOKEN=${encodeURIComponent(session.xsrfToken)}; laravel_session=${session.laravelSession}`,
-    'Accept': 'text/html',
-    'Referer': `${BASE_URL}/mypage`,
+    'Accept': 'application/json',
+    'Referer': `${BASE_URL}/mypage/rental-subscription`,
   };
 
   const results: Record<string, unknown> = {};
 
-  // 1. /mypage/rental-subscription のHTML全文を取得
+  // 1. JSバンドルから$ROUTES定義のrentalセクションを探す
   try {
-    const res = await fetch(`${BASE_URL}/mypage/rental-subscription`, { headers });
-    const html = await res.text();
-    results.html = html;
+    const res = await fetch(`${BASE_URL}/js/app.js?id=2d37bb4f92f769de4c57`, {
+      headers: { 'User-Agent': headers['User-Agent'] },
+    });
+    const js = await res.text();
 
-    // scriptタグのsrc属性を抽出
-    const scriptSrcs = html.match(/src="([^"]+\.js[^"]*)"/g) || [];
-    results.scripts = scriptSrcs;
+    // POST_RENTAL 関連のルート定義を探す
+    const rentalRouteMatches = js.match(/.{0,60}POST_RENTAL[^,}]{0,120}/gi) || [];
+    // GET_RENTAL も探す
+    const getRentalMatches = js.match(/.{0,60}GET_RENTAL[^,}]{0,120}/gi) || [];
+    // RENTAL を含むURL定義を探す（"/api/..."形式）
+    const rentalApiUrls = js.match(/.{0,30}\/api\/[^"'`\s]*rental[^"'`\s]*.{0,30}/gi) || [];
+    // $ROUTES や ROUTES オブジェクト定義付近
+    const routesDef = js.match(/.{0,40}ROUTES\s*[=:{].{0,200}/gi) || [];
+    // rental_item 関連
+    const rentalItemMatches = js.match(/.{0,60}rental_item[^,;)]{0,120}/gi) || [];
+    // mypage関連のAPIパスを全て探す
+    const mypageApiMatches = js.match(/["'`]\/api\/[^"'`]*mypage[^"'`]*["'`]/gi) || [];
+    // selling_rental 関連
+    const sellingRentalMatches = js.match(/.{0,40}selling_rental.{0,80}/gi) || [];
+
+    results.jsAnalysis = {
+      rentalRouteMatches: [...new Set(rentalRouteMatches)].slice(0, 15),
+      getRentalMatches: [...new Set(getRentalMatches)].slice(0, 15),
+      rentalApiUrls: [...new Set(rentalApiUrls)].slice(0, 15),
+      routesDef: [...new Set(routesDef)].slice(0, 10),
+      rentalItemMatches: [...new Set(rentalItemMatches)].slice(0, 15),
+      mypageApiMatches: [...new Set(mypageApiMatches)],
+      sellingRentalMatches: [...new Set(sellingRentalMatches)].slice(0, 10),
+    };
   } catch (e) {
-    results.html = { error: String(e) };
+    results.jsAnalysis = { error: String(e) };
   }
 
-  // 2. JSバンドルの中からAPIエンドポイントを探す
-  const scriptUrls: string[] = [];
-  const htmlStr = results.html as string;
-  if (typeof htmlStr === 'string') {
-    const matches = htmlStr.matchAll(/src="([^"]+\.js[^"]*)"/g);
-    for (const m of matches) {
-      let url = m[1];
-      if (url.startsWith('/')) url = BASE_URL + url;
-      scriptUrls.push(url);
-    }
-  }
+  // 2. 推測されるエンドポイントを試す
+  const guessEndpoints = [
+    { url: `${BASE_URL}/api/user/mypage/rental`, method: 'POST' },
+    { url: `${BASE_URL}/api/auth/user/rental`, method: 'POST' },
+    { url: `${BASE_URL}/api/auth/user/rental_item`, method: 'POST' },
+    { url: `${BASE_URL}/api/rental/list`, method: 'POST' },
+    { url: `${BASE_URL}/api/rental_item/list`, method: 'POST' },
+    { url: `${BASE_URL}/api/user/rental_item`, method: 'POST' },
+    { url: `${BASE_URL}/api/mypage/rental`, method: 'POST' },
+    { url: `${BASE_URL}/api/rental_subscription`, method: 'POST' },
+  ];
 
-  // 各JSバンドルから rental/subscription 関連のコードを探す
-  const jsFindings: Record<string, unknown>[] = [];
-  for (const url of scriptUrls) {
+  const apiResults: Record<string, unknown>[] = [];
+  for (const ep of guessEndpoints) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': headers['User-Agent'] } });
-      const js = await res.text();
-      // rental/subscription関連の文字列を探す
-      const rentalMatches = js.match(/.{0,100}rental.{0,100}/gi) || [];
-      const subscMatches = js.match(/.{0,100}subscription.{0,100}/gi) || [];
-      const apiMatches = js.match(/.{0,100}\/api\/[^\s"'`]{3,60}.{0,30}/gi) || [];
-      if (rentalMatches.length > 0 || subscMatches.length > 0) {
-        jsFindings.push({
-          url,
-          size: js.length,
-          rentalMatches: rentalMatches.slice(0, 20),
-          subscMatches: subscMatches.slice(0, 20),
-          apiMatches: apiMatches.slice(0, 30),
-        });
-      }
+      const res = await fetch(ep.url, { method: ep.method, headers });
+      let body: unknown;
+      const text = await res.text();
+      try { body = JSON.parse(text); } catch { body = text.slice(0, 200); }
+      apiResults.push({ endpoint: `${ep.method} ${ep.url}`, status: res.status, body });
     } catch (e) {
-      jsFindings.push({ url, error: String(e) });
+      apiResults.push({ endpoint: `${ep.method} ${ep.url}`, error: String(e) });
     }
   }
-  results.jsFindings = jsFindings;
+  results.apiProbes = apiResults;
 
   return NextResponse.json(results);
 }
