@@ -478,9 +478,6 @@ function Dashboard() {
                 レンタル残: ー
               </p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              累計: {data.memberSummary.totalAttendance}回
-            </p>
           </CardContent>
         </Card>
 
