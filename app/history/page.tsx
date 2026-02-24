@@ -165,7 +165,7 @@ export default function HistoryPage() {
         <TabsList className="w-full">
           <TabsTrigger value="history" className="flex-1">履歴</TabsTrigger>
           <TabsTrigger value="analytics" className="flex-1">分析</TabsTrigger>
-          <TabsTrigger value="completion" className="flex-1">制覇</TabsTrigger>
+          <TabsTrigger value="completion" className="flex-1">実績</TabsTrigger>
         </TabsList>
 
         <TabsContent value="history">

@@ -9,7 +9,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 type FilterMode = 'all' | 'taken' | 'untaken';
 
 interface ProgramItem {
-  id: number;
   name: string;
   colorCode: string;
   textColor: string;
@@ -61,21 +60,6 @@ export default function ProgramCompletion() {
       })
       .filter((s) => s.programs.length > 0);
   }, [data, filter]);
-
-  // フィルター後のサマリー
-  const filteredSummary = useMemo(() => {
-    if (!data) return { total: 0, taken: 0 };
-    if (filter === 'all') return data.summary;
-    let total = 0;
-    let taken = 0;
-    for (const s of filteredSeries) {
-      for (const p of s.programs) {
-        total++;
-        if (p.count > 0) taken++;
-      }
-    }
-    return { total, taken };
-  }, [data, filter, filteredSeries]);
 
   if (loading) {
     return (
@@ -183,7 +167,7 @@ export default function ProgramCompletion() {
                   <div className="grid grid-cols-3 gap-2 pb-2">
                     {series.programs.map((program) => (
                       <div
-                        key={program.id}
+                        key={program.name}
                         className={`rounded-lg px-2 py-2 text-center ${
                           program.count === 0 ? 'bg-muted' : ''
                         }`}
