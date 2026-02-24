@@ -103,39 +103,31 @@ export default function ProgramCompletion() {
   ];
 
   return (
-    <div className="space-y-4">
-      {/* サマリーカード */}
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          <div className="flex items-baseline justify-between">
-            <p className="text-base font-medium text-foreground">
-              <span className="text-2xl font-bold">{data.summary.taken}</span>
-              {' / '}
-              <span>{data.summary.total}</span>
-              {' プログラム受講済'}
-            </p>
-            <span className="text-base font-bold text-foreground">{percentage}%</span>
-          </div>
-          <Progress value={percentage} className="h-3" />
-        </CardContent>
-      </Card>
-
-      {/* フィルター */}
-      <div className="flex gap-2">
-        {filterButtons.map(({ mode, label }) => (
-          <button
-            key={mode}
-            onClick={() => setFilter(mode)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              filter === mode
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-foreground active:bg-muted/80'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+    <div className="space-y-3">
+      {/* サマリー + フィルター */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <span className="text-xl font-bold">{data.summary.taken}</span>
+          <span className="text-sm text-muted-foreground">/ {data.summary.total}</span>
+          <span className="text-sm text-muted-foreground">({percentage}%)</span>
+        </div>
+        <div className="flex gap-1">
+          {filterButtons.map(({ mode, label }) => (
+            <button
+              key={mode}
+              onClick={() => setFilter(mode)}
+              className={`px-2.5 py-1 rounded-full text-sm font-medium transition-colors ${
+                filter === mode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground active:bg-muted/80'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
+      <Progress value={percentage} className="h-2" />
 
       {/* シリーズ別アコーディオン */}
       {filteredSeries.length === 0 ? (
@@ -145,7 +137,7 @@ export default function ProgramCompletion() {
           </CardContent>
         </Card>
       ) : (
-        <Accordion type="multiple" className="space-y-2">
+        <Accordion type="multiple" className="space-y-1">
           {filteredSeries.map((series) => {
             const seriesTaken = series.programs.filter((p) => p.count > 0).length;
             const seriesTotal = series.programs.length;
@@ -153,9 +145,9 @@ export default function ProgramCompletion() {
               <AccordionItem
                 key={series.seriesName}
                 value={series.seriesName}
-                className="border rounded-lg px-4"
+                className="border rounded-lg px-3"
               >
-                <AccordionTrigger className="text-base py-3">
+                <AccordionTrigger className="text-base py-2.5">
                   <div className="flex items-center justify-between w-full pr-2">
                     <span className="font-medium text-foreground">{series.seriesName}</span>
                     <span className="text-sm text-muted-foreground">
@@ -164,11 +156,11 @@ export default function ProgramCompletion() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="grid grid-cols-3 gap-2 pb-2">
+                  <div className="grid grid-cols-3 gap-1.5 pb-2">
                     {series.programs.map((program) => (
                       <div
                         key={program.name}
-                        className={`rounded-lg px-2 py-2 text-center ${
+                        className={`rounded px-1.5 py-1 text-center ${
                           program.count === 0 ? 'bg-muted' : ''
                         }`}
                         style={
@@ -180,13 +172,13 @@ export default function ProgramCompletion() {
                             : undefined
                         }
                       >
-                        <p className={`text-sm font-medium truncate ${
+                        <p className={`text-xs font-medium truncate ${
                           program.count === 0 ? 'text-muted-foreground' : ''
                         }`}>
                           {program.name}
                         </p>
                         {program.count > 0 && (
-                          <p className="text-xs mt-0.5 opacity-90">
+                          <p className="text-[10px] leading-tight">
                             {program.count}回
                           </p>
                         )}
