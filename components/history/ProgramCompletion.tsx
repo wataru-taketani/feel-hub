@@ -160,7 +160,7 @@ export default function ProgramCompletion() {
                     {series.programs.map((program) => (
                       <div
                         key={program.name}
-                        className={`rounded px-1.5 py-1 text-center ${
+                        className={`rounded px-1.5 py-1.5 text-center ${
                           program.count === 0 ? 'bg-muted' : ''
                         }`}
                         style={
@@ -172,16 +172,14 @@ export default function ProgramCompletion() {
                             : undefined
                         }
                       >
-                        <p className={`text-xs font-medium truncate ${
+                        <p className={`text-sm font-medium truncate ${
                           program.count === 0 ? 'text-muted-foreground' : ''
                         }`}>
                           {program.name}
                         </p>
-                        {program.count > 0 && (
-                          <p className="text-[10px] leading-tight">
-                            {program.count}回
-                          </p>
-                        )}
+                        <p className="text-xs">
+                          {program.count > 0 ? `${program.count}回` : '\u00A0'}
+                        </p>
                       </div>
                     ))}
                   </div>
