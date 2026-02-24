@@ -123,7 +123,13 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
   );
 }
 
-export default function HistoryAnalytics() {
+export default function HistoryAnalytics({
+  externalProgram,
+  onExternalProgramConsumed,
+}: {
+  externalProgram?: string | null;
+  onExternalProgramConsumed?: () => void;
+}) {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodPreset>('all');
@@ -168,6 +174,15 @@ export default function HistoryAnalytics() {
       .then(setProgramColors)
       .catch(() => {});
   }, []);
+
+  // 実績タブからのプログラム指定
+  useEffect(() => {
+    if (externalProgram) {
+      setSelectedPrograms([externalProgram]);
+      setPeriod('all');
+      onExternalProgramConsumed?.();
+    }
+  }, [externalProgram, onExternalProgramConsumed]);
 
   // フィルタ条件付きレコード取得（プログラム・インストラクター・スタジオのいずれかが指定時）
   const hasActiveFilter = selectedPrograms.length > 0 || selectedInstructors.length > 0 || !!tappedStudio;

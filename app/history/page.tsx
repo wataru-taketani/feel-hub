@@ -27,6 +27,8 @@ function getPeriodDates(mode: PeriodMode): { from: string; to: string } | null {
 }
 
 export default function HistoryPage() {
+  const [activeTab, setActiveTab] = useState('history');
+  const [analyticsProgram, setAnalyticsProgram] = useState<string | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -161,7 +163,7 @@ export default function HistoryPage() {
         <p className="text-sm text-muted-foreground bg-muted p-2 rounded">{syncMessage}</p>
       )}
 
-      <Tabs defaultValue="history">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full">
           <TabsTrigger value="history" className="flex-1">履歴</TabsTrigger>
           <TabsTrigger value="analytics" className="flex-1">分析</TabsTrigger>
@@ -339,11 +341,17 @@ export default function HistoryPage() {
         </TabsContent>
 
         <TabsContent value="analytics">
-          <HistoryAnalytics />
+          <HistoryAnalytics
+            externalProgram={analyticsProgram}
+            onExternalProgramConsumed={() => setAnalyticsProgram(null)}
+          />
         </TabsContent>
 
         <TabsContent value="completion">
-          <ProgramCompletion />
+          <ProgramCompletion onSelectProgram={(name) => {
+            setAnalyticsProgram(name);
+            setActiveTab('analytics');
+          }} />
         </TabsContent>
       </Tabs>
     </div>

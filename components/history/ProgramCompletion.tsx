@@ -25,7 +25,11 @@ interface ProgramsResponse {
   summary: { total: number; taken: number };
 }
 
-export default function ProgramCompletion() {
+export default function ProgramCompletion({
+  onSelectProgram,
+}: {
+  onSelectProgram?: (name: string) => void;
+}) {
   const [data, setData] = useState<ProgramsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,12 +160,14 @@ export default function ProgramCompletion() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="grid grid-cols-3 gap-1.5 pb-2">
+                  <div className="space-y-1 pb-2">
                     {series.programs.map((program) => (
                       <div
                         key={program.name}
-                        className={`rounded px-1.5 py-1.5 text-center ${
-                          program.count === 0 ? 'bg-muted' : ''
+                        className={`flex items-center justify-between rounded px-2 py-1.5 ${
+                          program.count === 0
+                            ? 'bg-muted'
+                            : 'active:opacity-80'
                         }`}
                         style={
                           program.count > 0
@@ -171,15 +177,18 @@ export default function ProgramCompletion() {
                               }
                             : undefined
                         }
+                        onClick={() => program.count > 0 && onSelectProgram?.(program.name)}
                       >
-                        <p className={`text-sm font-medium truncate ${
+                        <span className={`text-sm font-medium truncate ${
                           program.count === 0 ? 'text-muted-foreground' : ''
                         }`}>
                           {program.name}
-                        </p>
-                        <p className="text-xs">
-                          {program.count > 0 ? `${program.count}回` : '\u00A0'}
-                        </p>
+                        </span>
+                        {program.count > 0 && (
+                          <span className="text-sm ml-2 shrink-0">
+                            {program.count}回
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
