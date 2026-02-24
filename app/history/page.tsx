@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, MapPin } from 'lucide-react';
 import HistoryAnalytics from '@/components/history/HistoryAnalytics';
+import ProgramCompletion from '@/components/history/ProgramCompletion';
 import InstructorMultiSelect from '@/components/lessons/InstructorMultiSelect';
 import type { AttendanceRecord } from '@/types';
 
@@ -164,6 +165,7 @@ export default function HistoryPage() {
         <TabsList className="w-full">
           <TabsTrigger value="history" className="flex-1">履歴</TabsTrigger>
           <TabsTrigger value="analytics" className="flex-1">分析</TabsTrigger>
+          <TabsTrigger value="completion" className="flex-1">制覇</TabsTrigger>
         </TabsList>
 
         <TabsContent value="history">
@@ -338,6 +340,10 @@ export default function HistoryPage() {
 
         <TabsContent value="analytics">
           <HistoryAnalytics />
+        </TabsContent>
+
+        <TabsContent value="completion">
+          <ProgramCompletion />
         </TabsContent>
       </Tabs>
     </div>
