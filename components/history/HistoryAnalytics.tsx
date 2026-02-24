@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -133,6 +133,7 @@ export default function HistoryAnalytics({
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodPreset>('all');
+  const externalConsumed = useRef(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -151,7 +152,9 @@ export default function HistoryAnalytics({
   }
 
   // フィルター（InstructorMultiSelect）
-  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>(
+    externalProgram ? [externalProgram] : []
+  );
   const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
   // タップで設定されたフィルター
   const [tappedStudio, setTappedStudio] = useState<string | null>(null);
@@ -175,11 +178,10 @@ export default function HistoryAnalytics({
       .catch(() => {});
   }, []);
 
-  // 実績タブからのプログラム指定
+  // 実績タブからのプログラム指定（初回マウント時に消費）
   useEffect(() => {
-    if (externalProgram) {
-      setSelectedPrograms([externalProgram]);
-      setPeriod('all');
+    if (externalProgram && !externalConsumed.current) {
+      externalConsumed.current = true;
       onExternalProgramConsumed?.();
     }
   }, [externalProgram, onExternalProgramConsumed]);
