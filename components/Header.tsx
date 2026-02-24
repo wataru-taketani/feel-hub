@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,17 +11,25 @@ import { User, LogOut, BookOpen, CalendarDays } from 'lucide-react';
 export default function Header() {
   const { user, loading, logout } = useAuthContext();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const pathname = usePathname();
+
+  const handleNavClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (pathname === href) {
+      e.preventDefault();
+      window.location.reload();
+    }
+  }, [pathname]);
 
   return (
     <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="text-lg font-bold text-primary">
+        <Link href="/" className="text-lg font-bold text-primary" onClick={(e) => handleNavClick(e, '/')}>
           FEEL hub
         </Link>
 
         <nav className="flex items-center gap-1">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/lessons">
+            <Link href="/lessons" onClick={(e) => handleNavClick(e, '/lessons')}>
               <CalendarDays className="h-4 w-4 mr-1" />
               <span className="hidden sm:inline">レッスン</span>
             </Link>
@@ -29,13 +38,13 @@ export default function Header() {
           {loading ? null : user ? (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/mypage">
+                <Link href="/mypage" onClick={(e) => handleNavClick(e, '/mypage')}>
                   <User className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">マイページ</span>
                 </Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/history">
+                <Link href="/history" onClick={(e) => handleNavClick(e, '/history')}>
                   <BookOpen className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">履歴</span>
                 </Link>
