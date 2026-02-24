@@ -16,6 +16,27 @@ function normalizeProgram(name: string): string {
     .trim();
 }
 
+/** 自然順ソート（"Hit 1, Hit 2, ..., Hit 10" の順にする） */
+function naturalCompare(a: string, b: string): number {
+  const re = /(\d+)|(\D+)/g;
+  const aParts = a.match(re) || [];
+  const bParts = b.match(re) || [];
+  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+    if (i >= aParts.length) return -1;
+    if (i >= bParts.length) return 1;
+    const aIsNum = /^\d+$/.test(aParts[i]);
+    const bIsNum = /^\d+$/.test(bParts[i]);
+    if (aIsNum && bIsNum) {
+      const diff = parseInt(aParts[i], 10) - parseInt(bParts[i], 10);
+      if (diff !== 0) return diff;
+    } else {
+      const cmp = aParts[i].localeCompare(bParts[i]);
+      if (cmp !== 0) return cmp;
+    }
+  }
+  return 0;
+}
+
 export async function GET() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -81,7 +102,7 @@ export async function GET() {
     .filter((s) => seriesMap.has(s))
     .map((s) => ({
       seriesName: s,
-      programs: seriesMap.get(s)!,
+      programs: seriesMap.get(s)!.sort((a, b) => naturalCompare(a.name, b.name)),
     }));
 
   return NextResponse.json({
