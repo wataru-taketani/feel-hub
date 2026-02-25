@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
     const studiosParam = request.nextUrl.searchParams.get('studios');
     const studioList = studiosParam ? studiosParam.split(',').filter(Boolean) : [];
 
-    // 全件取得（1000件ずつページネーション）
+    // 今日以降のレッスンのみ取得（過去日をDBレベルで除外）
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
     const allData: Record<string, unknown>[] = [];
     const PAGE_SIZE = 1000;
     let from = 0;
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
       let query = supabase
         .from('lessons')
         .select('id, date, time, end_time, program_name, instructor, studio, is_full, available_slots, ticket_type, color_code, text_color, sid_hash, url')
+        .gte('date', today)
         .order('date', { ascending: true })
         .order('time', { ascending: true })
         .order('id', { ascending: true })
@@ -52,10 +54,10 @@ export async function GET(request: NextRequest) {
       from += PAGE_SIZE;
     }
 
-    // 現在時刻（UTC epoch）
+    // 現在時刻（UTC epoch） — 当日の時間帯フィルタ用（日付フィルタはDB側で実施済み）
     const nowMs = Date.now();
 
-    // snake_case → camelCase 変換 + isPast算出 → 過去除外
+    // snake_case → camelCase 変換 + 当日の過去時間帯を除外
     const lessons = allData
       .map((row) => {
         const time = row.time as string;
