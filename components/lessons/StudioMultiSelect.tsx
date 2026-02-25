@@ -17,26 +17,42 @@ interface StudioMultiSelectProps {
 export default function StudioMultiSelect({ selected, onChange }: StudioMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // ダイアログ内の一時選択状態（閉じたときだけ親に反映）
+  const [draft, setDraft] = useState<string[]>(selected);
+
+  const handleOpen = (isOpen: boolean) => {
+    if (isOpen) {
+      setDraft(selected);
+    } else {
+      // 閉じるときに変更があれば反映
+      const draftKey = [...draft].sort().join(',');
+      const selectedKey = [...selected].sort().join(',');
+      if (draftKey !== selectedKey) {
+        onChange(draft);
+      }
+    }
+    setOpen(isOpen);
+  };
 
   const toggleExpand = (key: string) => {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const toggleStudio = (studio: string) => {
-    if (selected.includes(studio)) {
-      onChange(selected.filter((s) => s !== studio));
+    if (draft.includes(studio)) {
+      setDraft(draft.filter((s) => s !== studio));
     } else {
-      onChange([...selected, studio]);
+      setDraft([...draft, studio]);
     }
   };
 
   const togglePrefecture = (studios: string[]) => {
-    const allSelected = studios.every((s) => selected.includes(s));
+    const allSelected = studios.every((s) => draft.includes(s));
     if (allSelected) {
-      onChange(selected.filter((s) => !studios.includes(s)));
+      setDraft(draft.filter((s) => !studios.includes(s)));
     } else {
-      const newSet = new Set([...selected, ...studios]);
-      onChange([...newSet]);
+      const newSet = new Set([...draft, ...studios]);
+      setDraft([...newSet]);
     }
   };
 
@@ -48,7 +64,7 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
 
   return (
     <>
-      <Button variant="outline" size="sm" className="h-9 gap-1.5 min-w-[130px] justify-between" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" className="h-9 gap-1.5 min-w-[130px] justify-between" onClick={() => handleOpen(true)}>
         <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         <span className="truncate">{label}</span>
         {selected.length > 1 && (
@@ -59,14 +75,14 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
         <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpen}>
         <DialogContent className="max-w-xs p-0 gap-0 max-h-[80vh] flex flex-col">
           <DialogTitle className="sr-only">店舗選択</DialogTitle>
           {/* ヘッダー */}
           <div className="border-b px-3 py-2 flex items-center justify-between shrink-0">
             <span className="text-sm font-semibold">店舗選択</span>
-            {selected.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1.5 text-xs" onClick={() => onChange([])}>
+            {draft.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1.5 text-xs" onClick={() => setDraft([])}>
                 <X className="h-3 w-3 mr-1" />選択解除
               </Button>
             )}
@@ -82,8 +98,8 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
                 {region.prefectures.map((pref) => {
                   const prefKey = `${region.area}_${pref.name}`;
                   const isExpanded = expanded[prefKey] ?? false;
-                  const allChecked = pref.studios.every((s) => selected.includes(s));
-                  const someChecked = pref.studios.some((s) => selected.includes(s));
+                  const allChecked = pref.studios.every((s) => draft.includes(s));
+                  const someChecked = pref.studios.some((s) => draft.includes(s));
 
                   return (
                     <div key={prefKey}>
@@ -113,7 +129,7 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
                               className="flex items-center px-6 py-1.5 active:bg-accent/50 cursor-pointer border-b border-border/30 text-sm"
                             >
                               <Checkbox
-                                checked={selected.includes(studio)}
+                                checked={draft.includes(studio)}
                                 onCheckedChange={() => toggleStudio(studio)}
                                 className="mr-2"
                               />
