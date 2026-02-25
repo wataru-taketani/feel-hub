@@ -50,7 +50,7 @@ export default function Header() {
                 </Link>
               </Button>
               <div className="w-px h-6 bg-border mx-1 sm:mx-1.5" />
-              <Button variant="ghost" size="sm" className="flex-col h-auto gap-0 px-2 py-1 sm:flex-row sm:h-8 sm:gap-1 sm:px-3 sm:py-0 text-muted-foreground" onClick={() => setShowLogoutDialog(true)}>
+              <Button variant="ghost" size="sm" className="flex-col h-auto gap-0 px-2 py-1 sm:flex-row sm:h-8 sm:gap-1 sm:px-3 sm:py-0" onClick={() => setShowLogoutDialog(true)}>
                 <LogOut className="h-4 w-4" />
                 <span className="text-[10px] sm:text-sm leading-tight">ログアウト</span>
               </Button>
