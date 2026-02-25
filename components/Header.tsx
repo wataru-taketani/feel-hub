@@ -27,7 +27,7 @@ export default function Header() {
           FEEL hub
         </Link>
 
-        <nav className="flex items-center gap-0.5 sm:gap-1">
+        <nav className="flex items-center gap-0.5 sm:gap-1 -mr-2">
           <Button variant="ghost" size="sm" className="flex-col h-auto gap-0 px-2 py-1 sm:flex-row sm:h-8 sm:gap-1 sm:px-3 sm:py-0" asChild>
             <Link href="/lessons" onClick={(e) => handleNavClick(e, '/lessons')}>
               <CalendarDays className="h-4 w-4" />
