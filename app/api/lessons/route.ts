@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     while (true) {
       let query = supabase
         .from('lessons')
-        .select('*')
+        .select('id, date, time, end_time, program_name, instructor, studio, is_full, available_slots, ticket_type, color_code, text_color, sid_hash, url')
         .order('date', { ascending: true })
         .order('time', { ascending: true })
         .order('id', { ascending: true })

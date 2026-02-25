@@ -101,7 +101,7 @@ export default function FilterBar({
   const chipElements = (
     <>
       {filters.studios.map((s) => (
-        <Badge key={`s-${s}`} variant="outline" className="gap-1 pr-1 text-xs h-6">
+        <Badge key={`s-${s}`} variant="outline" className="gap-1 pr-1 text-xs h-6 shrink-0">
           <MapPin className="h-3 w-3 text-muted-foreground" />
           {s}
           <button
@@ -116,7 +116,7 @@ export default function FilterBar({
         <span className="text-muted-foreground/40 text-xs">|</span>
       )}
       {filters.programs.map((p) => (
-        <Badge key={`p-${p}`} variant="outline" className="gap-1 pr-1 text-xs h-6 border-purple-200 text-purple-700">
+        <Badge key={`p-${p}`} variant="outline" className="gap-1 pr-1 text-xs h-6 shrink-0 border-purple-200 text-purple-700">
           <Music className="h-3 w-3" />
           {p}
           <button
@@ -131,7 +131,7 @@ export default function FilterBar({
         <span className="text-muted-foreground/40 text-xs">|</span>
       )}
       {filters.instructors.map((ir) => (
-        <Badge key={`ir-${ir}`} variant="outline" className="gap-1 pr-1 text-xs h-6 border-blue-200 text-blue-700">
+        <Badge key={`ir-${ir}`} variant="outline" className="gap-1 pr-1 text-xs h-6 shrink-0 border-blue-200 text-blue-700">
           <User className="h-3 w-3" />
           {ir}
           <button
@@ -183,6 +183,7 @@ export default function FilterBar({
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 px-2 text-muted-foreground" onClick={reset}>
                 <RotateCcw className="h-3.5 w-3.5" />
+                リセット
               </Button>
             )}
           </div>
@@ -196,8 +197,8 @@ export default function FilterBar({
 
       {/* ── フィルタ操作行（hideToolbar時）: チップ + 絞り込みトグル ── */}
       {hideToolbar && (
-        <div className="flex items-start gap-2">
-          <div className="flex-1 flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto">
             {chipElements}
           </div>
           {hasActiveFilters && (
@@ -208,6 +209,7 @@ export default function FilterBar({
               onClick={reset}
             >
               <RotateCcw className="h-3.5 w-3.5" />
+              リセット
             </Button>
           )}
           <Button

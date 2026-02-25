@@ -75,8 +75,8 @@ export default function ProgramAnalyticsModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle>
             {programName && colorCode ? (
               <span
@@ -95,88 +95,92 @@ export default function ProgramAnalyticsModal({
         </DialogHeader>
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="space-y-3 px-6 pb-6">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-24 w-full" />
           </div>
         ) : stats ? (
-          <div className="space-y-4">
-            {/* 受講回数 */}
-            <div className="text-center py-2">
-              <p className="text-3xl font-bold">{stats.totalLessons}</p>
-              <p className="text-sm text-muted-foreground">回受講</p>
-            </div>
-
-            {/* インストラクターランキング */}
-            {stats.instructorRanking.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium mb-1.5">インストラクター</h3>
-                <div className="space-y-0.5">
-                  {stats.instructorRanking.slice(0, 5).map((item, i) => (
-                    <div key={item.name} className="flex items-center gap-2 text-sm py-0.5">
-                      <span className="w-5 text-right text-muted-foreground text-xs">#{i + 1}</span>
-                      <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-muted-foreground text-xs">{item.count}回</span>
-                    </div>
-                  ))}
-                </div>
+          <>
+            <div className="flex-1 overflow-y-auto px-6 space-y-4">
+              {/* 受講回数 */}
+              <div className="text-center py-2">
+                <p className="text-3xl font-bold">{stats.totalLessons}</p>
+                <p className="text-sm text-muted-foreground">回受講</p>
               </div>
-            )}
 
-            {/* スタジオランキング */}
-            {stats.studioRanking.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium mb-1.5">スタジオ</h3>
-                <div className="space-y-0.5">
-                  {stats.studioRanking.slice(0, 5).map((item, i) => (
-                    <div key={item.name} className="flex items-center gap-2 text-sm py-0.5">
-                      <span className="w-5 text-right text-muted-foreground text-xs">#{i + 1}</span>
-                      <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-muted-foreground text-xs">{item.count}回</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 受講履歴 */}
-            {records.length > 0 && (() => {
-              const INITIAL_SHOW = 3;
-              const display = historyExpanded ? records : records.slice(0, INITIAL_SHOW);
-              return (
+              {/* インストラクターランキング */}
+              {stats.instructorRanking.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-1.5">受講履歴</h3>
+                  <h3 className="text-sm font-medium mb-1.5">インストラクター</h3>
                   <div className="space-y-0.5">
-                    {display.map((r, i) => (
-                      <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-2">
-                        <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
-                        <span className="truncate flex-1">{r.instructorName}</span>
-                        <span className="text-muted-foreground text-xs whitespace-nowrap">{r.storeName}</span>
+                    {stats.instructorRanking.slice(0, 5).map((item, i) => (
+                      <div key={item.name} className="flex items-center gap-2 text-sm py-0.5">
+                        <span className="w-5 text-right text-muted-foreground text-xs">#{i + 1}</span>
+                        <span className="flex-1 truncate">{item.name}</span>
+                        <span className="text-muted-foreground text-xs">{item.count}回</span>
                       </div>
                     ))}
                   </div>
-                  {records.length > INITIAL_SHOW && (
-                    <button
-                      className="text-xs text-muted-foreground active:text-foreground mt-1 flex items-center gap-0.5"
-                      onClick={() => setHistoryExpanded(!historyExpanded)}
-                    >
-                      {historyExpanded ? '閉じる' : `もっと見る（全${records.length}件）`}
-                      <ChevronDown className={`h-3 w-3 transition-transform ${historyExpanded ? 'rotate-180' : ''}`} />
-                    </button>
-                  )}
                 </div>
-              );
-            })()}
+              )}
 
-            {/* レッスン検索ボタン */}
-            <Button className="w-full" onClick={handleSearchLessons}>
-              <Search className="h-4 w-4 mr-2" />
-              このレッスンを探す
-            </Button>
-          </div>
+              {/* スタジオランキング */}
+              {stats.studioRanking.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-1.5">スタジオ</h3>
+                  <div className="space-y-0.5">
+                    {stats.studioRanking.slice(0, 5).map((item, i) => (
+                      <div key={item.name} className="flex items-center gap-2 text-sm py-0.5">
+                        <span className="w-5 text-right text-muted-foreground text-xs">#{i + 1}</span>
+                        <span className="flex-1 truncate">{item.name}</span>
+                        <span className="text-muted-foreground text-xs">{item.count}回</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 受講履歴 */}
+              {records.length > 0 && (() => {
+                const INITIAL_SHOW = 3;
+                const display = historyExpanded ? records : records.slice(0, INITIAL_SHOW);
+                return (
+                  <div>
+                    <h3 className="text-sm font-medium mb-1.5">受講履歴</h3>
+                    <div className="space-y-0.5">
+                      {display.map((r, i) => (
+                        <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-2">
+                          <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
+                          <span className="truncate flex-1">{r.instructorName}</span>
+                          <span className="text-muted-foreground text-xs whitespace-nowrap">{r.storeName}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {records.length > INITIAL_SHOW && (
+                      <button
+                        className="text-xs text-muted-foreground active:text-foreground mt-1 flex items-center gap-0.5"
+                        onClick={() => setHistoryExpanded(!historyExpanded)}
+                      >
+                        {historyExpanded ? '閉じる' : `もっと見る（全${records.length}件）`}
+                        <ChevronDown className={`h-3 w-3 transition-transform ${historyExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* レッスン検索ボタン（常に表示されるフッター） */}
+            <div className="border-t px-6 py-3 shrink-0">
+              <Button className="w-full" onClick={handleSearchLessons}>
+                <Search className="h-4 w-4 mr-2" />
+                このレッスンを探す
+              </Button>
+            </div>
+          </>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">データの取得に失敗しました</p>
+          <p className="text-sm text-muted-foreground text-center px-6 pb-6 py-4">データの取得に失敗しました</p>
         )}
       </DialogContent>
     </Dialog>

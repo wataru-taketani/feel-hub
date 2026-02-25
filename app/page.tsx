@@ -245,27 +245,6 @@ function Dashboard() {
   const [removeTarget, setRemoveTarget] = useState<WaitlistItem | null>(null);
 
   useEffect(() => {
-    // LINE userId 取得
-    fetch('/api/profile')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.profile?.lineUserId) setHasLineUserId(true);
-      })
-      .catch(() => {});
-    // グループ一覧取得
-    fetch('/api/groups')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.groups) {
-          setGroups(data.groups.map((g: { id: string; name: string; memberCount: number }) => ({
-            id: g.id, name: g.name, memberCount: g.memberCount,
-          })));
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     async function fetchDashboard(retried = false): Promise<DashboardData> {
       const res = await fetch('/api/dashboard');
       const body = await res.json();
@@ -281,17 +260,25 @@ function Dashboard() {
       return body;
     }
 
-    fetchDashboard()
-      .then(setData)
-      .catch((e) => {
-        if (e.message === 'FC_NOT_LINKED') {
-          window.location.href = '/mypage';
-          return;
-        } else {
-          setError(e.message);
-        }
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch('/api/profile').then(r => r.ok ? r.json() : null),
+      fetch('/api/groups').then(r => r.ok ? r.json() : null),
+      fetchDashboard(),
+    ]).then(([profileData, groupsData, dashboardData]) => {
+      if (profileData?.profile?.lineUserId) setHasLineUserId(true);
+      if (groupsData?.groups) {
+        setGroups(groupsData.groups.map((g: { id: string; name: string; memberCount: number }) => ({
+          id: g.id, name: g.name, memberCount: g.memberCount,
+        })));
+      }
+      setData(dashboardData);
+    }).catch((e) => {
+      if (e.message === 'FC_NOT_LINKED') {
+        window.location.href = '/mypage';
+      } else {
+        setError(e.message);
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
   const handleReserve = useCallback(async (sidHash: string, sheetNo: string): Promise<ReserveApiResult> => {

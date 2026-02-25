@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import type { Lesson } from '@/types';
 import LessonCard from './LessonCard';
 
@@ -17,7 +17,7 @@ interface CalendarDateColumnProps {
   sortReservedFirst?: boolean;
 }
 
-export default function CalendarDateColumn({ date, lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, sortReservedFirst }: CalendarDateColumnProps) {
+export default memo(function CalendarDateColumn({ date, lessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, sortReservedFirst }: CalendarDateColumnProps) {
   // 予約済みレッスンを先頭に（sortReservedFirst有効時のみ）
   const sortedLessons = useMemo(() => {
     if (!isReserved || !sortReservedFirst) return lessons;
@@ -48,4 +48,4 @@ export default function CalendarDateColumn({ date, lessons, isBookmarked, onTogg
       )}
     </div>
   );
-}
+})

@@ -94,7 +94,7 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
           </div>
 
           {/* エリア別リスト */}
-          <div className="overflow-y-auto">
+          <div className="overflow-y-auto flex-1">
             {STUDIO_REGIONS.map((region) => (
               <div key={region.area}>
                 <div className="px-3 py-1.5 bg-muted/50 text-[11px] font-semibold text-muted-foreground tracking-wide">
@@ -148,6 +148,13 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
                 })}
               </div>
             ))}
+          </div>
+
+          {/* 決定ボタン */}
+          <div className="border-t px-3 py-2 shrink-0">
+            <Button className="w-full" onClick={() => handleOpen(false)}>
+              {draft.length > 0 ? `${draft.length}店舗で決定` : '決定'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

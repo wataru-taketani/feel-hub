@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import type { Lesson } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ interface LessonCardProps {
   onTapLesson?: (lesson: Lesson) => void;
 }
 
-export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isReserved, sheetNo, isOnWaitlist, onTapLesson }: LessonCardProps) {
+export default memo(function LessonCard({ lesson, isBookmarked, onToggleBookmark, isReserved, sheetNo, isOnWaitlist, onTapLesson }: LessonCardProps) {
   const { startTime, endTime, programName, instructor, studio, isFull, isPast, availableSlots, ticketType, colorCode, textColor } = lesson;
 
   const grayed = isFull && !isPast && !isReserved;
@@ -95,4 +96,4 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       </div>
     </div>
   );
-}
+})

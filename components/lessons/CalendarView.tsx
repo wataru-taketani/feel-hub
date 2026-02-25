@@ -92,17 +92,47 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
     return count;
   }, [pinnedMap]);
 
-  // snap-mandatory を一時無効化してスクロール
-  const scrollWithoutSnap = useCallback((container: HTMLElement, left: number) => {
+  // snap-mandatory を一時無効化して手動アニメーションでスクロール
+  // scrollTo({ behavior: 'smooth' }) はiOS Safariでsnap無効化が間に合わず効かないため
+  // requestAnimationFrameで直接scrollLeftを操作する
+  const animatingRef = useRef(false);
+  const scrollWithoutSnap = useCallback((container: HTMLElement, targetLeft: number) => {
+    if (animatingRef.current) return;
+    const start = container.scrollLeft;
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    const clampedTarget = Math.max(0, Math.min(targetLeft, maxScroll));
+    const diff = clampedTarget - start;
+    if (Math.abs(diff) < 1) return;
+
+    animatingRef.current = true;
+    // 1. snap無効化
     container.style.scrollSnapType = 'none';
-    container.scrollTo({ left, behavior: 'smooth' });
-    const onEnd = () => {
-      container.style.scrollSnapType = '';
-      container.removeEventListener('scrollend', onEnd);
+    // 2. レイアウト強制再計算（スタイル変更を確実に反映）
+    void container.offsetHeight;
+
+    // 3. 手動アニメーション（300ms, easeInOutCubic）
+    const duration = 300;
+    const startTime = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      const newLeft = start + diff * ease;
+      container.scrollLeft = newLeft;
+      // ヘッダー・ピン行も同期
+      if (headerRef.current) headerRef.current.scrollLeft = newLeft;
+      if (reservedRef.current) reservedRef.current.scrollLeft = newLeft;
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // 4. snap復元
+        container.style.scrollSnapType = '';
+        animatingRef.current = false;
+      }
     };
-    container.addEventListener('scrollend', onEnd);
-    // fallback: scrollend未対応ブラウザ用
-    setTimeout(() => { container.style.scrollSnapType = ''; }, 500);
+    requestAnimationFrame(animate);
   }, []);
 
   // 今日の列にスクロール

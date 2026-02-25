@@ -124,28 +124,39 @@ export async function GET() {
 
   // 予約データにlessonId, sidHashを付与（lessonsテーブルと突合）
   // FC APIの reservation_store は "上大岡（KOK）"、DBのstudioは "上大岡" なのでカッコ除去で正規化
-  const enrichedReservations = await Promise.all(
-    mypageData.reservations.map(async (r) => {
-      const studioNormalized = r.studio.replace(/（.*）/, '');
+  // Batch: collect all unique (date, time, program, studio) combos
+  const reservationKeys = mypageData.reservations.map(r => ({
+    date: r.date,
+    time: r.startTime + ':00',
+    programName: r.programName,
+    studio: r.studio.replace(/（.*）/, ''),
+  }));
 
-      const { data: lessonRows } = await supabaseAdmin
-        .from('lessons')
-        .select('id, sid_hash')
-        .eq('date', r.date)
-        .eq('time', r.startTime + ':00')
-        .eq('program_name', r.programName)
-        .eq('studio', studioNormalized)
-        .limit(1);
+  // Single query with OR conditions
+  const { data: allLessonRows } = await supabaseAdmin
+    .from('lessons')
+    .select('id, sid_hash, date, time, program_name, studio')
+    .in('date', [...new Set(reservationKeys.map(k => k.date))])
+    .in('time', [...new Set(reservationKeys.map(k => k.time))]);
 
-      const lessonRow = lessonRows?.[0] ?? null;
+  // Build lookup map
+  const lessonMap = new Map<string, { id: string; sidHash: string | null }>();
+  for (const row of (allLessonRows || [])) {
+    const key = `${row.date}_${row.time}_${row.program_name}_${row.studio}`;
+    lessonMap.set(key, { id: row.id, sidHash: row.sid_hash });
+  }
 
-      return {
-        ...r,
-        lessonId: lessonRow?.id ?? null,
-        sidHash: lessonRow?.sid_hash ?? null,
-      };
-    })
-  );
+  // Enrich without N+1
+  const enrichedReservations = mypageData.reservations.map(r => {
+    const studioNormalized = r.studio.replace(/（.*）/, '');
+    const key = `${r.date}_${r.startTime}:00_${r.programName}_${studioNormalized}`;
+    const lesson = lessonMap.get(key);
+    return {
+      ...r,
+      lessonId: lesson?.id ?? null,
+      sidHash: lesson?.sidHash ?? null,
+    };
+  });
 
   // レンタルサブスク情報
   let rentalSubscriptions: { name: string; availableCount: number; availableCountFlg: boolean }[] = [];

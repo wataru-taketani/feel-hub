@@ -42,9 +42,10 @@ export default function InstructorMultiSelect({ instructors, selected, onChange,
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-xs p-0 gap-0">
+        <DialogContent className="max-w-xs p-0 gap-0 max-h-[80vh] flex flex-col">
           <DialogTitle className="sr-only">{label}</DialogTitle>
           <Command
+            className="flex flex-col flex-1 min-h-0"
             filter={(value, search) =>
               value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
             }
@@ -60,7 +61,7 @@ export default function InstructorMultiSelect({ instructors, selected, onChange,
               </div>
             )}
 
-            <CommandList className="max-h-[50vh]">
+            <CommandList className="flex-1 overflow-y-auto">
               <CommandEmpty>該当なし</CommandEmpty>
               <CommandGroup>
                 {instructors.map((ir) => (
@@ -72,6 +73,13 @@ export default function InstructorMultiSelect({ instructors, selected, onChange,
               </CommandGroup>
             </CommandList>
           </Command>
+
+          {/* 決定ボタン */}
+          <div className="border-t px-3 py-2 shrink-0">
+            <Button className="w-full" onClick={() => setOpen(false)}>
+              {selected.length > 0 ? `${selected.length}${labelUnit}で決定` : '決定'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
