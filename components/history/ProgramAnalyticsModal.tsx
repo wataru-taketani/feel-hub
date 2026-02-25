@@ -102,17 +102,16 @@ export default function ProgramAnalyticsModal({
           </div>
         ) : stats ? (
           <>
-            <div className="flex-1 overflow-y-auto px-6 space-y-4">
+            <div className="flex-1 overflow-y-auto px-6 space-y-3">
               {/* 受講回数 */}
-              <div className="text-center py-2">
-                <p className="text-3xl font-bold">{stats.totalLessons}</p>
-                <p className="text-sm text-muted-foreground">回受講</p>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-bold text-foreground">{stats.totalLessons}</span>回受講
+              </p>
 
               {/* インストラクターランキング */}
               {stats.instructorRanking.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-1.5">インストラクター</h3>
+                  <h3 className="text-sm font-medium mb-1">インストラクター</h3>
                   <div className="space-y-0.5">
                     {stats.instructorRanking.slice(0, 5).map((item, i) => (
                       <div key={item.name} className="flex items-center gap-2 text-sm py-0.5">
@@ -128,7 +127,7 @@ export default function ProgramAnalyticsModal({
               {/* スタジオランキング */}
               {stats.studioRanking.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium mb-1.5">スタジオ</h3>
+                  <h3 className="text-sm font-medium mb-1">スタジオ</h3>
                   <div className="space-y-0.5">
                     {stats.studioRanking.slice(0, 5).map((item, i) => (
                       <div key={item.name} className="flex items-center gap-2 text-sm py-0.5">
@@ -147,7 +146,7 @@ export default function ProgramAnalyticsModal({
                 const display = historyExpanded ? records : records.slice(0, INITIAL_SHOW);
                 return (
                   <div>
-                    <h3 className="text-sm font-medium mb-1.5">受講履歴</h3>
+                    <h3 className="text-sm font-medium mb-1">受講履歴</h3>
                     <div className="space-y-0.5">
                       {display.map((r, i) => (
                         <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-2">
