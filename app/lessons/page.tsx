@@ -270,6 +270,13 @@ function LessonsPageInner() {
     }
   }, [fetchLessons]);
 
+  // 全日付を全レッスンから抽出（フィルタ後もカレンダー列を維持）
+  const allDates = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of allLessons) set.add(l.date);
+    return [...set].sort();
+  }, [allLessons]);
+
   // 全プログラム名を全レッスンから抽出
   const allPrograms = useMemo(() => {
     const set = new Set<string>();
@@ -416,6 +423,7 @@ function LessonsPageInner() {
         {!loading && !error && (
           <CalendarView
             lessons={filteredLessons}
+            allDates={allDates}
             reservedLessons={reservedLessons}
             bookmarkedLessons={bookmarkedLessons}
             isBookmarked={isBookmarked}

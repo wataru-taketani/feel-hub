@@ -11,6 +11,7 @@ import LessonCard from './LessonCard';
 
 interface CalendarViewProps {
   lessons: Lesson[];
+  allDates?: string[];
   reservedLessons?: Lesson[];
   bookmarkedLessons?: Lesson[];
   isBookmarked: (lesson: Lesson) => boolean;
@@ -30,7 +31,7 @@ interface CalendarViewProps {
 
 const COL_WIDTH = 'shrink-0 w-[calc(100%/3)] sm:w-[calc(100%/5)] lg:w-[calc(100%/7)] min-w-[150px]';
 
-export default function CalendarView({ lessons, reservedLessons, bookmarkedLessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, bookmarkOnly, toolbarLeft, toolbarRight, middleContent }: CalendarViewProps) {
+export default function CalendarView({ lessons, allDates, reservedLessons, bookmarkedLessons, isBookmarked, onToggleBookmark, isReserved, getSheetNo, isOnWaitlist, onTapLesson, bookmarkOnly, toolbarLeft, toolbarRight, middleContent }: CalendarViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const reservedRef = useRef<HTMLDivElement>(null);
@@ -51,7 +52,10 @@ export default function CalendarView({ lessons, reservedLessons, bookmarkedLesso
     return map;
   }, [lessons]);
 
-  const dates = useMemo(() => [...dateMap.keys()].sort(), [dateMap]);
+  const dates = useMemo(() => {
+    if (allDates && allDates.length > 0) return allDates;
+    return [...dateMap.keys()].sort();
+  }, [dateMap, allDates]);
 
   // 固定行に表示するレッスン（予約済み + ブックマーク済み、時間順）
   const pinnedMap = useMemo(() => {
