@@ -26,8 +26,8 @@ export default function StudioSelectDialog({ open, onSelect }: StudioSelectDialo
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+    <Dialog open={open} onOpenChange={() => onSelect(null)}>
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />

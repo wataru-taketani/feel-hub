@@ -44,7 +44,7 @@ function bikeStyle(status: number, isInteractive: boolean, isSelected: boolean) 
     // 予約可能（空き）
     return cn(
       'bg-white border-2 border-gray-400 text-gray-700',
-      isInteractive && 'cursor-pointer hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100'
+      isInteractive && 'cursor-pointer active:border-blue-400 active:bg-blue-100'
     );
   }
   if (status === 3) {

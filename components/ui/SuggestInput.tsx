@@ -53,7 +53,7 @@ export default function SuggestInput({ value, onChange, suggestions, placeholder
           <button
             type="button"
             onClick={() => { onChange(''); setOpen(false); }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground active:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -66,7 +66,7 @@ export default function SuggestInput({ value, onChange, suggestions, placeholder
             <button
               key={item}
               type="button"
-              className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent active:bg-accent/70 truncate"
+              className="w-full text-left px-3 py-1.5 text-sm active:bg-accent active:bg-accent/70 truncate"
               onMouseDown={(e) => {
                 e.preventDefault();
                 onChange(item);

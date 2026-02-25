@@ -75,7 +75,7 @@ export default function ProgramAnalyticsModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
             {programName && colorCode ? (

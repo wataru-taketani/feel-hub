@@ -21,14 +21,14 @@ function LoginContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md border border-red-200">
+            <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/50">
               ログインに失敗しました（{error}）
             </div>
           )}
 
           <Button
             asChild
-            className="w-full bg-[#06C755] hover:bg-[#05b04c] text-white text-base py-6"
+            className="w-full bg-[#06C755] active:bg-[#05b04c] text-white text-base py-6"
           >
             <a href="/api/auth/line">
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -39,7 +39,7 @@ function LoginContent() {
           </Button>
 
           <div className="text-center">
-            <Link href="/lessons" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link href="/lessons" className="text-sm text-muted-foreground active:text-foreground">
               ログインせずにレッスン一覧を見る
             </Link>
           </div>

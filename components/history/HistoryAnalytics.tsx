@@ -76,7 +76,7 @@ function RankingSection({
         {display.map((item, i) => (
           <div
             key={item.name}
-            className={`flex items-center gap-2 text-sm py-1 rounded -mx-1 px-1 ${onTapItem ? 'cursor-pointer active:bg-accent/50 hover:bg-accent/30' : ''}`}
+            className={`flex items-center gap-2 text-sm py-1 rounded -mx-1 px-1 ${onTapItem ? 'cursor-pointer active:bg-accent/50 active:bg-accent/30' : ''}`}
             onClick={() => onTapItem?.(item.name)}
           >
             <span className="w-6 text-right text-muted-foreground text-xs">#{i + 1}</span>
@@ -100,7 +100,7 @@ function RankingSection({
       </div>
       {items.length > INITIAL_SHOW && (
         <button
-          className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-0.5"
+          className="text-xs text-muted-foreground active:text-foreground mt-1 flex items-center gap-0.5"
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? '閉じる' : `もっと見る（全${items.length}件）`}
@@ -116,7 +116,7 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
   return (
     <Badge variant="secondary" className="gap-1 pr-1 text-xs">
       {label}
-      <button onClick={onClear} className="hover:bg-accent rounded-full p-0.5">
+      <button onClick={onClear} className="active:bg-accent rounded-full p-0.5">
         <X className="h-3 w-3" />
       </button>
     </Badge>
@@ -533,7 +533,7 @@ export default function HistoryAnalytics() {
                     </div>
                     {filteredRecords.length > INITIAL_SHOW && (
                       <button
-                        className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-0.5"
+                        className="text-xs text-muted-foreground active:text-foreground mt-1 flex items-center gap-0.5"
                         onClick={() => setFilteredExpanded(!filteredExpanded)}
                       >
                         {filteredExpanded ? '閉じる' : `もっと見る（全${filteredRecords.length}件）`}

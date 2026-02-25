@@ -176,15 +176,17 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
       <div className="flex items-center gap-1">
         {toolbarLeft}
         <div className="flex-1" />
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(-1)}>
-          <ChevronLeft className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={() => scrollBy(-1)}>
+          <ChevronLeft className="h-3.5 w-3.5 mr-0.5" />
+          前へ
         </Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs px-2 sm:px-3" onClick={scrollToToday}>
-          <CalendarDays className="h-3.5 w-3.5 sm:mr-1" />
-          <span className="hidden sm:inline">今日</span>
+        <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={scrollToToday}>
+          <CalendarDays className="h-3.5 w-3.5 mr-1" />
+          今日
         </Button>
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(1)}>
-          <ChevronRight className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={() => scrollBy(1)}>
+          次へ
+          <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
         </Button>
         {toolbarRight}
       </div>

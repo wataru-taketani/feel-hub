@@ -26,8 +26,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
     <div
       className={cn(
         'group relative h-[88px] px-2.5 py-1.5 border-b border-border last:border-b-0 transition-colors',
-        isPast && 'opacity-35',
-        grayed ? 'bg-muted' : isReserved ? 'ring-2 ring-inset ring-red-500 bg-[#f6dcdc]' : 'active:bg-accent/30',
+        isPast ? 'bg-muted/60' : grayed ? 'bg-muted' : isReserved ? 'ring-2 ring-inset ring-red-500 bg-[#f6dcdc]' : 'active:bg-accent/30',
         onTapLesson && 'cursor-pointer'
       )}
       onClick={() => onTapLesson?.(lesson)}
@@ -36,7 +35,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       <Button
         variant="ghost"
         size="icon"
-        className={cn('absolute -top-0.5 -right-0.5 h-8 w-8 transition-opacity z-10', isReserved || isBookmarked ? 'opacity-80' : 'opacity-50')}
+        className={cn('absolute -top-0.5 -right-0.5 h-8 w-8 transition-all z-10 active:scale-125', isReserved || isBookmarked ? 'opacity-80' : 'opacity-50')}
         onClick={(e) => {
           e.stopPropagation();
           onToggleBookmark(lesson);
@@ -52,7 +51,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       )}
 
       {/* 時間 */}
-      <div className={cn('text-[11px] font-medium tracking-wide tabular-nums', grayed ? 'text-muted-foreground/70' : 'text-muted-foreground')}>
+      <div className={cn('text-[11px] font-medium tracking-wide tabular-nums', 'text-muted-foreground')}>
         {startTime}–{endTime}
       </div>
 
@@ -69,7 +68,7 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
       </div>
 
       {/* IR名 + バイク番号 */}
-      <div className={cn('text-[11px] font-medium mt-0.5 flex items-center justify-between', grayed ? 'text-muted-foreground/60' : 'text-foreground/80')}>
+      <div className={cn('text-[11px] font-medium mt-0.5 flex items-center justify-between', grayed ? 'text-muted-foreground' : 'text-foreground/80')}>
         <span className="truncate">{instructor}</span>
         {isReserved && sheetNo && (
           <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 ml-1">
@@ -80,16 +79,16 @@ export default function LessonCard({ lesson, isBookmarked, onToggleBookmark, isR
 
       {/* スタジオ + 残席 + チケット種類 */}
       <div className="flex items-center justify-between mt-0.5">
-        <span className={cn('text-[10px] font-semibold truncate', grayed ? 'text-muted-foreground/50' : 'text-foreground/60')}>
+        <span className={cn('text-[10px] font-semibold truncate', grayed ? 'text-muted-foreground' : 'text-foreground/60')}>
           {formatStudio(studio)}
           {ticketType && (
-            <Badge variant="outline" className={cn('text-[10px] px-1 py-0 h-4 ml-1 inline-flex align-middle bg-white/80', grayed && 'opacity-50')}>
+            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 ml-1 inline-flex align-middle bg-white/80">
               {ticketType === 'PLATINUM' ? 'PT' : ticketType === 'GOLD' ? 'GD' : ticketType === 'SILVER' ? 'SV' : 'WH'}
             </Badge>
           )}
         </span>
         {isFull ? (
-          <span className="text-[10px] font-semibold text-muted-foreground/60 shrink-0">✕</span>
+          <span className="text-[10px] font-semibold text-muted-foreground shrink-0">✕</span>
         ) : (
           <span className="text-[10px] font-bold text-green-700 tabular-nums shrink-0">{availableSlots}</span>
         )}

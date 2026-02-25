@@ -144,10 +144,10 @@ function WaitlistCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 text-muted-foreground"
+            className="h-8 w-8 p-0 text-muted-foreground"
             onClick={() => onTapRemove(entry)}
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-4 w-4" />
           </Button>
         </span>
       </div>
@@ -389,7 +389,7 @@ function Dashboard() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-bold">
+      <h1 className="text-2xl font-bold">
         {data.memberSummary.displayName || 'ダッシュボード'}
       </h1>
 
@@ -403,7 +403,12 @@ function Dashboard() {
         </CardHeader>
         <CardContent>
           {upcoming.length === 0 ? (
-            <p className="text-sm text-muted-foreground">予約はありません</p>
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p>予約はありません</p>
+              <Button variant="link" className="p-0 h-auto text-sm" asChild>
+                <Link href="/lessons">レッスンを探す</Link>
+              </Button>
+            </div>
           ) : (
             <div className="space-y-3">
               {upcoming.map((r, i) => (

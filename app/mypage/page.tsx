@@ -293,7 +293,7 @@ function MypageContent() {
             </p>
             <form onSubmit={handleFcLink} className="space-y-4">
               {fcLinkError && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md border border-red-200">
+                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/50">
                   {fcLinkError}
                 </div>
               )}
@@ -643,7 +643,7 @@ function MypageContent() {
               </DialogHeader>
               <div className="space-y-3">
                 {createError && (
-                  <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md border border-red-200">
+                  <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-lg border border-destructive/50">
                     {createError}
                   </div>
                 )}

@@ -370,12 +370,12 @@ function LessonsPageInner() {
       size="sm"
       className={cn(
         "h-8 text-xs gap-1.5 px-2 sm:px-3",
-        filters.bookmarkOnly && "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
+        filters.bookmarkOnly && "bg-yellow-500 active:bg-yellow-600 text-white border-yellow-500"
       )}
       onClick={() => setFilters((f) => ({ ...f, bookmarkOnly: !f.bookmarkOnly }))}
     >
       <Star className={cn("h-3.5 w-3.5", filters.bookmarkOnly && "fill-white")} />
-      <span className="hidden sm:inline">ブックマーク</span>
+      ブックマーク
     </Button>
   );
 

@@ -27,31 +27,31 @@ export default function Header() {
           FEEL hub
         </Link>
 
-        <nav className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" asChild>
+        <nav className="flex items-center gap-0.5 sm:gap-1">
+          <Button variant="ghost" size="sm" className="flex-col h-auto gap-0 px-2 py-1 sm:flex-row sm:h-8 sm:gap-1 sm:px-3 sm:py-0" asChild>
             <Link href="/lessons" onClick={(e) => handleNavClick(e, '/lessons')}>
-              <CalendarDays className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">レッスン</span>
+              <CalendarDays className="h-4 w-4" />
+              <span className="text-[10px] sm:text-sm leading-tight">レッスン</span>
             </Link>
           </Button>
 
           {loading ? null : user ? (
             <>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" className="flex-col h-auto gap-0 px-2 py-1 sm:flex-row sm:h-8 sm:gap-1 sm:px-3 sm:py-0" asChild>
                 <Link href="/mypage" onClick={(e) => handleNavClick(e, '/mypage')}>
-                  <User className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">マイページ</span>
+                  <User className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-sm leading-tight">マイページ</span>
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" className="flex-col h-auto gap-0 px-2 py-1 sm:flex-row sm:h-8 sm:gap-1 sm:px-3 sm:py-0" asChild>
                 <Link href="/history" onClick={(e) => handleNavClick(e, '/history')}>
-                  <BookOpen className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">履歴</span>
+                  <BookOpen className="h-4 w-4" />
+                  <span className="text-[10px] sm:text-sm leading-tight">履歴</span>
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowLogoutDialog(true)}>
-                <LogOut className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">ログアウト</span>
+              <Button variant="ghost" size="sm" className="flex-col h-auto gap-0 px-2 py-1 sm:flex-row sm:h-8 sm:gap-1 sm:px-3 sm:py-0" onClick={() => setShowLogoutDialog(true)}>
+                <LogOut className="h-4 w-4" />
+                <span className="text-[10px] sm:text-sm leading-tight">ログアウト</span>
               </Button>
 
               {showLogoutDialog && (
