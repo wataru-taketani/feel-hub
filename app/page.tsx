@@ -13,6 +13,7 @@ import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
 import type { ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
 import type { Lesson } from '@/types';
+import { fetchWithRetry } from '@/lib/fetchWithRetry';
 import LessonDetailModal from '@/components/lessons/LessonDetailModal';
 import type { ReserveApiResult } from '@/components/lessons/LessonDetailModal';
 
@@ -246,7 +247,7 @@ function Dashboard() {
 
   useEffect(() => {
     async function fetchDashboard(retried = false): Promise<DashboardData> {
-      const res = await fetch('/api/dashboard');
+      const res = await fetch('/api/dashboard'); // FEELCYCLE API経由 — リトライ禁止
       const body = await res.json();
       if (!res.ok) {
         if (body.code === 'FC_SESSION_EXPIRED' && !retried) {
@@ -261,8 +262,8 @@ function Dashboard() {
     }
 
     Promise.all([
-      fetch('/api/profile').then(r => r.ok ? r.json() : null),
-      fetch('/api/groups').then(r => r.ok ? r.json() : null),
+      fetchWithRetry('/api/profile').then(r => r.ok ? r.json() : null),
+      fetchWithRetry('/api/groups').then(r => r.ok ? r.json() : null),
       fetchDashboard(),
     ]).then(([profileData, groupsData, dashboardData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);

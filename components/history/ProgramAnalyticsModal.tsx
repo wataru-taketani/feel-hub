@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, ChevronDown } from 'lucide-react';
+import { fetchWithRetry } from '@/lib/fetchWithRetry';
 
 type RankingItem = { name: string; count: number };
 
@@ -57,9 +58,9 @@ export default function ProgramAnalyticsModal({
 
     const encodedName = encodeURIComponent(programName);
     Promise.all([
-      fetch(`/api/history/stats?program=${encodedName}`).then(r => r.json()),
-      fetch(`/api/history?program=${encodedName}`).then(r => r.json()),
-      fetch(`/api/lessons/count?program=${encodedName}`).then(r => r.json()),
+      fetchWithRetry(`/api/history/stats?program=${encodedName}`).then(r => r.json()),
+      fetchWithRetry(`/api/history?program=${encodedName}`).then(r => r.json()),
+      fetchWithRetry(`/api/lessons/count?program=${encodedName}`).then(r => r.json()),
     ])
       .then(([statsData, historyData, countData]) => {
         setStats(statsData);

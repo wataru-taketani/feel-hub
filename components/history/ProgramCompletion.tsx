@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import ProgramAnalyticsModal from '@/components/history/ProgramAnalyticsModal';
+import { fetchWithRetry } from '@/lib/fetchWithRetry';
 
 type FilterMode = 'all' | 'taken' | 'untaken';
 
@@ -34,7 +35,7 @@ export default function ProgramCompletion() {
   const [filter, setFilter] = useState<FilterMode>('all');
 
   useEffect(() => {
-    fetch('/api/history/programs')
+    fetchWithRetry('/api/history/programs')
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));

@@ -9,10 +9,12 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, MapPin } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import HistoryAnalytics from '@/components/history/HistoryAnalytics';
 import ProgramCompletion from '@/components/history/ProgramCompletion';
 import InstructorMultiSelect from '@/components/lessons/InstructorMultiSelect';
 import type { AttendanceRecord } from '@/types';
+import { fetchWithRetry } from '@/lib/fetchWithRetry';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
 type PeriodMode = 'month' | '3m' | '6m' | '1y' | 'all' | 'custom';
@@ -31,6 +33,7 @@ export default function HistoryPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -60,7 +63,7 @@ export default function HistoryPage() {
         }
       }
       const qs = params.toString();
-      const res = await fetch(`/api/history${qs ? `?${qs}` : ''}`);
+      const res = await fetchWithRetry(`/api/history${qs ? `?${qs}` : ''}`);
       const data = await res.json();
       setRecords(data.records || []);
     } catch {
@@ -76,13 +79,14 @@ export default function HistoryPage() {
   }, [periodMode, selectedMonth, customFrom, customTo, fetchHistory]);
 
   useEffect(() => {
-    fetch('/api/programs')
+    fetchWithRetry('/api/programs')
       .then(res => res.json())
       .then(setProgramColors)
       .catch(() => {});
   }, []);
 
   const handleSync = async () => {
+    setShowSyncConfirm(false);
     setSyncing(true);
     setSyncMessage(null);
     try {
@@ -148,7 +152,7 @@ export default function HistoryPage() {
     <div className="max-w-2xl mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">受講履歴</h1>
-        <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+        <Button variant="outline" size="sm" onClick={() => setShowSyncConfirm(true)} disabled={syncing}>
           {syncing ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -156,6 +160,22 @@ export default function HistoryPage() {
           )}
           同期
         </Button>
+        <Dialog open={showSyncConfirm} onOpenChange={setShowSyncConfirm}>
+          <DialogContent className="max-w-xs">
+            <DialogHeader>
+              <DialogTitle>履歴を同期</DialogTitle>
+              <DialogDescription>FEELCYCLEから受講履歴を取得します。実行しますか？</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowSyncConfirm(false)}>
+                キャンセル
+              </Button>
+              <Button className="flex-1" onClick={handleSync}>
+                同期する
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {syncMessage && (

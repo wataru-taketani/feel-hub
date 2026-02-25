@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, Star } from "lucide-react";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import type { Lesson, FilterPreset } from "@/types";
 import { parseHomeStoreToStudio } from "@/lib/lessonUtils";
 import { cn } from "@/lib/utils";
@@ -106,7 +107,7 @@ function LessonsPageInner() {
         ? [...new Set([...studios, ...reservedStudiosRef.current, ...bookmarkedStudiosRef.current])]
         : [];
       const params = allStudios.length > 0 ? `?studios=${encodeURIComponent(allStudios.join(','))}` : '';
-      const response = await fetch(`/api/lessons${params}`);
+      const response = await fetchWithRetry(`/api/lessons${params}`);
       const data = await response.json();
       if (data.success) {
         setAllLessons(data.data);
@@ -128,9 +129,9 @@ function LessonsPageInner() {
       return;
     }
     Promise.all([
-      fetch('/api/profile').then(res => res.ok ? res.json() : null).catch(() => null),
-      fetch('/api/dashboard').then(res => res.ok ? res.json() : null).catch(() => null),
-      fetch('/api/groups').then(res => res.ok ? res.json() : null).catch(() => null),
+      fetchWithRetry('/api/profile').then(res => res.ok ? res.json() : null).catch(() => null),
+      fetch('/api/dashboard').then(res => res.ok ? res.json() : null).catch(() => null), // FEELCYCLE API経由 — リトライ禁止
+      fetchWithRetry('/api/groups').then(res => res.ok ? res.json() : null).catch(() => null),
     ]).then(([profileData, dashboardData, groupsData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);
       if (profileData?.profile?.homeStore) {
