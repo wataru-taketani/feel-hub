@@ -157,11 +157,11 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
   if (dates.length === 0) {
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {toolbarLeft}
           <div className="flex-1" />
-          {middleContent}
         </div>
+        {middleContent}
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-12 text-center">
           <CalendarDays className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">レッスンが見つかりません</p>
@@ -172,20 +172,10 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
 
   return (
     <div className="space-y-2">
-      {/* ツールバー（1行に統合） */}
-      <div className="flex items-center gap-1">
+      {/* フィルタ操作行 */}
+      <div className="flex items-center gap-1.5">
         {toolbarLeft}
         <div className="flex-1" />
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(-1)}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="sm" className="h-8 text-xs px-2 sm:px-3" onClick={scrollToToday}>
-          <CalendarDays className="h-3.5 w-3.5 sm:mr-1" />
-          <span className="hidden sm:inline">今日</span>
-        </Button>
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => scrollBy(1)}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
         {toolbarRight}
       </div>
 
@@ -194,8 +184,23 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
 
       {/* カレンダーグループ */}
       <div>
-        {/* 日付ヘッダー行（sticky） */}
+        {/* カレンダーナビ + 日付ヘッダー（sticky） */}
         <div className="sticky top-14 z-20 border border-b-0 rounded-t-lg overflow-hidden bg-card">
+          {/* ナビ行 */}
+          <div className="flex items-center justify-center gap-1 py-1 px-2 border-b border-border">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => scrollBy(-1)} aria-label="前の日へ">
+              <ChevronLeft className="h-3.5 w-3.5 mr-0.5" />
+              前へ
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={scrollToToday} aria-label="今日の日付へスクロール">
+              <CalendarDays className="h-3.5 w-3.5 mr-1" />
+              今日
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => scrollBy(1)} aria-label="次の日へ">
+              次へ
+              <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+            </Button>
+          </div>
           <div ref={headerRef} className="flex overflow-hidden">
             {dates.map((date) => {
               const dow = getDayOfWeek(date);
@@ -221,7 +226,7 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
 
         {/* 固定行（sticky：予約済み + ブックマークON時はブックマーク済みも） */}
         {hasPinnable && (
-          <div className="sticky top-[82px] z-[15] border-x border-border overflow-hidden bg-card">
+          <div className="sticky top-[114px] z-[15] border-x border-border overflow-hidden bg-card">
             {!pinnedCollapsed && (
               <div ref={reservedRef} className="flex overflow-x-auto calendar-scroll" onScroll={(e) => syncScroll(e.currentTarget)}>
                 {dates.map((date) => {
