@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -123,17 +123,10 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
   );
 }
 
-export default function HistoryAnalytics({
-  externalProgram,
-  onExternalProgramConsumed,
-}: {
-  externalProgram?: string | null;
-  onExternalProgramConsumed?: () => void;
-}) {
+export default function HistoryAnalytics() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodPreset>('all');
-  const externalConsumed = useRef(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -152,9 +145,7 @@ export default function HistoryAnalytics({
   }
 
   // フィルター（InstructorMultiSelect）
-  const [selectedPrograms, setSelectedPrograms] = useState<string[]>(
-    externalProgram ? [externalProgram] : []
-  );
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
   // タップで設定されたフィルター
   const [tappedStudio, setTappedStudio] = useState<string | null>(null);
@@ -177,14 +168,6 @@ export default function HistoryAnalytics({
       .then(setProgramColors)
       .catch(() => {});
   }, []);
-
-  // 実績タブからのプログラム指定（初回マウント時に消費）
-  useEffect(() => {
-    if (externalProgram && !externalConsumed.current) {
-      externalConsumed.current = true;
-      onExternalProgramConsumed?.();
-    }
-  }, [externalProgram, onExternalProgramConsumed]);
 
   // フィルタ条件付きレコード取得（プログラム・インストラクター・スタジオのいずれかが指定時）
   const hasActiveFilter = selectedPrograms.length > 0 || selectedInstructors.length > 0 || !!tappedStudio;

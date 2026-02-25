@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
   const program = searchParams.get('program'); // exact match or comma-separated
   const instructor = searchParams.get('instructor'); // exact match or comma-separated
   const store = searchParams.get('store');     // exact match
+  const limit = searchParams.get('limit');     // max records
 
   let query = supabaseAdmin
     .from('attendance_history')
@@ -50,6 +51,10 @@ export async function GET(request: NextRequest) {
     query = instructors.length === 1 ? query.eq('instructor_name', instructors[0]) : query.in('instructor_name', instructors);
   }
   if (store) query = query.eq('store_name', store);
+  if (limit) {
+    const n = parseInt(limit, 10);
+    if (n > 0) query = query.limit(n);
+  }
 
   const { data, error } = await query;
 

@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import ProgramAnalyticsModal from '@/components/history/ProgramAnalyticsModal';
 
 type FilterMode = 'all' | 'taken' | 'untaken';
 
@@ -25,11 +26,8 @@ interface ProgramsResponse {
   summary: { total: number; taken: number };
 }
 
-export default function ProgramCompletion({
-  onSelectProgram,
-}: {
-  onSelectProgram?: (name: string) => void;
-}) {
+export default function ProgramCompletion() {
+  const [selectedProgram, setSelectedProgram] = useState<ProgramItem | null>(null);
   const [data, setData] = useState<ProgramsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -177,7 +175,7 @@ export default function ProgramCompletion({
                               }
                             : undefined
                         }
-                        onClick={() => program.count > 0 && onSelectProgram?.(program.name)}
+                        onClick={() => program.count > 0 && setSelectedProgram(program)}
                       >
                         <span className={`text-sm font-medium truncate ${
                           program.count === 0 ? 'text-muted-foreground' : ''
@@ -198,6 +196,14 @@ export default function ProgramCompletion({
           })}
         </Accordion>
       )}
+
+      <ProgramAnalyticsModal
+        programName={selectedProgram?.name ?? null}
+        open={!!selectedProgram}
+        onClose={() => setSelectedProgram(null)}
+        colorCode={selectedProgram?.colorCode}
+        textColor={selectedProgram?.textColor}
+      />
     </div>
   );
 }

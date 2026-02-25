@@ -28,7 +28,6 @@ function getPeriodDates(mode: PeriodMode): { from: string; to: string } | null {
 
 export default function HistoryPage() {
   const [activeTab, setActiveTab] = useState('history');
-  const [analyticsProgram, setAnalyticsProgram] = useState<string | null>(null);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -341,17 +340,11 @@ export default function HistoryPage() {
         </TabsContent>
 
         <TabsContent value="analytics">
-          <HistoryAnalytics
-            externalProgram={analyticsProgram}
-            onExternalProgramConsumed={() => setAnalyticsProgram(null)}
-          />
+          <HistoryAnalytics />
         </TabsContent>
 
         <TabsContent value="completion">
-          <ProgramCompletion onSelectProgram={(name) => {
-            setAnalyticsProgram(name);
-            setActiveTab('analytics');
-          }} />
+          <ProgramCompletion />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2, Star } from "lucide-react";
 import type { Lesson, FilterPreset } from "@/types";
 import { parseHomeStoreToStudio } from "@/lib/lessonUtils";
@@ -27,10 +28,20 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 export default function LessonsPage() {
+  return (
+    <Suspense>
+      <LessonsPageInner />
+    </Suspense>
+  );
+}
+
+function LessonsPageInner() {
+  const searchParams = useSearchParams();
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const programParamAppliedRef = useRef(false);
 
   const { user } = useAuthContext();
   const { bookmarks, toggle, isBookmarked, loaded: bookmarksLoaded } = useBookmarks();
@@ -225,6 +236,16 @@ export default function LessonsPage() {
     // ④ ダイアログ表示
     setShowStudioDialog(true);
   }, [presetsLoaded, profileLoaded, preset, fetchLessons]);
+
+  // URLパラメータからプログラムフィルタ適用（スタジオ解決後に1回のみ）
+  useEffect(() => {
+    if (!studioResolvedRef.current || programParamAppliedRef.current) return;
+    const programParam = searchParams.get('program');
+    if (programParam) {
+      programParamAppliedRef.current = true;
+      setFilters(f => ({ ...f, programs: [programParam] }));
+    }
+  }, [searchParams]);
 
   // スタジオフィルタ変更検知 → API再取得
   useEffect(() => {
