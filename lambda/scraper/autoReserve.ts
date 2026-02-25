@@ -206,12 +206,12 @@ function formatLessonInfo(entry: AutoReserveEntry): string {
 }
 
 function formatSuccessMessage(entry: AutoReserveEntry, sheetNo: string): string {
-  return `【自動予約完了】\n${formatLessonInfo(entry)}\n座席: ${sheetNo}\n\nhttps://m.feelcycle.com/reserved/top`;
+  return `【自動予約完了】\n${formatLessonInfo(entry)}\n座席: ${sheetNo}\n\nhttps://m.feelcycle.com/mypage`;
 }
 
 function formatNeedsConfirmMessage(entry: AutoReserveEntry, reason?: string): string {
   const detail = reason || '追加確認が必要です。手動で予約してください。';
-  return `【要確認】空きが出ました\n${formatLessonInfo(entry)}\n\n${detail}\nhttps://m.feelcycle.com/reserve`;
+  return `【要確認】空きが出ました\n${formatLessonInfo(entry)}\n\n${detail}\nhttps://m.feelcycle.com/mypage`;
 }
 
 function formatErrorMessage(entry: AutoReserveEntry, detail: string): string {
