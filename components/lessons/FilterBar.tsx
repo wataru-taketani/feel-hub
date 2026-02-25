@@ -106,7 +106,7 @@ export default function FilterBar({
           {s}
           <button
             onClick={() => update({ studios: filters.studios.filter((x) => x !== s) })}
-            className="rounded-full active:bg-muted p-0.5"
+            className="rounded-full hover:bg-muted p-0.5"
           >
             <X className="h-3 w-3" />
           </button>
@@ -121,7 +121,7 @@ export default function FilterBar({
           {p}
           <button
             onClick={() => update({ programs: filters.programs.filter((x) => x !== p) })}
-            className="rounded-full active:bg-muted p-0.5"
+            className="rounded-full hover:bg-muted p-0.5"
           >
             <X className="h-3 w-3" />
           </button>
@@ -136,7 +136,7 @@ export default function FilterBar({
           {ir}
           <button
             onClick={() => update({ instructors: filters.instructors.filter((x) => x !== ir) })}
-            className="rounded-full active:bg-muted p-0.5"
+            className="rounded-full hover:bg-muted p-0.5"
           >
             <X className="h-3 w-3" />
           </button>
@@ -157,7 +157,7 @@ export default function FilterBar({
               size="sm"
               className={cn(
                 'h-8 text-xs gap-1.5 px-3',
-                filters.bookmarkOnly && 'bg-yellow-500 active:bg-yellow-600 text-white border-yellow-500'
+                filters.bookmarkOnly && 'bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500'
               )}
               onClick={() => update({ bookmarkOnly: !filters.bookmarkOnly })}
             >
@@ -213,13 +213,11 @@ export default function FilterBar({
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1.5 px-2 shrink-0"
+            className="h-8 text-xs gap-1.5 px-2 sm:px-3 shrink-0"
             onClick={() => setOpen(!open)}
-            aria-label="絞り込みパネルを開閉"
-            aria-expanded={open}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            絞り込み
+            <span className="hidden sm:inline">絞り込み</span>
             {activeCount > 0 && (
               <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
                 {activeCount}
