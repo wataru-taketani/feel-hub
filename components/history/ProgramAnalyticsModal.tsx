@@ -78,16 +78,21 @@ export default function ProgramAnalyticsModal({
       <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle>
-            {programName && colorCode ? (
-              <span
-                className="inline-block px-2 py-1 rounded text-base font-bold"
-                style={{ backgroundColor: colorCode, color: textColor || '#fff' }}
-              >
-                {programName}
-              </span>
-            ) : (
-              programName
-            )}
+            <span className="flex items-center gap-2 flex-wrap">
+              {programName && colorCode ? (
+                <span
+                  className="inline-block px-2 py-1 rounded text-base font-bold"
+                  style={{ backgroundColor: colorCode, color: textColor || '#fff' }}
+                >
+                  {programName}
+                </span>
+              ) : (
+                programName
+              )}
+              {!loading && stats && (
+                <span className="text-sm font-normal text-muted-foreground">{stats.totalLessons}回受講</span>
+              )}
+            </span>
           </DialogTitle>
           <DialogDescription className="sr-only">
             {programName}の受講分析
@@ -103,10 +108,6 @@ export default function ProgramAnalyticsModal({
         ) : stats ? (
           <>
             <div className="flex-1 overflow-y-auto px-6 space-y-3">
-              {/* 受講回数 */}
-              <p className="text-sm text-muted-foreground">
-                <span className="font-bold text-foreground">{stats.totalLessons}</span>回受講
-              </p>
 
               {/* インストラクターランキング */}
               {stats.instructorRanking.length > 0 && (
