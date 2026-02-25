@@ -41,7 +41,6 @@ function LessonsPageInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const programParamAppliedRef = useRef(false);
 
   const { user } = useAuthContext();
   const { bookmarks, toggle, isBookmarked, loaded: bookmarksLoaded } = useBookmarks();
@@ -190,13 +189,16 @@ function LessonsPageInner() {
     if (!presetsLoaded || !profileLoaded || studioResolvedRef.current) return;
     studioResolvedRef.current = true;
 
+    // URLパラメータのプログラム指定（プリセットより優先）
+    const programParam = searchParams.get('program');
+
     // ① 保存済みプリセット
     if (preset) {
       const studios = preset.filters.studios || [];
       setDefaultStudios(studios);
       // 旧形式 programSearch → 新形式 programs に変換
       const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
-      const programs = pf.programs || [];
+      const programs = programParam ? [programParam] : (pf.programs || []);
       setFilters({ ...pf, programs, bookmarkOnly: false });
       prevStudiosRef.current = studios;
       fetchLessons(studios);
@@ -207,7 +209,7 @@ function LessonsPageInner() {
     if (profileHomeStore.current) {
       const studios = [profileHomeStore.current];
       setDefaultStudios(studios);
-      setFilters(f => ({ ...f, studios }));
+      setFilters(f => ({ ...f, studios, ...(programParam ? { programs: [programParam] } : {}) }));
       prevStudiosRef.current = studios;
       fetchLessons(studios);
       return;
@@ -220,12 +222,13 @@ function LessonsPageInner() {
         const val = JSON.parse(saved) as string;
         if (val === '__all__') {
           setDefaultStudios([]);
+          if (programParam) setFilters(f => ({ ...f, programs: [programParam] }));
           prevStudiosRef.current = [];
           fetchLessons([]);
         } else {
           const studios = [val];
           setDefaultStudios(studios);
-          setFilters(f => ({ ...f, studios }));
+          setFilters(f => ({ ...f, studios, ...(programParam ? { programs: [programParam] } : {}) }));
           prevStudiosRef.current = studios;
           fetchLessons(studios);
         }
@@ -235,17 +238,7 @@ function LessonsPageInner() {
 
     // ④ ダイアログ表示
     setShowStudioDialog(true);
-  }, [presetsLoaded, profileLoaded, preset, fetchLessons]);
-
-  // URLパラメータからプログラムフィルタ適用（スタジオ解決後に1回のみ）
-  useEffect(() => {
-    if (!studioResolvedRef.current || programParamAppliedRef.current) return;
-    const programParam = searchParams.get('program');
-    if (programParam) {
-      programParamAppliedRef.current = true;
-      setFilters(f => ({ ...f, programs: [programParam] }));
-    }
-  }, [searchParams]);
+  }, [presetsLoaded, profileLoaded, preset, fetchLessons, searchParams]);
 
   // スタジオフィルタ変更検知 → API再取得
   useEffect(() => {

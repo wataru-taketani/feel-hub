@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
 
 type RankingItem = { name: string; count: number };
 
@@ -43,6 +43,7 @@ export default function ProgramAnalyticsModal({
   const [stats, setStats] = useState<StatsData | null>(null);
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   useEffect(() => {
     if (!open || !programName) return;
@@ -50,11 +51,12 @@ export default function ProgramAnalyticsModal({
     setLoading(true);
     setStats(null);
     setRecords([]);
+    setHistoryExpanded(false);
 
     const encodedName = encodeURIComponent(programName);
     Promise.all([
       fetch(`/api/history/stats?program=${encodedName}`).then(r => r.json()),
-      fetch(`/api/history?program=${encodedName}&limit=5`).then(r => r.json()),
+      fetch(`/api/history?program=${encodedName}`).then(r => r.json()),
     ])
       .then(([statsData, historyData]) => {
         setStats(statsData);
@@ -138,21 +140,34 @@ export default function ProgramAnalyticsModal({
               </div>
             )}
 
-            {/* 直近の受講履歴 */}
-            {records.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium mb-1.5">直近の受講</h3>
-                <div className="space-y-0.5">
-                  {records.map((r, i) => (
-                    <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-2">
-                      <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
-                      <span className="truncate flex-1">{r.instructorName}</span>
-                      <span className="text-muted-foreground text-xs whitespace-nowrap">{r.storeName}</span>
-                    </div>
-                  ))}
+            {/* 受講履歴 */}
+            {records.length > 0 && (() => {
+              const INITIAL_SHOW = 3;
+              const display = historyExpanded ? records : records.slice(0, INITIAL_SHOW);
+              return (
+                <div>
+                  <h3 className="text-sm font-medium mb-1.5">受講履歴</h3>
+                  <div className="space-y-0.5">
+                    {display.map((r, i) => (
+                      <div key={`${r.shiftDate}-${r.startTime}-${i}`} className="flex items-center text-sm py-0.5 gap-2">
+                        <span className="text-muted-foreground text-xs whitespace-nowrap">{r.shiftDate}</span>
+                        <span className="truncate flex-1">{r.instructorName}</span>
+                        <span className="text-muted-foreground text-xs whitespace-nowrap">{r.storeName}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {records.length > INITIAL_SHOW && (
+                    <button
+                      className="text-xs text-muted-foreground active:text-foreground mt-1 flex items-center gap-0.5"
+                      onClick={() => setHistoryExpanded(!historyExpanded)}
+                    >
+                      {historyExpanded ? '閉じる' : `もっと見る（全${records.length}件）`}
+                      <ChevronDown className={`h-3 w-3 transition-transform ${historyExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* レッスン検索ボタン */}
             <Button className="w-full" onClick={handleSearchLessons}>
