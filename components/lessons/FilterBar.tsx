@@ -200,6 +200,16 @@ export default function FilterBar({
           <div className="flex-1 flex flex-wrap items-center gap-1.5">
             {chipElements}
           </div>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs gap-1 px-2 text-muted-foreground shrink-0"
+              onClick={reset}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
