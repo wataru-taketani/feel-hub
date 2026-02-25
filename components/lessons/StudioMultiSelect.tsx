@@ -76,16 +76,21 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpen}>
-        <DialogContent className="max-w-xs p-0 gap-0 max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-xs p-0 gap-0 max-h-[80vh] flex flex-col [&>button.absolute]:hidden">
           <DialogTitle className="sr-only">店舗選択</DialogTitle>
           {/* ヘッダー */}
           <div className="border-b px-3 py-2 flex items-center justify-between shrink-0">
             <span className="text-sm font-semibold">店舗選択</span>
-            {draft.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1.5 text-xs" onClick={() => setDraft([])}>
-                <X className="h-3 w-3 mr-1" />選択解除
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {draft.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1.5 text-xs" onClick={() => setDraft([])}>
+                  選択解除
+                </Button>
+              )}
+              <button onClick={() => handleOpen(false)} className="rounded-sm opacity-70 active:opacity-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* エリア別リスト */}
