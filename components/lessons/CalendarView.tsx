@@ -92,6 +92,19 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
     return count;
   }, [pinnedMap]);
 
+  // snap-mandatory を一時無効化してスクロール
+  const scrollWithoutSnap = useCallback((container: HTMLElement, left: number) => {
+    container.style.scrollSnapType = 'none';
+    container.scrollTo({ left, behavior: 'smooth' });
+    const onEnd = () => {
+      container.style.scrollSnapType = '';
+      container.removeEventListener('scrollend', onEnd);
+    };
+    container.addEventListener('scrollend', onEnd);
+    // fallback: scrollend未対応ブラウザ用
+    setTimeout(() => { container.style.scrollSnapType = ''; }, 500);
+  }, []);
+
   // 今日の列にスクロール
   const scrollToToday = useCallback(() => {
     const container = scrollRef.current;
@@ -101,8 +114,8 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
     const columnWidth = container.firstElementChild
       ? (container.firstElementChild as HTMLElement).offsetWidth
       : 0;
-    container.scrollTo({ left: columnWidth * todayIndex, behavior: 'smooth' });
-  }, [dates, today]);
+    scrollWithoutSnap(container, columnWidth * todayIndex);
+  }, [dates, today, scrollWithoutSnap]);
 
   // 初回表示でのみ今日にスクロール
   useEffect(() => {
@@ -119,7 +132,7 @@ export default function CalendarView({ lessons, allDates, reservedLessons, bookm
     const columnWidth = container.firstElementChild
       ? (container.firstElementChild as HTMLElement).offsetWidth
       : 200;
-    container.scrollBy({ left: columnWidth * direction, behavior: 'smooth' });
+    scrollWithoutSnap(container, container.scrollLeft + columnWidth * direction);
   };
 
   // 横スクロール同期（3エリア双方向）
