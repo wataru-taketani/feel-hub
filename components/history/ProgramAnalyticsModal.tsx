@@ -44,6 +44,7 @@ export default function ProgramAnalyticsModal({
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [lessonCount, setLessonCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open || !programName) return;
@@ -52,15 +53,18 @@ export default function ProgramAnalyticsModal({
     setStats(null);
     setRecords([]);
     setHistoryExpanded(false);
+    setLessonCount(null);
 
     const encodedName = encodeURIComponent(programName);
     Promise.all([
       fetch(`/api/history/stats?program=${encodedName}`).then(r => r.json()),
       fetch(`/api/history?program=${encodedName}`).then(r => r.json()),
+      fetch(`/api/lessons/count?program=${encodedName}`).then(r => r.json()),
     ])
-      .then(([statsData, historyData]) => {
+      .then(([statsData, historyData, countData]) => {
         setStats(statsData);
         setRecords(historyData.records || []);
+        setLessonCount(countData.count ?? 0);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -173,10 +177,14 @@ export default function ProgramAnalyticsModal({
 
             {/* レッスン検索ボタン（常に表示されるフッター） */}
             <div className="border-t px-6 py-3 shrink-0">
-              <Button className="w-full" onClick={handleSearchLessons}>
-                <Search className="h-4 w-4 mr-2" />
-                このレッスンを探す
-              </Button>
+              {lessonCount === 0 ? (
+                <p className="text-sm text-muted-foreground text-center">現在このプログラムのレッスンはありません</p>
+              ) : (
+                <Button className="w-full" onClick={handleSearchLessons}>
+                  <Search className="h-4 w-4 mr-2" />
+                  このレッスンを探す{lessonCount !== null && `（${lessonCount}件）`}
+                </Button>
+              )}
             </div>
           </>
         ) : (
