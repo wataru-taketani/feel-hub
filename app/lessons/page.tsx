@@ -303,20 +303,25 @@ function LessonsPageInner() {
     return [...set].sort();
   }, [allLessons]);
 
+  // フィルタ用Set（O(1)ルックアップ）
+  const studioSet = useMemo(() => new Set(filters.studios), [filters.studios]);
+  const programSet = useMemo(() => new Set(filters.programs), [filters.programs]);
+  const instructorSet = useMemo(() => new Set(filters.instructors), [filters.instructors]);
+
   // クライアントサイドフィルタ — 本体一覧用（スタジオフィルタ厳守）
   const filteredLessons = useMemo(() => {
     return allLessons.filter((lesson) => {
-      if (filters.studios.length > 0 && !filters.studios.includes(lesson.studio)) return false;
-      if (filters.programs.length > 0 && !filters.programs.includes(lesson.programName)) return false;
-      if (filters.instructors.length > 0) {
+      if (studioSet.size > 0 && !studioSet.has(lesson.studio)) return false;
+      if (programSet.size > 0 && !programSet.has(lesson.programName)) return false;
+      if (instructorSet.size > 0) {
         const lessonIRs = lesson.instructor.split(", ");
-        if (!filters.instructors.some((ir) => lessonIRs.includes(ir))) return false;
+        if (!lessonIRs.some((ir) => instructorSet.has(ir))) return false;
       }
       if (filters.ticketFilter === "NORMAL" && lesson.ticketType !== null) return false;
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
       return true;
     });
-  }, [allLessons, filters.studios, filters.programs, filters.instructors, filters.ticketFilter]);
+  }, [allLessons, studioSet, programSet, instructorSet, filters.ticketFilter]);
 
   // 固定行用: 予約済み（全スタジオ）
   const reservedLessons = useMemo(() =>
