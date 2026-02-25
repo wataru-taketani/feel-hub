@@ -162,10 +162,8 @@ export default function ProgramCompletion() {
                     {series.programs.map((program) => (
                       <div
                         key={program.name}
-                        className={`flex items-center justify-between rounded px-2 py-1.5 ${
-                          program.count === 0
-                            ? 'bg-muted'
-                            : 'active:opacity-80'
+                        className={`flex items-center justify-between rounded px-2 py-1.5 active:opacity-80 ${
+                          program.count === 0 ? 'bg-muted' : ''
                         }`}
                         style={
                           program.count > 0
@@ -175,7 +173,7 @@ export default function ProgramCompletion() {
                               }
                             : undefined
                         }
-                        onClick={() => program.count > 0 && setSelectedProgram(program)}
+                        onClick={() => setSelectedProgram(program)}
                       >
                         <span className={`text-sm font-medium truncate ${
                           program.count === 0 ? 'text-muted-foreground' : ''
