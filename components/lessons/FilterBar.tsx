@@ -195,38 +195,10 @@ export default function FilterBar({
         </>
       )}
 
-      {/* ── フィルタ操作行（hideToolbar時）: チップ + 絞り込みトグル ── */}
-      {hideToolbar && (
-        <div className="flex items-center gap-2">
-          <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto">
-            {chipElements}
-          </div>
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs gap-1 px-2 text-muted-foreground shrink-0"
-              onClick={reset}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              リセット
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5 px-2 sm:px-3 shrink-0"
-            onClick={() => setOpen(!open)}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            絞り込み
-            {activeCount > 0 && (
-              <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
-                {activeCount}
-              </Badge>
-            )}
-            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
-          </Button>
+      {/* ── チップ行（hideToolbar時）: チップのみ。ボタン類は親がtoolbarRightに配置 ── */}
+      {hideToolbar && hasChips && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {chipElements}
         </div>
       )}
 

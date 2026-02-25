@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Star } from "lucide-react";
+import { Loader2, Star, SlidersHorizontal, RotateCcw, ChevronDown } from "lucide-react";
 import type { Lesson, FilterPreset } from "@/types";
 import { parseHomeStoreToStudio } from "@/lib/lessonUtils";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { useFilterPresets } from "@/hooks/useFilterPresets";
 import { useWaitlist } from "@/hooks/useWaitlist";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
 import LessonDetailModal from "@/components/lessons/LessonDetailModal";
@@ -379,6 +380,41 @@ function LessonsPageInner() {
     </Button>
   );
 
+  const activeFilterCount =
+    (filters.studios.length > 0 ? 1 : 0) +
+    (filters.programs.length > 0 ? 1 : 0) +
+    (filters.instructors.length > 0 ? 1 : 0) +
+    (filters.ticketFilter !== 'ALL' ? 1 : 0);
+
+  const handleResetFilters = () =>
+    setFilters({ studios: [], programs: [], instructors: [], ticketFilter: 'ALL', bookmarkOnly: false });
+
+  const toolbarRight = (
+    <>
+      {activeFilterCount > 0 && (
+        <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 px-2 text-muted-foreground" onClick={handleResetFilters}>
+          <RotateCcw className="h-3.5 w-3.5" />
+          リセット
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-xs gap-1.5 px-2 sm:px-3"
+        onClick={() => setFilterOpen(!filterOpen)}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" />
+        絞り込み
+        {activeFilterCount > 0 && (
+          <Badge variant="secondary" className="rounded-full px-1.5 h-5 text-[10px] ml-0.5">
+            {activeFilterCount}
+          </Badge>
+        )}
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', filterOpen && 'rotate-180')} />
+      </Button>
+    </>
+  );
+
   const filterPanel = (
     <FilterBar
       hideToolbar
@@ -439,6 +475,7 @@ function LessonsPageInner() {
             onTapLesson={handleTapLesson}
             bookmarkOnly={filters.bookmarkOnly}
             toolbarLeft={toolbarLeft}
+            toolbarRight={toolbarRight}
             middleContent={filterPanel}
           />
         )}
