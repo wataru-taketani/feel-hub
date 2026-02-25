@@ -206,7 +206,7 @@ function formatLessonInfo(entry: AutoReserveEntry): string {
 }
 
 function formatSuccessMessage(entry: AutoReserveEntry, sheetNo: string): string {
-  return `【自動予約完了】\n${formatLessonInfo(entry)}\n座席: ${sheetNo}\n\nhttps://m.feelcycle.com/mypage`;
+  return `【自動予約完了】\n${formatLessonInfo(entry)}\nバイク: ${sheetNo}\n\nhttps://m.feelcycle.com/mypage`;
 }
 
 function formatNeedsConfirmMessage(entry: AutoReserveEntry, reason?: string): string {
