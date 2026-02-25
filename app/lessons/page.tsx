@@ -196,10 +196,15 @@ function LessonsPageInner() {
     if (preset) {
       const studios = preset.filters.studios || [];
       setDefaultStudios(studios);
-      // 旧形式 programSearch → 新形式 programs に変換
-      const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
-      const programs = programParam ? [programParam] : (pf.programs || []);
-      setFilters({ ...pf, programs, bookmarkOnly: false });
+      if (programParam) {
+        // URL指定時: スタジオだけ維持し、他はリセット
+        setFilters({ ...DEFAULT_FILTERS, studios, programs: [programParam] });
+      } else {
+        // 旧形式 programSearch → 新形式 programs に変換
+        const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
+        const programs = pf.programs || [];
+        setFilters({ ...pf, programs, bookmarkOnly: false });
+      }
       prevStudiosRef.current = studios;
       fetchLessons(studios);
       return;
