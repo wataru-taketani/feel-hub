@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send } from 'lucide-react';
+import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send, CalendarPlus } from 'lucide-react';
 import { formatStudio, formatDate } from '@/lib/lessonUtils';
+import { downloadICS } from '@/lib/calendarUtils';
 
 const SeatMap = lazy(() => import('@/components/lessons/SeatMap'));
 
@@ -204,6 +205,21 @@ export default function LessonDetailModal({
             </div>
           </DialogDescription>
         </DialogHeader>
+
+        {/* カレンダーに追加 */}
+        {!lesson.isPast && (
+          <div className="pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => downloadICS(lesson)}
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              カレンダーに追加
+            </Button>
+          </div>
+        )}
 
         {/* グループ誘い機能（予約済み + グループ所属時） */}
         {isReserved && groups && groups.length > 0 && onInviteGroup && (
