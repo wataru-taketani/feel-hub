@@ -553,6 +553,7 @@ export default function LessonDetailModal({
                           selectedSeats={bikeSelectSeats}
                           onSelectedSeatsChange={setBikeSelectSeats}
                           onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                          preferredSeats={preferredSeats}
                         />
                       </Suspense>
                       <div className="flex gap-2">
@@ -642,6 +643,7 @@ export default function LessonDetailModal({
                         selectedSeats={bikeSelectSeats}
                         onSelectedSeatsChange={setBikeSelectSeats}
                         onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                        preferredSeats={preferredSeats}
                       />
                     </Suspense>
                   )}
@@ -796,6 +798,7 @@ export default function LessonDetailModal({
                           multiSelect
                           selectedSeats={autoTransferSeats}
                           onSelectedSeatsChange={setAutoTransferSeats}
+                          preferredSeats={preferredSeats}
                         />
                       </Suspense>
                       {autoTransferSeats.length > 0 && (
