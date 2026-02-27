@@ -18,9 +18,31 @@ function generateUID(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}@feel-hub`;
 }
 
+function formatDateJP(dateStr: string): string {
+  const d = new Date(dateStr);
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}年${m}月${day}日(${days[d.getDay()]})`;
+}
+
+// ICS の DESCRIPTION 内で改行するには \\n を使う
+function escapeICS(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
 export function generateICS(lesson: CalendarLesson): string {
   const now = new Date();
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const studioDisplay = formatStudio(lesson.studio);
+
+  const description = [
+    `日時： ${formatDateJP(lesson.date)} ${lesson.startTime}～${lesson.endTime}`,
+    `店舗： ${studioDisplay}`,
+    `レッスン： ${lesson.programName}`,
+    `インストラクター： ${lesson.instructor}`,
+  ].join('\n');
 
   const lines = [
     'BEGIN:VCALENDAR',
@@ -33,9 +55,9 @@ export function generateICS(lesson: CalendarLesson): string {
     `DTSTAMP:${stamp}`,
     `DTSTART;TZID=Asia/Tokyo:${toICSDateTime(lesson.date, lesson.startTime)}`,
     `DTEND;TZID=Asia/Tokyo:${toICSDateTime(lesson.date, lesson.endTime)}`,
-    `SUMMARY:${lesson.programName}（${lesson.studio}）`,
-    `LOCATION:FEELCYCLE ${formatStudio(lesson.studio)}`,
-    `DESCRIPTION:インストラクター: ${lesson.instructor}`,
+    `SUMMARY:【FEELCYCLE】${lesson.programName}`,
+    `LOCATION:FEELCYCLE ${studioDisplay}`,
+    `DESCRIPTION:${escapeICS(description)}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ];
