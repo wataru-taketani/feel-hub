@@ -39,7 +39,7 @@ interface SeatMapProps {
 const STYLE_AVAILABLE = 'bg-white border-2 border-gray-400 text-gray-700';
 const STYLE_RESERVED = 'bg-gray-600 border border-gray-500 text-gray-300';
 const STYLE_MINE = 'bg-pink-400 border-2 border-pink-500 text-white';
-const STYLE_SELECTED = 'bg-pink-400 border-2 border-pink-500 text-white ring-2 ring-pink-300';
+const STYLE_SELECTED = 'bg-orange-500 border-2 border-orange-600 text-white ring-2 ring-orange-300';
 const STYLE_PREFERRED = 'bg-orange-200 border-2 border-orange-400 text-orange-900';
 
 export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey, onDataLoaded, preferredSeats, multiSelect, selectedSeats, onSelectedSeatsChange }: SeatMapProps) {
@@ -104,7 +104,6 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
   const bikes = Object.entries(data.bikes);
   const availableCount = bikes.filter(([, b]) => b.status === 1).length;
   const totalCount = bikes.length;
-  const hasMine = bikes.some(([, b]) => b.status === 3);
   const preferredSet = new Set(preferredSeats || []);
 
   // バイクの丸サイズ（px）
@@ -216,30 +215,8 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
         })}
       </div>
 
-      {/* 凡例 + カウント */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-white border-2 border-gray-400" />
-            空き
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full bg-gray-600 border border-gray-500" />
-            予約済
-          </span>
-          {hasMine && (
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded-full bg-pink-400 border-2 border-pink-500" />
-              自分
-            </span>
-          )}
-          {preferredSet.size > 0 && (
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded-full bg-orange-200 border-2 border-orange-400" />
-              おすすめ
-            </span>
-          )}
-        </div>
+      {/* カウント */}
+      <div className="flex justify-end text-xs text-muted-foreground">
         <span className="font-medium">
           {multiSelect ? `選択中 ${(selectedSeats || []).length} 台` : `空き ${availableCount} / ${totalCount} 台`}
         </span>
