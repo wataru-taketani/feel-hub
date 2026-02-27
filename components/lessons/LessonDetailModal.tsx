@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send, CalendarPlus, ArrowRightLeft } from 'lucide-react';
-import { formatStudio, formatDate } from '@/lib/lessonUtils';
+import { formatStudio, formatDate, parseHomeStoreToStudio } from '@/lib/lessonUtils';
 import { downloadICS } from '@/lib/calendarUtils';
 
 const SeatMap = lazy(() => import('@/components/lessons/SeatMap'));
@@ -97,11 +97,13 @@ export default function LessonDetailModal({
   useEffect(() => {
     if (!open || !lesson || !hasFcSession) return;
     setPreferredSeats([]);
-    fetch(`/api/seat-preferences?studio=${encodeURIComponent(lesson.studio)}`)
+    // FC API形式 "銀座（GNZ）" → DB形式 "銀座" に正規化
+    const studioKey = parseHomeStoreToStudio(lesson.studio);
+    fetch(`/api/seat-preferences?studio=${encodeURIComponent(studioKey)}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data?.preferences?.[lesson.studio]) {
-          setPreferredSeats(data.preferences[lesson.studio]);
+        if (data?.preferences?.[studioKey]) {
+          setPreferredSeats(data.preferences[studioKey]);
         }
       })
       .catch(() => {});
