@@ -687,8 +687,23 @@ export default function LessonDetailModal({
         {/* 座席マップセクション（予約済み: 手動振替 + 自動振替 / 満席: 閲覧のみ） */}
         {!lesson.isPast && lesson.sidHash && hasFcSession && !canReserve && (
           <div className="pt-2 border-t">
-            {showReadOnlySeatMap ? (
-              <div className="space-y-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+              onClick={() => {
+                setShowReadOnlySeatMap(!showReadOnlySeatMap);
+                if (showReadOnlySeatMap) {
+                  setTransferSeat(null);
+                  setTransferResult(null);
+                }
+              }}
+            >
+              バイクマップを表示
+              <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showReadOnlySeatMap ? 'rotate-180' : ''}`} />
+            </Button>
+            {showReadOnlySeatMap && (
+              <div className="space-y-2 mt-2">
                 <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
                   <SeatMap
                     sidHash={lesson.sidHash}
@@ -738,16 +753,6 @@ export default function LessonDetailModal({
                   </div>
                 )}
               </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-xs text-muted-foreground"
-                onClick={() => setShowReadOnlySeatMap(true)}
-              >
-                バイクマップを表示
-                <ChevronDown className="h-3.5 w-3.5 ml-1" />
-              </Button>
             )}
           </div>
         )}
