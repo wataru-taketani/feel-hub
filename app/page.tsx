@@ -98,11 +98,13 @@ function waitlistLessonToLesson(entry: WaitlistItem): Lesson | null {
 // --- キャンセル待ちカード（Dialog無し・軽量） ---
 function WaitlistCard({
   entry,
+  isReserved,
   onTapCard,
   onTapRemove,
   onResume,
 }: {
   entry: WaitlistItem;
+  isReserved: boolean;
   onTapCard: (entry: WaitlistItem) => void;
   onTapRemove: (entry: WaitlistItem) => void;
   onResume: (lessonId: string) => void;
@@ -134,7 +136,7 @@ function WaitlistCard({
           ) : entry.autoReserve ? (
             <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
               <Zap className="h-3 w-3 mr-1" />
-              自動予約
+              {isReserved ? '自動振替' : '自動予約'}
             </Badge>
           ) : (
             <Badge variant="secondary" className="text-xs">
@@ -177,11 +179,13 @@ function WaitlistCard({
 // --- キャンセル待ちセクション ---
 function WaitlistSection({
   entries,
+  reservedLessonIds,
   onResume,
   onTapCard,
   onTapRemove,
 }: {
   entries: WaitlistItem[];
+  reservedLessonIds: Set<string>;
   onResume: (lessonId: string) => void;
   onTapCard: (entry: WaitlistItem) => void;
   onTapRemove: (entry: WaitlistItem) => void;
@@ -215,6 +219,7 @@ function WaitlistSection({
               <WaitlistCard
                 key={entry.id}
                 entry={entry}
+                isReserved={reservedLessonIds.has(entry.lessonId)}
                 onTapCard={onTapCard}
                 onTapRemove={onTapRemove}
                 onResume={onResume}
@@ -365,6 +370,11 @@ function Dashboard() {
     .sort((a, b) => `${a.date}_${a.startTime}`.localeCompare(`${b.date}_${b.startTime}`))
     .slice(0, 5);
 
+  // 予約済みlessonIdセット（自動振替バッジ判定用）
+  const reservedLessonIds = new Set(
+    data.reservations.map(r => r.lessonId).filter((id): id is string => !!id)
+  );
+
   // チケットの期限チェック（14日以内に期限切れ）
   const hasExpiringTickets = data.tickets.some(t =>
     t.details.some(d => {
@@ -441,6 +451,7 @@ function Dashboard() {
       {/* 空き通知 */}
       <WaitlistSection
         entries={waitlistEntries}
+        reservedLessonIds={reservedLessonIds}
         onResume={resumeWaitlist}
         onTapCard={handleTapWaitlist}
         onTapRemove={setRemoveTarget}
