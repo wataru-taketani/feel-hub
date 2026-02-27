@@ -17,6 +17,7 @@ interface WaitlistRow {
   user_id: string;
   lesson_id: string;
   auto_reserve: boolean;
+  preferred_seats: string[] | null;
   lessons: {
     id: string;
     date: string;

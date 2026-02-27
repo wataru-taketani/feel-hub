@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
         const modalType = Number(result.raw.modal_type ?? 0);
         const tmpLessonId = result.raw.tmp_lesson_id as string | undefined;
 
-        // 自動完了可能なケース
-        if (tmpLessonId && (modalType === 1042 || modalType === 1143)) {
+        // 自動完了可能なケース（1024: 差替え確認も自動完了）
+        if (tmpLessonId && (modalType === 1042 || modalType === 1143 || modalType === 1024)) {
           let ticketType: number | undefined;
           if (modalType === 1143) {
             const tickets = result.raw.consumption_ticket_list as Array<{ ticket_type?: number }> | undefined;
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
           const completion = await reserveCompletion(fcSession, tmpLessonId, ticketType);
 
           if (completion.resultCode === 0) {
-            const extra = modalType === 1143 ? '（チケット1枚使用）' : modalType === 1042 ? '（他店利用）' : '';
+            const extra = modalType === 1024 ? '（振替）' : modalType === 1143 ? '（チケット1枚使用）' : modalType === 1042 ? '（他店利用）' : '';
             return NextResponse.json({
               success: true,
               resultCode: 0,

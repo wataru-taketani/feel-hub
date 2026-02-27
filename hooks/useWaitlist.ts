@@ -24,6 +24,7 @@ interface WaitlistItem {
   lessonId: string;
   notified: boolean;
   autoReserve: boolean;
+  preferredSeats: string[] | null;
   lesson: WaitlistLesson | null;
 }
 
@@ -53,6 +54,7 @@ export function useWaitlist() {
             lessonId: e.lessonId,
             notified: e.notified,
             autoReserve: e.autoReserve ?? false,
+            preferredSeats: e.preferredSeats ?? null,
             lesson: e.lesson,
           });
         }
@@ -81,8 +83,10 @@ export function useWaitlist() {
   );
 
   const addToWaitlist = useCallback(
-    async (lesson: Lesson, autoReserve = false) => {
+    async (lesson: Lesson, autoReserve = false, preferredSeats?: string[]) => {
       if (!user) return;
+
+      const seats = preferredSeats && preferredSeats.length > 0 ? preferredSeats : null;
 
       // 楽観的更新
       const tempId = crypto.randomUUID();
@@ -93,6 +97,7 @@ export function useWaitlist() {
           lessonId: lesson.id,
           notified: false,
           autoReserve,
+          preferredSeats: seats,
           lesson: {
             id: lesson.id,
             date: lesson.date,
@@ -114,7 +119,7 @@ export function useWaitlist() {
         const res = await fetch('/api/waitlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lessonId: lesson.id, autoReserve }),
+          body: JSON.stringify({ lessonId: lesson.id, autoReserve, preferredSeats: seats }),
         });
         const data = await res.json();
         if (res.ok && data.entry) {
@@ -265,6 +270,58 @@ export function useWaitlist() {
     [user, entries]
   );
 
+  /** 指定レッスンの preferredSeats を取得 */
+  const getPreferredSeats = useCallback(
+    (lessonId: string): string[] | null => {
+      const item = entries.get(lessonId);
+      return item?.preferredSeats ?? null;
+    },
+    [entries]
+  );
+
+  /** preferredSeats を設定/変更 */
+  const setPreferredSeats = useCallback(
+    async (lessonId: string, seats: string[] | null) => {
+      if (!user) return;
+
+      const item = entries.get(lessonId);
+      if (!item) return;
+
+      const newSeats = seats && seats.length > 0 ? seats : null;
+
+      // 楽観的更新
+      setEntries((prev) => {
+        const next = new Map(prev);
+        next.set(lessonId, { ...item, preferredSeats: newSeats });
+        return next;
+      });
+
+      try {
+        const res = await fetch(`/api/waitlist/${item.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preferredSeats: newSeats }),
+        });
+        if (!res.ok) {
+          // ロールバック
+          setEntries((prev) => {
+            const next = new Map(prev);
+            next.set(lessonId, item);
+            return next;
+          });
+        }
+      } catch {
+        // ロールバック
+        setEntries((prev) => {
+          const next = new Map(prev);
+          next.set(lessonId, item);
+          return next;
+        });
+      }
+    },
+    [user, entries]
+  );
+
   /** レッスン情報付きの全エントリ配列（HOME表示用） */
   const waitlistEntries = useMemo(() => {
     return Array.from(entries.values())
@@ -283,10 +340,12 @@ export function useWaitlist() {
     isOnWaitlist,
     isNotified,
     getAutoReserve,
+    getPreferredSeats,
     addToWaitlist,
     removeFromWaitlist,
     resumeWaitlist,
     toggleAutoReserve,
+    setPreferredSeats,
     waitlistEntries,
     loaded,
   };

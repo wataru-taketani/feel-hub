@@ -53,6 +53,7 @@ export interface WaitlistEntry {
   createdAt: string;
   notified: boolean;
   autoReserve: boolean;
+  preferredSeats: string[] | null;
 }
 
 // キャンセル待ち登録（レッスン詳細付き）

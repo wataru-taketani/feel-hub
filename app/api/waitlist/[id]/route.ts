@@ -23,6 +23,12 @@ export async function PATCH(
   if (typeof body.notified === 'boolean') {
     updates.notified = body.notified;
   }
+  // preferred_seats の更新（配列 or null）
+  if ('preferredSeats' in body) {
+    updates.preferred_seats = Array.isArray(body.preferredSeats) && body.preferredSeats.length > 0
+      ? body.preferredSeats
+      : null;
+  }
   // 後方互換: bodyが空の場合は従来の「再開」動作
   if (Object.keys(updates).length === 0) {
     updates.notified = false;

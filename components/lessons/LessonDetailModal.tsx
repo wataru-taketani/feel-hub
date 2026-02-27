@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send, CalendarPlus } from 'lucide-react';
+import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send, CalendarPlus, ArrowRightLeft } from 'lucide-react';
 import { formatStudio, formatDate } from '@/lib/lessonUtils';
 import { downloadICS } from '@/lib/calendarUtils';
 
@@ -36,11 +36,13 @@ interface LessonDetailModalProps {
   hasFcSession: boolean;
   isOnWaitlist: boolean;
   isReserved: boolean;
-  onAddWaitlist: (lesson: Lesson, autoReserve?: boolean) => void;
+  onAddWaitlist: (lesson: Lesson, autoReserve?: boolean, preferredSeats?: string[]) => void;
   onRemoveWaitlist: (lessonId: string) => void;
   onReserve?: (sidHash: string, sheetNo: string) => Promise<ReserveApiResult>;
   waitlistAutoReserve?: boolean;
   onToggleAutoReserve?: (lessonId: string) => void;
+  waitlistPreferredSeats?: string[] | null;
+  onSetPreferredSeats?: (lessonId: string, seats: string[] | null) => void;
   groups?: GroupInfo[];
   onInviteGroup?: (groupId: string, lesson: Lesson) => Promise<{ sent: number; total: number }>;
 }
@@ -59,6 +61,8 @@ export default function LessonDetailModal({
   onReserve,
   waitlistAutoReserve,
   onToggleAutoReserve,
+  waitlistPreferredSeats,
+  onSetPreferredSeats,
   groups,
   onInviteGroup,
 }: LessonDetailModalProps) {
@@ -73,6 +77,16 @@ export default function LessonDetailModal({
   const [realAvailable, setRealAvailable] = useState<{ available: number; total: number } | null>(null);
   // お気に入り席
   const [preferredSeats, setPreferredSeats] = useState<string[]>([]);
+  // バイク指定モード（自動予約時のバイク選択）
+  const [showBikeSelect, setShowBikeSelect] = useState(false);
+  const [bikeSelectSeats, setBikeSelectSeats] = useState<string[]>([]);
+  // 手動振替（予約済み→空席タップ→振替）
+  const [transferSeat, setTransferSeat] = useState<string | null>(null);
+  const [transferring, setTransferring] = useState(false);
+  const [transferResult, setTransferResult] = useState<ReserveApiResult | null>(null);
+  // 自動振替（予約済み→指定席で自動振替設定）
+  const [showAutoTransfer, setShowAutoTransfer] = useState(false);
+  const [autoTransferSeats, setAutoTransferSeats] = useState<string[]>([]);
   // グループ誘い機能
   const [inviteStep, setInviteStep] = useState<'idle' | 'select' | 'confirm' | 'sending' | 'done'>('idle');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -142,6 +156,23 @@ export default function LessonDetailModal({
     }
   };
 
+  const handleTransfer = async () => {
+    if (!onReserve || !lesson.sidHash || !transferSeat) return;
+    setTransferring(true);
+    setTransferResult(null);
+    try {
+      const result = await onReserve(lesson.sidHash, transferSeat);
+      setTransferResult(result);
+      if (result.success) {
+        setTransferSeat(null);
+      }
+    } catch {
+      setTransferResult({ success: false, resultCode: -1, message: '通信エラーが発生しました' });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   const handleOpenChange = (o: boolean) => {
     if (!o) {
       // reset state on close
@@ -152,6 +183,13 @@ export default function LessonDetailModal({
       setShowReadOnlySeatMap(false);
       setRealAvailable(null);
       setPreferredSeats([]);
+      setShowBikeSelect(false);
+      setBikeSelectSeats([]);
+      setTransferSeat(null);
+      setTransferring(false);
+      setTransferResult(null);
+      setShowAutoTransfer(false);
+      setAutoTransferSeats([]);
       setInviteStep('idle');
       setSelectedGroupId(null);
       setInviteResult(null);
@@ -471,6 +509,83 @@ export default function LessonDetailModal({
                   空きが出たら自動予約する
                 </label>
               )}
+              {/* バイク指定（自動予約ON時のみ） */}
+              {hasFcSession && waitlistAutoReserve && onSetPreferredSeats && lesson.sidHash && (
+                <div className="space-y-2">
+                  {waitlistPreferredSeats && waitlistPreferredSeats.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        指定バイク: {waitlistPreferredSeats.map(s => `#${s}`).join(', ')}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => {
+                          setBikeSelectSeats(waitlistPreferredSeats);
+                          setShowBikeSelect(!showBikeSelect);
+                        }}
+                      >
+                        バイク指定を変更
+                        <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showBikeSelect ? 'rotate-180' : ''}`} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => {
+                        setBikeSelectSeats([]);
+                        setShowBikeSelect(!showBikeSelect);
+                      }}
+                    >
+                      バイク指定
+                      <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showBikeSelect ? 'rotate-180' : ''}`} />
+                    </Button>
+                  )}
+                  {showBikeSelect && (
+                    <div className="space-y-2">
+                      <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                        <SeatMap
+                          sidHash={lesson.sidHash}
+                          multiSelect
+                          selectedSeats={bikeSelectSeats}
+                          onSelectedSeatsChange={setBikeSelectSeats}
+                          onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                        />
+                      </Suspense>
+                      <div className="flex gap-2">
+                        {waitlistPreferredSeats && waitlistPreferredSeats.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              onSetPreferredSeats(lesson.id, null);
+                              setShowBikeSelect(false);
+                              setBikeSelectSeats([]);
+                            }}
+                          >
+                            指定解除
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          disabled={bikeSelectSeats.length === 0}
+                          onClick={() => {
+                            onSetPreferredSeats(lesson.id, bikeSelectSeats);
+                            setShowBikeSelect(false);
+                          }}
+                        >
+                          決定
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -491,19 +606,61 @@ export default function LessonDetailModal({
                   <input
                     type="checkbox"
                     checked={autoReserve}
-                    onChange={(e) => setAutoReserve(e.target.checked)}
+                    onChange={(e) => {
+                      setAutoReserve(e.target.checked);
+                      if (!e.target.checked) {
+                        setShowBikeSelect(false);
+                        setBikeSelectSeats([]);
+                      }
+                    }}
                     className="rounded border-gray-300"
                   />
                   <Zap className="h-3.5 w-3.5 text-amber-500" />
                   空きが出たら自動予約する
                 </label>
               )}
+              {/* バイク指定（自動予約ON時のみ） */}
+              {hasFcSession && autoReserve && lesson.sidHash && (
+                <div className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => {
+                      setBikeSelectSeats([]);
+                      setShowBikeSelect(!showBikeSelect);
+                    }}
+                  >
+                    バイク指定
+                    <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showBikeSelect ? 'rotate-180' : ''}`} />
+                  </Button>
+                  {showBikeSelect && (
+                    <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                      <SeatMap
+                        sidHash={lesson.sidHash}
+                        multiSelect
+                        selectedSeats={bikeSelectSeats}
+                        onSelectedSeatsChange={setBikeSelectSeats}
+                        onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                      />
+                    </Suspense>
+                  )}
+                  {showBikeSelect && bikeSelectSeats.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      選択中: {bikeSelectSeats.sort((a, b) => Number(a) - Number(b)).map(s => `#${s}`).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
               <Button
                 size="sm"
                 className="w-full"
                 onClick={() => {
-                  onAddWaitlist(lesson, autoReserve);
+                  const seats = showBikeSelect && bikeSelectSeats.length > 0 ? bikeSelectSeats : undefined;
+                  onAddWaitlist(lesson, autoReserve, seats);
                   setAutoReserve(false);
+                  setShowBikeSelect(false);
+                  setBikeSelectSeats([]);
                   handleOpenChange(false);
                 }}
               >
@@ -523,17 +680,60 @@ export default function LessonDetailModal({
           )}
         </div>
 
-        {/* 座席マップセクション（閲覧のみ: 満席 or 予約済みの場合） */}
+        {/* 座席マップセクション（予約済み: 手動振替 + 自動振替 / 満席: 閲覧のみ） */}
         {!lesson.isPast && lesson.sidHash && hasFcSession && !canReserve && (
           <div className="pt-2 border-t">
             {showReadOnlySeatMap ? (
-              <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
-                <SeatMap
-                  sidHash={lesson.sidHash}
-                  onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
-                  preferredSeats={preferredSeats}
-                />
-              </Suspense>
+              <div className="space-y-2">
+                <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                  <SeatMap
+                    sidHash={lesson.sidHash}
+                    interactive={isReserved && !!onReserve}
+                    selectedSeat={transferSeat}
+                    onSeatSelect={(seat) => setTransferSeat(seat)}
+                    onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                    preferredSeats={preferredSeats}
+                    refreshKey={seatMapRefreshKey}
+                  />
+                </Suspense>
+
+                {/* 手動振替: 空席をタップ → 確認ボタン */}
+                {isReserved && onReserve && transferSeat && !transferResult?.success && (
+                  <div className="p-3 bg-muted rounded-lg space-y-2">
+                    <p className="text-sm font-medium">バイク #{transferSeat} に振替しますか？</p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setTransferSeat(null)}
+                        disabled={transferring}
+                      >
+                        戻る
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleTransfer}
+                        disabled={transferring}
+                      >
+                        {transferring ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ArrowRightLeft className="h-4 w-4 mr-1" />}
+                        振替する
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 振替結果表示 */}
+                {transferResult && (
+                  <div className={`p-3 rounded-lg text-sm ${transferResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                    <div className="flex items-start gap-2">
+                      {transferResult.success ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" /> : <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />}
+                      <span>{transferResult.message}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <Button
                 variant="ghost"
@@ -545,6 +745,82 @@ export default function LessonDetailModal({
                 <ChevronDown className="h-3.5 w-3.5 ml-1" />
               </Button>
             )}
+          </div>
+        )}
+
+        {/* 自動振替セクション（予約済み + FCセッションあり + LINE連携済み） */}
+        {isReserved && !lesson.isPast && lesson.sidHash && hasFcSession && hasLineUserId && isLoggedIn && onSetPreferredSeats && (
+          <div className="pt-2 border-t">
+            {(() => {
+              const hasAutoTransfer = isOnWaitlist && waitlistAutoReserve && waitlistPreferredSeats && waitlistPreferredSeats.length > 0;
+              if (hasAutoTransfer) {
+                return (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      自動振替設定済み: {waitlistPreferredSeats!.map(s => `#${s}`).join(', ')}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        onRemoveWaitlist(lesson.id);
+                      }}
+                    >
+                      <BellOff className="h-4 w-4 mr-2" />
+                      自動振替を解除する
+                    </Button>
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground"
+                    onClick={() => {
+                      setAutoTransferSeats([]);
+                      setShowAutoTransfer(!showAutoTransfer);
+                    }}
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />
+                    空いたら自動振替する
+                    <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showAutoTransfer ? 'rotate-180' : ''}`} />
+                  </Button>
+                  {showAutoTransfer && (
+                    <div className="space-y-2">
+                      <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                        <SeatMap
+                          sidHash={lesson.sidHash!}
+                          multiSelect
+                          selectedSeats={autoTransferSeats}
+                          onSelectedSeatsChange={setAutoTransferSeats}
+                        />
+                      </Suspense>
+                      {autoTransferSeats.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          選択中: {autoTransferSeats.sort((a, b) => Number(a) - Number(b)).map(s => `#${s}`).join(', ')}
+                        </p>
+                      )}
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={autoTransferSeats.length === 0}
+                        onClick={() => {
+                          onAddWaitlist(lesson, true, autoTransferSeats);
+                          setShowAutoTransfer(false);
+                          setAutoTransferSeats([]);
+                        }}
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        設定する
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </DialogContent>

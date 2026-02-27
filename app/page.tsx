@@ -232,7 +232,7 @@ function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { waitlistEntries, isOnWaitlist, getAutoReserve, addToWaitlist, resumeWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
+  const { waitlistEntries, isOnWaitlist, getAutoReserve, getPreferredSeats, addToWaitlist, resumeWaitlist, removeFromWaitlist, toggleAutoReserve, setPreferredSeats } = useWaitlist();
 
   // モーダル状態
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -519,11 +519,13 @@ function Dashboard() {
         hasFcSession={true}
         isOnWaitlist={selectedLesson ? isOnWaitlist(selectedLesson.id) : false}
         isReserved={modalIsReserved}
-        onAddWaitlist={(lesson, autoReserve) => addToWaitlist(lesson, autoReserve)}
+        onAddWaitlist={(lesson, autoReserve, preferredSeats) => addToWaitlist(lesson, autoReserve, preferredSeats)}
         onRemoveWaitlist={removeFromWaitlist}
         onReserve={handleReserve}
         waitlistAutoReserve={selectedLesson ? getAutoReserve(selectedLesson.id) : false}
         onToggleAutoReserve={toggleAutoReserve}
+        waitlistPreferredSeats={selectedLesson ? getPreferredSeats(selectedLesson.id) : null}
+        onSetPreferredSeats={setPreferredSeats}
         groups={groups}
         onInviteGroup={handleInviteGroup}
       />

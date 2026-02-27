@@ -46,7 +46,7 @@ function LessonsPageInner() {
   const { user } = useAuthContext();
   const { bookmarks, toggle, isBookmarked, loaded: bookmarksLoaded } = useBookmarks();
   const { preset, savePreset, deletePreset, isLoaded: presetsLoaded } = useFilterPresets();
-  const { isOnWaitlist, getAutoReserve, addToWaitlist, removeFromWaitlist, toggleAutoReserve } = useWaitlist();
+  const { isOnWaitlist, getAutoReserve, getPreferredSeats, addToWaitlist, removeFromWaitlist, toggleAutoReserve, setPreferredSeats } = useWaitlist();
 
   // デフォルトスタジオ解決
   const [defaultStudios, setDefaultStudios] = useState<string[]>([]);
@@ -458,11 +458,13 @@ function LessonsPageInner() {
           hasFcSession={hasFcSession}
           isOnWaitlist={selectedLesson ? isOnWaitlist(selectedLesson.id) : false}
           isReserved={selectedLesson ? isReserved(selectedLesson) : false}
-          onAddWaitlist={(lesson, autoReserve) => addToWaitlist(lesson, autoReserve)}
+          onAddWaitlist={(lesson, autoReserve, preferredSeats) => addToWaitlist(lesson, autoReserve, preferredSeats)}
           onRemoveWaitlist={removeFromWaitlist}
           onReserve={handleReserve}
           waitlistAutoReserve={selectedLesson ? getAutoReserve(selectedLesson.id) : false}
           onToggleAutoReserve={toggleAutoReserve}
+          waitlistPreferredSeats={selectedLesson ? getPreferredSeats(selectedLesson.id) : null}
+          onSetPreferredSeats={setPreferredSeats}
           groups={groups}
           onInviteGroup={handleInviteGroup}
         />

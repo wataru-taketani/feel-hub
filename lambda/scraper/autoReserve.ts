@@ -12,6 +12,7 @@ interface AutoReserveEntry {
   id: string;
   user_id: string;
   lesson_id: string;
+  preferred_seats: string[] | null;
   lessons: {
     sid_hash: string;
     program_name: string;
@@ -106,10 +107,20 @@ export async function autoReserveLesson(
       return 'conflict';
     }
 
+    // 指定席フィルタ
+    const targetSeats = entry.preferred_seats
+      ? availableSeats.filter(s => entry.preferred_seats!.includes(s))
+      : availableSeats;
+
+    if (targetSeats.length === 0) {
+      console.log(`${tag} Preferred seats ${entry.preferred_seats?.join(',')} not available, will retry next cycle`);
+      return 'conflict';
+    }
+
     // 最初の空席を選択（番号順で最小）
-    availableSeats.sort((a, b) => Number(a) - Number(b));
-    sheetNo = availableSeats[0];
-    console.log(`${tag} Selected seat #${sheetNo} from ${availableSeats.length} available`);
+    targetSeats.sort((a, b) => Number(a) - Number(b));
+    sheetNo = targetSeats[0];
+    console.log(`${tag} Selected seat #${sheetNo} from ${targetSeats.length} target seats (${availableSeats.length} total available)`);
   } catch (e) {
     console.error(`${tag} getSeatMap failed:`, e);
     if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
@@ -138,9 +149,11 @@ export async function autoReserveLesson(
         console.log(`${tag} rc=303 modal_type=${modalType} tmp_lesson_id=${tmpLessonId}`);
 
         // 自動完了可能なケース
-        if (tmpLessonId && (modalType === 1042 || modalType === 1143)) {
+        // 1024: 差替え確認 → 指定席モードでのみ自動完了（既存予約との振替）
+        if (tmpLessonId && (modalType === 1042 || modalType === 1143 || (modalType === 1024 && entry.preferred_seats))) {
           // 1042: 他店利用案内 → 自動でOK
           // 1143: チケット消費確認 → 自動で確定
+          // 1024: 差替え提案 → 指定席設定ありなら自動振替
           let ticketType: number | undefined;
           if (modalType === 1143) {
             // consumption_ticket_list から最初のチケットを選択
@@ -152,7 +165,7 @@ export async function autoReserveLesson(
           console.log(`${tag} Completion result: rc=${completion.resultCode}, msg=${completion.message}`, JSON.stringify(completion.raw));
 
           if (completion.resultCode === 0) {
-            const extra = modalType === 1143 ? '\n(チケット1枚使用)' : modalType === 1042 ? '\n(他店利用)' : '';
+            const extra = modalType === 1024 ? '\n(振替)' : modalType === 1143 ? '\n(チケット1枚使用)' : modalType === 1042 ? '\n(他店利用)' : '';
             await notify(lineUserId, formatSuccessMessage(entry, sheetNo) + extra);
             return 'success';
           }
@@ -206,7 +219,8 @@ function formatLessonInfo(entry: AutoReserveEntry): string {
 }
 
 function formatSuccessMessage(entry: AutoReserveEntry, sheetNo: string): string {
-  return `【自動予約完了】\n${formatLessonInfo(entry)}\nバイク: ${sheetNo}\n\nhttps://m.feelcycle.com/mypage`;
+  const label = entry.preferred_seats ? '【自動予約完了（指定席）】' : '【自動予約完了】';
+  return `${label}\n${formatLessonInfo(entry)}\nバイク: ${sheetNo}\n\nhttps://m.feelcycle.com/mypage`;
 }
 
 function formatNeedsConfirmMessage(entry: AutoReserveEntry, reason?: string): string {
