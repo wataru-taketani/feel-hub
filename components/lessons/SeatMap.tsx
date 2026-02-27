@@ -35,28 +35,12 @@ interface SeatMapProps {
   onSelectedSeatsChange?: (seats: string[]) => void;
 }
 
-// status → スタイル
-function bikeStyle(status: number, isInteractive: boolean, isSelected: boolean) {
-  if (isSelected) {
-    return 'bg-blue-500 border-2 border-blue-600 text-white ring-2 ring-blue-300';
-  }
-  if (status === 1) {
-    // 予約可能（空き）
-    return cn(
-      'bg-white border-2 border-gray-400 text-gray-700',
-      isInteractive && 'cursor-pointer active:border-blue-400 active:bg-blue-100'
-    );
-  }
-  if (status === 3) {
-    // 自分の予約
-    return 'bg-pink-400 border-2 border-pink-500 text-white';
-  }
-  // status === 2 or other: 予約済（他の人）
-  return cn(
-    'bg-gray-600 border border-gray-500 text-gray-300',
-    isInteractive && 'cursor-not-allowed opacity-60'
-  );
-}
+// 統一カラー: 空き=白, 予約済=グレー, 自分/選択中=ピンク, おすすめ=オレンジ
+const STYLE_AVAILABLE = 'bg-white border-2 border-gray-400 text-gray-700';
+const STYLE_RESERVED = 'bg-gray-600 border border-gray-500 text-gray-300';
+const STYLE_MINE = 'bg-pink-400 border-2 border-pink-500 text-white';
+const STYLE_SELECTED = 'bg-pink-400 border-2 border-pink-500 text-white ring-2 ring-pink-300';
+const STYLE_PREFERRED = 'bg-orange-200 border-2 border-orange-400 text-orange-900';
 
 export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey, onDataLoaded, preferredSeats, multiSelect, selectedSeats, onSelectedSeatsChange }: SeatMapProps) {
   const [data, setData] = useState<SeatMapResponse | null>(null);
@@ -191,20 +175,32 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
           const isSelected = selectedSeat === bikeNo;
           const isMultiSelected = multiSelect && (selectedSeats || []).includes(bikeNo);
           const isPreferred = preferredSet.has(bikeNo);
+          const isClickable = multiSelect || (interactive && bike.status === 1);
+
+          // 統一スタイル判定（優先順: 選択 > 自分 > おすすめ > 空き > 予約済）
+          let style: string;
+          if (isSelected || isMultiSelected) {
+            style = STYLE_SELECTED;
+          } else if (bike.status === 3) {
+            style = STYLE_MINE;
+          } else if (isPreferred && bike.status === 1) {
+            style = STYLE_PREFERRED;
+          } else if (bike.status === 1) {
+            style = STYLE_AVAILABLE;
+          } else {
+            style = STYLE_RESERVED;
+          }
+
           return (
             <div
               key={bikeNo}
-              className={`absolute flex items-center justify-center rounded-full ${
-                multiSelect
-                  ? isMultiSelected
-                    ? 'bg-yellow-200 border-2 border-yellow-500 text-yellow-900 cursor-pointer'
-                    : isPreferred
-                      ? 'bg-amber-50 border-2 border-dashed border-yellow-400 text-yellow-800 cursor-pointer'
-                      : 'bg-white border-2 border-gray-400 text-gray-700 cursor-pointer'
-                  : isPreferred && !isSelected && bike.status === 1
-                    ? cn('bg-yellow-200 border-2 border-yellow-500 text-yellow-900', interactive && 'cursor-pointer active:bg-yellow-200')
-                    : bikeStyle(bike.status, !!interactive, isSelected)
-              }`}
+              className={cn(
+                'absolute flex items-center justify-center rounded-full',
+                style,
+                isClickable && 'cursor-pointer',
+                isClickable && !isSelected && !isMultiSelected && 'active:ring-2 active:ring-pink-300',
+                !isClickable && interactive && bike.status !== 1 && 'cursor-not-allowed opacity-60',
+              )}
               style={{
                 left: `${(bike.x / data.mapWidth) * 100}%`,
                 top: `${(bike.y / data.mapHeight) * 100}%`,
@@ -223,48 +219,25 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
       {/* 凡例 + カウント */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
-          {multiSelect ? (
-            <>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-500 bg-yellow-200" />
-                選択中
-              </span>
-              {preferredSet.size > 0 && (
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full border-2 border-dashed border-yellow-400 bg-amber-50" />
-                  おすすめ
-                </span>
-              )}
-            </>
-          ) : (
-            <>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-3 h-3 rounded-full bg-white border-2 border-gray-400" />
-                空き
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-3 h-3 rounded-full bg-gray-600 border border-gray-500" />
-                予約済
-              </span>
-              {hasMine && (
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full bg-pink-400 border-2 border-pink-500" />
-                  自分
-                </span>
-              )}
-              {preferredSet.size > 0 && (
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full border-2 border-yellow-500 bg-yellow-200" />
-                  おすすめ
-                </span>
-              )}
-              {interactive && selectedSeat && (
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full bg-blue-500 border-2 border-blue-600" />
-                  選択中
-                </span>
-              )}
-            </>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full bg-white border-2 border-gray-400" />
+            空き
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full bg-gray-600 border border-gray-500" />
+            予約済
+          </span>
+          {hasMine && (
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-full bg-pink-400 border-2 border-pink-500" />
+              自分
+            </span>
+          )}
+          {preferredSet.size > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-full bg-orange-200 border-2 border-orange-400" />
+              おすすめ
+            </span>
           )}
         </div>
         <span className="font-medium">
