@@ -5,7 +5,7 @@ Feel HubのスクレイピングLambda関数をAWSにデプロイする手順で
 ## 📋 前提条件
 
 - AWSアカウント（既に保有済み）
-- Node.js 20.x以上
+- Node.js 22.x以上
 - npm
 
 ## 🚀 デプロイ手順

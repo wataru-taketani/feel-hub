@@ -107,7 +107,7 @@ Lambdaでは`@sparticuz/chromium`を使用しています。ローカルテス�
 
 ## 技術スタック
 
-- **Runtime**: Node.js 20.x
+- **Runtime**: Node.js 22.x
 - **Framework**: Serverless Framework v4
 - **言語**: TypeScript（serverless-plugin-typescriptで自動コンパイル）
 - **スクレイピング**: Puppeteer + @sparticuz/chromium（Lambda最適化）
