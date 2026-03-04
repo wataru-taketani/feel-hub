@@ -324,9 +324,10 @@ function Dashboard() {
     const lesson = waitlistLessonToLesson(entry);
     if (!lesson) return;
     setSelectedLesson(lesson);
-    setModalIsReserved(false);
+    const reserved = data?.reservations.some(r => r.lessonId === entry.lessonId) ?? false;
+    setModalIsReserved(reserved);
     setModalOpen(true);
-  }, []);
+  }, [data]);
 
   const handleConfirmRemove = useCallback(() => {
     if (!removeTarget) return;
