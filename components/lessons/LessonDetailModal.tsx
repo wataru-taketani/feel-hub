@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send, CalendarPlus, ArrowRightLeft } from 'lucide-react';
+import { Bell, BellOff, Clock, MapPin, Users, LogIn, Zap, Loader2, CheckCircle, AlertTriangle, ChevronDown, Send, CalendarPlus, ArrowRightLeft, RefreshCw } from 'lucide-react';
 import { formatStudio, formatDate, parseHomeStoreToStudio } from '@/lib/lessonUtils';
 import { downloadICS } from '@/lib/calendarUtils';
 
@@ -92,10 +92,33 @@ export default function LessonDetailModal({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [inviteResult, setInviteResult] = useState<{ sent: number; total: number } | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  // FC再接続
+  const [fcReconnected, setFcReconnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [reconnectError, setReconnectError] = useState<string | null>(null);
+
+  const effectiveHasFcSession = hasFcSession || fcReconnected;
+
+  const handleReconnect = async () => {
+    setReconnecting(true);
+    setReconnectError(null);
+    try {
+      const res = await fetch('/api/auth/feelcycle-reauth', { method: 'POST' });
+      if (res.ok) {
+        setFcReconnected(true);
+      } else {
+        setReconnectError('再接続に失敗しました。マイページで再連携してください');
+      }
+    } catch {
+      setReconnectError('再接続に失敗しました');
+    } finally {
+      setReconnecting(false);
+    }
+  };
 
   // モーダル表示時にお気に入り席を取得
   useEffect(() => {
-    if (!open || !lesson || !hasFcSession) return;
+    if (!open || !lesson || !effectiveHasFcSession) return;
     setPreferredSeats([]);
     // FC API形式 "銀座（GNZ）" → DB形式 "銀座" に正規化
     const studioKey = parseHomeStoreToStudio(lesson.studio);
@@ -107,11 +130,11 @@ export default function LessonDetailModal({
         }
       })
       .catch(() => {});
-  }, [open, lesson?.id, lesson?.studio, hasFcSession]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, lesson?.id, lesson?.studio, effectiveHasFcSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // DB上「満席」の場合、モーダル表示時に座席APIでリアルタイム確認
   useEffect(() => {
-    if (!open || !lesson || !lesson.isFull || !lesson.sidHash || !hasFcSession || lesson.isPast) return;
+    if (!open || !lesson || !lesson.isFull || !lesson.sidHash || !effectiveHasFcSession || lesson.isPast) return;
     setRealAvailable(null);
     fetch(`/api/seatmap?sidHash=${encodeURIComponent(lesson.sidHash)}`)
       .then(res => res.ok ? res.json() : null)
@@ -133,7 +156,7 @@ export default function LessonDetailModal({
   const effectiveAvailableSlots = realAvailable ? realAvailable.available : lesson.availableSlots;
 
   const canNotify = !isReserved && !lesson.isPast && effectiveIsFull;
-  const canReserve = !isReserved && !lesson.isPast && !effectiveIsFull && hasFcSession && lesson.sidHash && onReserve;
+  const canReserve = !isReserved && !lesson.isPast && !effectiveIsFull && effectiveHasFcSession && lesson.sidHash && onReserve;
 
   const handleReserve = async () => {
     if (!onReserve || !lesson.sidHash || !selectedSeat) return;
@@ -196,6 +219,8 @@ export default function LessonDetailModal({
       setSelectedGroupId(null);
       setInviteResult(null);
       setInviteError(null);
+      setFcReconnected(false);
+      setReconnectError(null);
     }
     onOpenChange(o);
   };
@@ -415,6 +440,38 @@ export default function LessonDetailModal({
           </div>
         )}
 
+        {/* FC再接続セクション（セッション切れ + ログイン済み + 未予約） */}
+        {isLoggedIn && !hasFcSession && !fcReconnected && !isReserved && !lesson.isPast && lesson.sidHash && (
+          <div className="pt-2 border-t space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">バイクマップ</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-destructive">FCセッション切れ</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={handleReconnect}
+                disabled={reconnecting}
+              >
+                {reconnecting ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    再接続中…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    再接続
+                  </>
+                )}
+              </Button>
+            </div>
+            {reconnectError && (
+              <p className="text-xs text-destructive">{reconnectError}</p>
+            )}
+          </div>
+        )}
+
         {/* 手動予約セクション（空席あり + 未予約 + FCセッションあり） */}
         {canReserve && !reserveResult?.success && (
           <div className="pt-2 border-t">
@@ -499,7 +556,7 @@ export default function LessonDetailModal({
             </div>
           ) : isOnWaitlist ? (
             <div className="space-y-2">
-              {hasFcSession && onToggleAutoReserve && (
+              {effectiveHasFcSession && onToggleAutoReserve && (
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
@@ -512,7 +569,7 @@ export default function LessonDetailModal({
                 </label>
               )}
               {/* バイク指定（自動予約ON時のみ） */}
-              {hasFcSession && waitlistAutoReserve && onSetPreferredSeats && lesson.sidHash && (
+              {effectiveHasFcSession && waitlistAutoReserve && onSetPreferredSeats && lesson.sidHash && (
                 <div className="space-y-2">
                   {waitlistPreferredSeats && waitlistPreferredSeats.length > 0 ? (
                     <div className="space-y-2">
@@ -604,7 +661,7 @@ export default function LessonDetailModal({
             </div>
           ) : (
             <div className="space-y-2">
-              {hasFcSession && (
+              {effectiveHasFcSession && (
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
@@ -623,7 +680,7 @@ export default function LessonDetailModal({
                 </label>
               )}
               {/* バイク指定（自動予約ON時のみ） */}
-              {hasFcSession && autoReserve && lesson.sidHash && (
+              {effectiveHasFcSession && autoReserve && lesson.sidHash && (
                 <div className="space-y-2">
                   <Button
                     variant="ghost"
@@ -685,7 +742,7 @@ export default function LessonDetailModal({
         </div>
 
         {/* 座席マップセクション（予約済み: 手動振替 + 自動振替 / 満席: 閲覧のみ） */}
-        {!lesson.isPast && lesson.sidHash && hasFcSession && !canReserve && (
+        {!lesson.isPast && lesson.sidHash && effectiveHasFcSession && !canReserve && (
           <div className="pt-2 border-t">
             <Button
               variant="ghost"
@@ -758,7 +815,7 @@ export default function LessonDetailModal({
         )}
 
         {/* 自動振替セクション（予約済み + FCセッションあり + LINE連携済み） */}
-        {isReserved && !lesson.isPast && lesson.sidHash && hasFcSession && hasLineUserId && isLoggedIn && onSetPreferredSeats && (
+        {isReserved && !lesson.isPast && lesson.sidHash && effectiveHasFcSession && hasLineUserId && isLoggedIn && onSetPreferredSeats && (
           <div className="pt-2 border-t">
             {(() => {
               const hasAutoTransfer = isOnWaitlist && waitlistAutoReserve && waitlistPreferredSeats && waitlistPreferredSeats.length > 0;
