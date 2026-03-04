@@ -743,79 +743,6 @@ export default function LessonDetailModal({
           )}
         </div>
 
-        {/* 座席マップセクション（予約済み: 手動振替 + 自動振替 / 満席: 閲覧のみ） */}
-        {!lesson.isPast && lesson.sidHash && effectiveHasFcSession && !canReserve && (
-          <div className="pt-2 border-t">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-xs text-muted-foreground"
-              onClick={() => {
-                setShowReadOnlySeatMap(!showReadOnlySeatMap);
-                if (showReadOnlySeatMap) {
-                  setTransferSeat(null);
-                  setTransferResult(null);
-                }
-              }}
-            >
-              バイクマップを表示
-              <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showReadOnlySeatMap ? 'rotate-180' : ''}`} />
-            </Button>
-            {showReadOnlySeatMap && (
-              <div className="space-y-2 mt-2">
-                <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
-                  <SeatMap
-                    sidHash={lesson.sidHash}
-                    interactive={isReserved && !!onReserve}
-                    selectedSeat={transferSeat}
-                    onSeatSelect={(seat) => setTransferSeat(seat)}
-                    onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
-                    preferredSeats={preferredSeats}
-                    refreshKey={seatMapRefreshKey}
-                  />
-                </Suspense>
-
-                {/* 手動振替: 空席をタップ → 確認ボタン */}
-                {isReserved && onReserve && transferSeat && !transferResult?.success && (
-                  <div className="p-3 bg-muted rounded-lg space-y-2">
-                    <p className="text-sm font-medium">バイク #{transferSeat} に振替しますか？</p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => setTransferSeat(null)}
-                        disabled={transferring}
-                      >
-                        戻る
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="flex-1"
-                        onClick={handleTransfer}
-                        disabled={transferring}
-                      >
-                        {transferring ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ArrowRightLeft className="h-4 w-4 mr-1" />}
-                        振替する
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 振替結果表示 */}
-                {transferResult && (
-                  <div className={`p-3 rounded-lg text-sm ${transferResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-                    <div className="flex items-start gap-2">
-                      {transferResult.success ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" /> : <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />}
-                      <span>{transferResult.message}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* 自動振替セクション（予約済み + FCセッションあり + LINE連携済み） */}
         {isReserved && !lesson.isPast && lesson.sidHash && effectiveHasFcSession && hasLineUserId && isLoggedIn && onSetPreferredSeats && (
           <div className="pt-2 border-t">
@@ -885,6 +812,7 @@ export default function LessonDetailModal({
                   </div>
                 );
               }
+              // 未設定時: 自動振替を新規設定
               return (
                 <div className="space-y-2">
                   <Button
@@ -936,6 +864,81 @@ export default function LessonDetailModal({
             })()}
           </div>
         )}
+
+        {/* 座席マップセクション（予約済み: 手動振替 / 満席: 閲覧のみ） */}
+        {!lesson.isPast && lesson.sidHash && effectiveHasFcSession && !canReserve && (
+          <div className="pt-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+              onClick={() => {
+                setShowReadOnlySeatMap(!showReadOnlySeatMap);
+                if (showReadOnlySeatMap) {
+                  setTransferSeat(null);
+                  setTransferResult(null);
+                }
+              }}
+            >
+              バイクマップを表示
+              <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showReadOnlySeatMap ? 'rotate-180' : ''}`} />
+            </Button>
+            {showReadOnlySeatMap && (
+              <div className="space-y-2 mt-2">
+                <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                  <SeatMap
+                    sidHash={lesson.sidHash}
+                    interactive={isReserved && !!onReserve}
+                    selectedSeat={transferSeat}
+                    onSeatSelect={(seat) => setTransferSeat(seat)}
+                    onDataLoaded={(avail, total) => setRealAvailable({ available: avail, total })}
+                    preferredSeats={preferredSeats}
+                    refreshKey={seatMapRefreshKey}
+                    waitlistPreferredSeats={waitlistPreferredSeats}
+                  />
+                </Suspense>
+
+                {/* 手動振替: 空席をタップ → 確認ボタン */}
+                {isReserved && onReserve && transferSeat && !transferResult?.success && (
+                  <div className="p-3 bg-muted rounded-lg space-y-2">
+                    <p className="text-sm font-medium">バイク #{transferSeat} に振替しますか？</p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setTransferSeat(null)}
+                        disabled={transferring}
+                      >
+                        戻る
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleTransfer}
+                        disabled={transferring}
+                      >
+                        {transferring ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ArrowRightLeft className="h-4 w-4 mr-1" />}
+                        振替する
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 振替結果表示 */}
+                {transferResult && (
+                  <div className={`p-3 rounded-lg text-sm ${transferResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                    <div className="flex items-start gap-2">
+                      {transferResult.success ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" /> : <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />}
+                      <span>{transferResult.message}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       </DialogContent>
     </Dialog>
   );

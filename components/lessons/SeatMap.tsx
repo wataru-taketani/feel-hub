@@ -29,6 +29,7 @@ interface SeatMapProps {
   refreshKey?: number;
   onDataLoaded?: (availableCount: number, totalCount: number) => void;
   preferredSeats?: string[];
+  waitlistPreferredSeats?: string[] | null;
   // マルチセレクトモード（おすすめバイク選択用）
   multiSelect?: boolean;
   selectedSeats?: string[];
@@ -41,8 +42,9 @@ const STYLE_RESERVED = 'bg-gray-600 border border-gray-500 text-gray-300';
 const STYLE_MINE = 'bg-pink-400 border-2 border-pink-500 text-white';
 const STYLE_SELECTED = 'bg-orange-500 border-2 border-orange-600 text-white ring-2 ring-orange-300';
 const STYLE_PREFERRED = 'bg-orange-200 border-2 border-orange-400 text-orange-900';
+const STYLE_WAITLIST = 'bg-yellow-200 border-2 border-yellow-500 text-yellow-900';
 
-export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey, onDataLoaded, preferredSeats, multiSelect, selectedSeats, onSelectedSeatsChange }: SeatMapProps) {
+export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSelect, refreshKey, onDataLoaded, preferredSeats, waitlistPreferredSeats, multiSelect, selectedSeats, onSelectedSeatsChange }: SeatMapProps) {
   const [data, setData] = useState<SeatMapResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +161,7 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
   const totalCount = bikes.length;
   const hasMine = bikes.some(([, b]) => b.status === 3);
   const preferredSet = new Set(preferredSeats || []);
+  const waitlistSet = new Set(waitlistPreferredSeats || []);
 
   // バイクの丸サイズ（px）
   const BIKE_SIZE = 30;
@@ -228,14 +231,17 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
           const isSelected = selectedSeat === bikeNo;
           const isMultiSelected = multiSelect && (selectedSeats || []).includes(bikeNo);
           const isPreferred = preferredSet.has(bikeNo);
+          const isWaitlist = waitlistSet.has(bikeNo);
           const isClickable = multiSelect || (interactive && bike.status === 1);
 
-          // 統一スタイル判定（優先順: 選択 > 自分 > おすすめ > 空き > 予約済）
+          // 統一スタイル判定（優先順: 選択 > 自分 > 自動振替 > おすすめ > 空き > 予約済）
           let style: string;
           if (isSelected || isMultiSelected) {
             style = STYLE_SELECTED;
           } else if (bike.status === 3) {
             style = STYLE_MINE;
+          } else if (isWaitlist) {
+            style = STYLE_WAITLIST;
           } else if (isPreferred && bike.status === 1) {
             style = STYLE_PREFERRED;
           } else if (bike.status === 1) {
@@ -283,6 +289,12 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
             <span className="flex items-center gap-1">
               <span className="inline-block w-3 h-3 rounded-full bg-pink-400 border-2 border-pink-500" />
               自分
+            </span>
+          )}
+          {waitlistSet.size > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-full bg-yellow-200 border-2 border-yellow-500" />
+              振替
             </span>
           )}
           {preferredSet.size > 0 && (
