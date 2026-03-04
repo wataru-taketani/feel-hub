@@ -151,8 +151,8 @@ npx serverless deploy --stage prod  # デプロイ
 - URL param でフィルタを受け取る場合、保存済みプリセットを上書きする（+ではなく置換）
 
 ## 積み残し / TODO
-- [ ] `LessonDetailModal.tsx`: テスト用に `lesson.isFull` 条件を一時解除中 → テスト完了後に `&& lesson.isFull` を戻す
-- [ ] Phase 5-3 Step 2: rc=303 の自動処理
+- [x] `LessonDetailModal.tsx`: `lesson.isFull` 条件 — 確認済み、正しく設定されている
+- [x] Phase 5-3 Step 2: rc=303 の自動処理 — Lambda/フロント両方で 1042/1143/1024 自動完了済み。10242（チケット購入）は自動化不可で手動案内
+- [x] 自動振替: 予約済みレッスンの席変更対応（`POST /api/reservation/sheet/change`）— 実機テスト済み
 - [ ] レッスン詳細モーダルにプログラム受講回数を表示（GROUP BY programで一括取得→キャッシュ方式）
 - [ ] LINE通知からキャンセル待ち再登録（Flex Message + postback or ワンタイムURL）
-- [x] 自動振替: 予約済みレッスンの席変更対応（`POST /api/reservation/sheet/change`）— 実機テスト済み
