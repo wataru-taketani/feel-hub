@@ -152,7 +152,9 @@ export default function LessonDetailModal({
   if (!lesson || !open) return null;
 
   // リアルタイム空き情報があればそちらを優先
-  const effectiveIsFull = realAvailable ? realAvailable.available === 0 : lesson.isFull;
+  const effectiveIsFull = realAvailable
+    ? realAvailable.available === 0
+    : (lesson.isFull && (!lesson.availableSlots || lesson.availableSlots === 0));
   const effectiveAvailableSlots = realAvailable ? realAvailable.available : lesson.availableSlots;
 
   const canNotify = !isReserved && !lesson.isPast && effectiveIsFull;
@@ -825,6 +827,50 @@ export default function LessonDetailModal({
                     <p className="text-xs text-muted-foreground">
                       自動振替設定済み: {waitlistPreferredSeats!.map(s => `#${s}`).join(', ')}
                     </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs text-muted-foreground"
+                      onClick={() => {
+                        setAutoTransferSeats([...waitlistPreferredSeats!]);
+                        setShowAutoTransfer(!showAutoTransfer);
+                      }}
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />
+                      バイク指定を変更
+                      <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showAutoTransfer ? 'rotate-180' : ''}`} />
+                    </Button>
+                    {showAutoTransfer && (
+                      <div className="space-y-2">
+                        <Suspense fallback={<Skeleton className="w-full h-48 rounded-lg" />}>
+                          <SeatMap
+                            sidHash={lesson.sidHash!}
+                            multiSelect
+                            selectedSeats={autoTransferSeats}
+                            onSelectedSeatsChange={setAutoTransferSeats}
+                            preferredSeats={preferredSeats}
+                          />
+                        </Suspense>
+                        {autoTransferSeats.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            選択中: {autoTransferSeats.sort((a, b) => Number(a) - Number(b)).map(s => `#${s}`).join(', ')}
+                          </p>
+                        )}
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          disabled={autoTransferSeats.length === 0}
+                          onClick={() => {
+                            onAddWaitlist(lesson, true, autoTransferSeats);
+                            setShowAutoTransfer(false);
+                            setAutoTransferSeats([]);
+                          }}
+                        >
+                          <Zap className="h-4 w-4 mr-2" />
+                          更新する
+                        </Button>
+                      </div>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
