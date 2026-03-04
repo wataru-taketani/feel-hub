@@ -46,16 +46,19 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
   const [data, setData] = useState<SeatMapResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
 
   const fetchSeatMap = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSessionExpired(false);
     try {
       const res = await fetch(`/api/seatmap?sidHash=${encodeURIComponent(sidHash)}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         if (body.code === 'FC_SESSION_EXPIRED') {
-          setError('FCセッション切れ。マイページで再連携してください');
+          setSessionExpired(true);
         } else {
           setError('バイクマップを取得できませんでした');
         }
@@ -75,6 +78,26 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
     }
   }, [sidHash]);
 
+  const handleReconnect = useCallback(async () => {
+    setReconnecting(true);
+    try {
+      const res = await fetch('/api/auth/feelcycle-reauth', { method: 'POST' });
+      if (res.ok) {
+        setSessionExpired(false);
+        setError(null);
+        fetchSeatMap();
+      } else {
+        setError('再接続に失敗しました。マイページで再連携してください');
+        setSessionExpired(false);
+      }
+    } catch {
+      setError('再接続に失敗しました');
+      setSessionExpired(false);
+    } finally {
+      setReconnecting(false);
+    }
+  }, [fetchSeatMap]);
+
   useEffect(() => {
     fetchSeatMap();
   }, [fetchSeatMap, refreshKey]);
@@ -84,6 +107,36 @@ export default function SeatMap({ sidHash, interactive, selectedSeat, onSeatSele
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">バイクマップ</p>
         <Skeleton className="w-full h-48 rounded-lg" />
+      </div>
+    );
+  }
+
+  if (sessionExpired) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">バイクマップ</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-destructive">FCセッション切れ</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-xs"
+            onClick={handleReconnect}
+            disabled={reconnecting}
+          >
+            {reconnecting ? (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                再接続中…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                再接続
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     );
   }
