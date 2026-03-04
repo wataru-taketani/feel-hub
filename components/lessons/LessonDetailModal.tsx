@@ -96,6 +96,7 @@ export default function LessonDetailModal({
   const [fcReconnected, setFcReconnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [reconnectError, setReconnectError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'waitlist' | 'autoTransfer' | 'seatPref' | null>(null);
 
   const effectiveHasFcSession = hasFcSession || fcReconnected;
 
@@ -223,6 +224,7 @@ export default function LessonDetailModal({
       setInviteError(null);
       setFcReconnected(false);
       setReconnectError(null);
+      setConfirmAction(null);
     }
     onOpenChange(o);
   };
@@ -619,18 +621,40 @@ export default function LessonDetailModal({
                       </Suspense>
                       <div className="flex gap-2">
                         {waitlistPreferredSeats && waitlistPreferredSeats.length > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => {
-                              onSetPreferredSeats(lesson.id, null);
-                              setShowBikeSelect(false);
-                              setBikeSelectSeats([]);
-                            }}
-                          >
-                            指定解除
-                          </Button>
+                          confirmAction === 'seatPref' ? (
+                            <div className="flex-1 flex gap-1">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => {
+                                  onSetPreferredSeats(lesson.id, null);
+                                  setShowBikeSelect(false);
+                                  setBikeSelectSeats([]);
+                                  setConfirmAction(null);
+                                }}
+                              >
+                                解除する
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => setConfirmAction(null)}
+                              >
+                                戻る
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => setConfirmAction('seatPref')}
+                            >
+                              指定解除
+                            </Button>
+                          )
                         )}
                         <Button
                           size="sm"
@@ -648,18 +672,40 @@ export default function LessonDetailModal({
                   )}
                 </div>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  onRemoveWaitlist(lesson.id);
-                  handleOpenChange(false);
-                }}
-              >
-                <BellOff className="h-4 w-4 mr-2" />
-                通知登録済み（解除する）
-              </Button>
+              {confirmAction === 'waitlist' ? (
+                <div className="flex gap-2 w-full">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      onRemoveWaitlist(lesson.id);
+                      setConfirmAction(null);
+                      handleOpenChange(false);
+                    }}
+                  >
+                    解除する
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setConfirmAction(null)}
+                  >
+                    戻る
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setConfirmAction('waitlist')}
+                >
+                  <BellOff className="h-4 w-4 mr-2" />
+                  通知登録済み（解除する）
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -798,17 +844,39 @@ export default function LessonDetailModal({
                         </Button>
                       </div>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        onRemoveWaitlist(lesson.id);
-                      }}
-                    >
-                      <BellOff className="h-4 w-4 mr-2" />
-                      自動振替を解除する
-                    </Button>
+                    {confirmAction === 'autoTransfer' ? (
+                      <div className="flex gap-2 w-full">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            onRemoveWaitlist(lesson.id);
+                            setConfirmAction(null);
+                          }}
+                        >
+                          解除する
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setConfirmAction(null)}
+                        >
+                          戻る
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setConfirmAction('autoTransfer')}
+                      >
+                        <BellOff className="h-4 w-4 mr-2" />
+                        自動振替を解除する
+                      </Button>
+                    )}
                   </div>
                 );
               }
