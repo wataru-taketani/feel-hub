@@ -213,7 +213,7 @@ export async function changeSeat(
   sidHash: string,
   sheetNo: string
 ): Promise<ReserveResult> {
-  const res = await fetch(`${BASE_URL}/api/reservation/change`, {
+  const res = await fetch(`${BASE_URL}/api/reservation/sheet/change`, {
     method: 'POST',
     headers: {
       ...buildHeaders(session),

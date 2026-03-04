@@ -195,6 +195,12 @@ export async function autoReserveLesson(
             await notify(lineUserId, formatSuccessMessage(entry, sheetNo).replace('【自動予約完了', '【自動振替完了'));
             return 'success';
           }
+          if (changeResult.resultCode === -1) {
+            // HTTP エラー (404等) → エンドポイント不正、再試行しない
+            console.error(`${tag} ChangeSeat HTTP error, stopping`);
+            await notify(lineUserId, formatErrorMessage(entry, '席変更に失敗しました。手動でFEELCYCLEサイトから変更してください。\nhttps://m.feelcycle.com/reserved/top'));
+            return 'error';
+          }
           // 席変更失敗（競合等）→ 次サイクルで再試行
           console.log(`${tag} ChangeSeat failed: rc=${changeResult.resultCode}, will retry`);
           return 'conflict';
@@ -204,7 +210,8 @@ export async function autoReserveLesson(
             await notify(lineUserId, '【自動振替失敗】\nFEELCYCLEセッションが切れました。マイページから再設定してください。');
             return 'auth_failed';
           }
-          // changeSeat のエンドポイントが不正 (404等) → conflict で再試行しない
+          // changeSeat のエンドポイントが不正 (404等) → 再試行しない
+          await notify(lineUserId, formatErrorMessage(entry, '席変更に失敗しました。手動でFEELCYCLEサイトから変更してください。\nhttps://m.feelcycle.com/reserved/top'));
           return 'error';
         }
       }
