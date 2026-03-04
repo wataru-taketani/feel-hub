@@ -219,7 +219,7 @@ export async function changeSeat(
       ...buildHeaders(session),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ sid: sidHash, sheet_no: Number(sheetNo) }),
+    body: JSON.stringify({ sid: sidHash, sheet_no: sheetNo }),
   });
 
   if (res.status === 401 || res.status === 302 || res.status === 403) {
