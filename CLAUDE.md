@@ -142,3 +142,9 @@ npx serverless deploy --stage prod  # デプロイ
 - Vercel env vars に改行が混入しないよう注意
 - `useSearchParams()` は `<Suspense>` 境界が必要（Next.js 15）
 - URL param でフィルタを受け取る場合、保存済みプリセットを上書きする（+ではなく置換）
+
+## 積み残し / TODO
+- [ ] `LessonDetailModal.tsx`: テスト用に `lesson.isFull` 条件を一時解除中 → テスト完了後に `&& lesson.isFull` を戻す
+- [ ] Phase 5-3 Step 2: rc=303 の自動処理
+- [ ] レッスン詳細モーダルにプログラム受講回数を表示（GROUP BY programで一括取得→キャッシュ方式）
+- [ ] LINE通知からキャンセル待ち再登録（Flex Message + postback or ワンタイムURL）

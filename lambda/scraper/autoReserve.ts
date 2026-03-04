@@ -6,7 +6,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { decrypt, login, getSeatMap, reserveLesson, reserveCompletion } from './fcClient';
+import { decrypt, login, getSeatMap, reserveLesson, reserveCompletion, changeSeat } from './fcClient';
 
 interface AutoReserveEntry {
   id: string;
@@ -183,6 +183,30 @@ export async function autoReserveLesson(
           : result.message || `追加操作が必要です (modal_type=${modalType})`;
         await notify(lineUserId, formatNeedsConfirmMessage(entry, reason));
         return 'needs_confirm';
+      }
+      case 1: {
+        // 予約済みレッスン → バイク位置変更で席変更を試みる（自動振替）
+        console.log(`${tag} Already reserved, attempting seat change to #${sheetNo}`);
+        try {
+          const changeResult = await changeSeat(session, sidHash, sheetNo);
+          console.log(`${tag} ChangeSeat result: rc=${changeResult.resultCode}, msg=${changeResult.message}`, JSON.stringify(changeResult.raw));
+
+          if (changeResult.resultCode === 0) {
+            await notify(lineUserId, formatSuccessMessage(entry, sheetNo).replace('【自動予約完了', '【自動振替完了'));
+            return 'success';
+          }
+          // 席変更失敗（競合等）→ 次サイクルで再試行
+          console.log(`${tag} ChangeSeat failed: rc=${changeResult.resultCode}, will retry`);
+          return 'conflict';
+        } catch (e) {
+          console.error(`${tag} changeSeat threw:`, e);
+          if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
+            await notify(lineUserId, '【自動振替失敗】\nFEELCYCLEセッションが切れました。マイページから再設定してください。');
+            return 'auth_failed';
+          }
+          // changeSeat のエンドポイントが不正 (404等) → conflict で再試行しない
+          return 'error';
+        }
       }
       case 205: {
         // 競合（他の人が先に取った）
