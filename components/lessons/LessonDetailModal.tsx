@@ -796,8 +796,8 @@ export default function LessonDetailModal({
           )}
         </div>
 
-        {/* 自動振替セクション（予約済み + FCセッションあり + LINE連携済み） */}
-        {isReserved && !lesson.isPast && lesson.sidHash && effectiveHasFcSession && hasLineUserId && isLoggedIn && onSetPreferredSeats && (
+        {/* 自動振替セクション（予約済み or 自動振替設定済み + FCセッションあり + LINE連携済み） */}
+        {(isReserved || (isOnWaitlist && waitlistAutoReserve && waitlistPreferredSeats && waitlistPreferredSeats.length > 0)) && !lesson.isPast && lesson.sidHash && effectiveHasFcSession && hasLineUserId && isLoggedIn && onSetPreferredSeats && (
           <div className="pt-2 border-t">
             {(() => {
               const hasAutoTransfer = isOnWaitlist && waitlistAutoReserve && waitlistPreferredSeats && waitlistPreferredSeats.length > 0;
