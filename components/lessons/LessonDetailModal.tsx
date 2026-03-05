@@ -841,7 +841,7 @@ export default function LessonDetailModal({
                           className="w-full"
                           disabled={autoTransferSeats.length === 0}
                           onClick={() => {
-                            onAddWaitlist(lesson, true, autoTransferSeats);
+                            onSetPreferredSeats(lesson.id, autoTransferSeats);
                             setShowAutoTransfer(false);
                             setAutoTransferSeats([]);
                           }}

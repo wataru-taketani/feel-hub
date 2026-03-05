@@ -88,17 +88,17 @@ export function useWaitlist() {
 
       const seats = preferredSeats && preferredSeats.length > 0 ? preferredSeats : null;
 
-      // 楽観的更新
-      const tempId = crypto.randomUUID();
+      // 楽観的更新（既存エントリがあればlessonデータを保持）
       setEntries((prev) => {
         const next = new Map(prev);
+        const existing = prev.get(lesson.id);
         next.set(lesson.id, {
-          id: tempId,
+          id: existing?.id ?? crypto.randomUUID(),
           lessonId: lesson.id,
-          notified: false,
+          notified: existing?.notified ?? false,
           autoReserve,
           preferredSeats: seats,
-          lesson: {
+          lesson: existing?.lesson ?? {
             id: lesson.id,
             date: lesson.date,
             startTime: lesson.startTime,
