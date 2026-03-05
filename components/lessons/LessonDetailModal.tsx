@@ -703,7 +703,7 @@ export default function LessonDetailModal({
                   onClick={() => setConfirmAction('waitlist')}
                 >
                   <BellOff className="h-4 w-4 mr-2" />
-                  通知登録済み（解除する）
+                  {waitlistAutoReserve ? '自動予約を解除する' : '通知登録済み（解除する）'}
                 </Button>
               )}
             </div>
