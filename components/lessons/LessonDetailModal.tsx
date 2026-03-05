@@ -234,12 +234,16 @@ export default function LessonDetailModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           {isOnWaitlist && (
-            <p className={`text-xs font-medium ${
+            <p className={`flex items-center gap-1 text-xs font-medium ${
               isReserved && waitlistAutoReserve ? 'text-blue-600'
               : waitlistAutoReserve ? 'text-amber-600'
               : 'text-muted-foreground'
             }`}>
-              {isReserved && waitlistAutoReserve ? '🔄 自動振替' : waitlistAutoReserve ? '⚡ 自動予約' : '🔔 キャンセル待ち'}
+              {isReserved && waitlistAutoReserve
+                ? <><RefreshCw className="h-3 w-3" />自動振替</>
+                : waitlistAutoReserve
+                ? <><Zap className="h-3 w-3" />自動予約</>
+                : <><Bell className="h-3 w-3" />キャンセル待ち</>}
             </p>
           )}
           <DialogTitle className="flex items-center gap-2">
