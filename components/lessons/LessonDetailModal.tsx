@@ -266,6 +266,15 @@ export default function LessonDetailModal({
               {isReserved && (
                 <Badge className="bg-red-500 text-white text-xs">予約済み</Badge>
               )}
+              {isOnWaitlist && (
+                <Badge className={
+                  isReserved && waitlistAutoReserve ? 'bg-blue-500 text-white text-xs'
+                  : waitlistAutoReserve ? 'bg-amber-500 text-white text-xs'
+                  : 'bg-gray-500 text-white text-xs'
+                }>
+                  {isReserved && waitlistAutoReserve ? '自動振替' : waitlistAutoReserve ? '自動予約' : 'キャンセル待ち'}
+                </Badge>
+              )}
               {lesson.ticketType && (
                 <Badge variant="outline" className="text-xs">
                   {lesson.ticketType === 'PLATINUM' ? 'PLATINUM' : lesson.ticketType === 'GOLD' ? 'GOLD' : lesson.ticketType === 'SILVER' ? 'SILVER' : 'WHITE'} チケット
