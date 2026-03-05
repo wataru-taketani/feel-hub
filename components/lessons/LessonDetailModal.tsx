@@ -233,6 +233,15 @@ export default function LessonDetailModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
+          {isOnWaitlist && (
+            <p className={`text-xs font-medium ${
+              isReserved && waitlistAutoReserve ? 'text-blue-600'
+              : waitlistAutoReserve ? 'text-amber-600'
+              : 'text-muted-foreground'
+            }`}>
+              {isReserved && waitlistAutoReserve ? '⚡ 自動振替' : waitlistAutoReserve ? '⚡ 自動予約' : '🔔 キャンセル待ち'}
+            </p>
+          )}
           <DialogTitle className="flex items-center gap-2">
             <span
               className="inline-block px-2 py-0.5 rounded text-sm font-bold"
@@ -265,15 +274,6 @@ export default function LessonDetailModal({
               </div>
               {isReserved && (
                 <Badge className="bg-red-500 text-white text-xs">予約済み</Badge>
-              )}
-              {isOnWaitlist && (
-                <Badge className={
-                  isReserved && waitlistAutoReserve ? 'bg-blue-500 text-white text-xs'
-                  : waitlistAutoReserve ? 'bg-amber-500 text-white text-xs'
-                  : 'bg-gray-500 text-white text-xs'
-                }>
-                  {isReserved && waitlistAutoReserve ? '自動振替' : waitlistAutoReserve ? '自動予約' : 'キャンセル待ち'}
-                </Badge>
               )}
               {lesson.ticketType && (
                 <Badge variant="outline" className="text-xs">
