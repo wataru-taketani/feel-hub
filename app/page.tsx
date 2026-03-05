@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap, ChevronRight } from 'lucide-react';
+import { CalendarDays, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap, ChevronRight, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
@@ -134,14 +134,14 @@ function WaitlistCard({
               再開
             </Button>
           ) : entry.autoReserve ? (
-            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
-              <Zap className="h-3 w-3 mr-1" />
+            <Badge variant="secondary" className={`text-xs ${isReserved ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
+              {isReserved ? <RefreshCw className="h-3 w-3 mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
               {isReserved ? '自動振替' : '自動予約'}
             </Badge>
           ) : (
             <Badge variant="secondary" className="text-xs">
               <Bell className="h-3 w-3 mr-1" />
-              監視中
+              実行中
             </Badge>
           )}
           <Button
@@ -197,10 +197,10 @@ function WaitlistSection({
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Bell className="h-4 w-4" />
-          キャンセル待ち
+          自動処理
           {watchingCount > 0 && (
             <Badge variant="secondary" className="text-xs">
-              {watchingCount}件監視中
+              {watchingCount}件実行中
             </Badge>
           )}
         </CardTitle>

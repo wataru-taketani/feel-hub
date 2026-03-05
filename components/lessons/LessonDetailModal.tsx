@@ -239,7 +239,7 @@ export default function LessonDetailModal({
               : waitlistAutoReserve ? 'text-amber-600'
               : 'text-muted-foreground'
             }`}>
-              {isReserved && waitlistAutoReserve ? '⚡ 自動振替' : waitlistAutoReserve ? '⚡ 自動予約' : '🔔 キャンセル待ち'}
+              {isReserved && waitlistAutoReserve ? '🔄 自動振替' : waitlistAutoReserve ? '⚡ 自動予約' : '🔔 キャンセル待ち'}
             </p>
           )}
           <DialogTitle className="flex items-center gap-2">
