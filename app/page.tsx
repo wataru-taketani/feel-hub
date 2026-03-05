@@ -141,7 +141,7 @@ function WaitlistCard({
           ) : (
             <Badge variant="secondary" className="text-xs">
               <Bell className="h-3 w-3 mr-1" />
-              実行中
+              キャンセル待ち
             </Badge>
           )}
           <Button
