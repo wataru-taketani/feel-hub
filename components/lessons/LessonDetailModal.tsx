@@ -234,7 +234,7 @@ export default function LessonDetailModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           {isOnWaitlist && (
-            <p className={`flex items-center justify-center gap-1 text-xs font-medium ${
+            <p className={`flex items-center justify-center gap-1 text-xs font-bold ${
               isReserved && waitlistAutoReserve ? 'text-blue-800'
               : waitlistAutoReserve ? 'text-amber-800'
               : 'text-muted-foreground'
