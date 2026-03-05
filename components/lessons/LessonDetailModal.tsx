@@ -277,7 +277,7 @@ export default function LessonDetailModal({
                 )}
               </div>
               {isReserved && (
-                <Badge className="bg-red-500 text-white text-xs">予約済み</Badge>
+                <div><Badge className="bg-red-500 text-white text-xs">予約済み</Badge></div>
               )}
               {lesson.ticketType && (
                 <Badge variant="outline" className="text-xs">
