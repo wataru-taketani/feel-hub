@@ -105,7 +105,7 @@ function WaitlistCard({
 }: {
   entry: WaitlistItem;
   isReserved: boolean;
-  onTapCard: (entry: WaitlistItem) => void;
+  onTapCard: (entry: WaitlistItem, isReserved: boolean) => void;
   onTapRemove: (entry: WaitlistItem) => void;
   onResume: (lessonId: string) => void;
 }) {
@@ -116,7 +116,7 @@ function WaitlistCard({
     <button
       type="button"
       className="border rounded-lg p-3 space-y-1 w-full text-left cursor-pointer active:bg-accent/50 transition-colors"
-      onClick={() => onTapCard(entry)}
+      onClick={() => onTapCard(entry, isReserved)}
     >
       <div className="flex items-center justify-between">
         <span className="font-medium text-sm">
@@ -187,7 +187,7 @@ function WaitlistSection({
   entries: WaitlistItem[];
   reservedLessonIds: Set<string>;
   onResume: (lessonId: string) => void;
-  onTapCard: (entry: WaitlistItem) => void;
+  onTapCard: (entry: WaitlistItem, isReserved: boolean) => void;
   onTapRemove: (entry: WaitlistItem) => void;
 }) {
   const watchingCount = entries.filter((e) => !e.notified).length;
@@ -320,14 +320,13 @@ function Dashboard() {
     setModalOpen(true);
   }, []);
 
-  const handleTapWaitlist = useCallback((entry: WaitlistItem) => {
+  const handleTapWaitlist = useCallback((entry: WaitlistItem, isReserved: boolean) => {
     const lesson = waitlistLessonToLesson(entry);
     if (!lesson) return;
     setSelectedLesson(lesson);
-    const reserved = data?.reservations.some(r => r.lessonId === entry.lessonId) ?? false;
-    setModalIsReserved(reserved);
+    setModalIsReserved(isReserved);
     setModalOpen(true);
-  }, [data]);
+  }, []);
 
   const handleConfirmRemove = useCallback(() => {
     if (!removeTarget) return;
