@@ -560,17 +560,11 @@ export default function LessonDetailModal({
             </div>
           ) : isOnWaitlist ? (
             <div className="space-y-2">
-              {effectiveHasFcSession && onToggleAutoReserve && (
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!waitlistAutoReserve}
-                    onChange={() => onToggleAutoReserve(lesson.id)}
-                    className="rounded border-gray-300"
-                  />
-                  <Zap className={`h-3.5 w-3.5 ${waitlistAutoReserve ? 'text-amber-500' : 'text-muted-foreground'}`} />
-                  空きが出たら自動予約する
-                </label>
+              {waitlistAutoReserve && (
+                <p className="flex items-center gap-1 text-xs text-amber-600">
+                  <Zap className="h-3.5 w-3.5" />
+                  自動予約ON
+                </p>
               )}
               {/* バイク指定（自動予約ON時のみ） */}
               {effectiveHasFcSession && waitlistAutoReserve && onSetPreferredSeats && lesson.sidHash && (
