@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Star } from "lucide-react";
+import { Loader2, Star, Sparkles } from "lucide-react";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import type { Lesson, FilterPreset } from "@/types";
 import { parseHomeStoreToStudio } from "@/lib/lessonUtils";
@@ -26,6 +26,7 @@ const DEFAULT_FILTERS: FilterState = {
   instructors: [],
   ticketFilter: "ALL",
   bookmarkOnly: false,
+  unattendedOnly: false,
 };
 
 export default function LessonsPage() {
@@ -47,6 +48,18 @@ function LessonsPageInner() {
   const { bookmarks, toggle, isBookmarked, loaded: bookmarksLoaded } = useBookmarks();
   const { preset, savePreset, deletePreset, isLoaded: presetsLoaded } = useFilterPresets();
   const { isOnWaitlist, getAutoReserve, getPreferredSeats, addToWaitlist, removeFromWaitlist, toggleAutoReserve, setPreferredSeats } = useWaitlist();
+
+  // 受講済みプログラム（未受講フィルタ用）
+  const [attendedPrograms, setAttendedPrograms] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user) return;
+    fetchWithRetry('/api/history/attended-programs')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.programs) setAttendedPrograms(new Set(data.programs));
+      })
+      .catch(() => {});
+  }, [user]);
 
   // デフォルトスタジオ解決
   const [defaultStudios, setDefaultStudios] = useState<string[]>([]);
@@ -204,7 +217,7 @@ function LessonsPageInner() {
         // 旧形式 programSearch → 新形式 programs に変換
         const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
         const programs = pf.programs || [];
-        setFilters({ ...pf, programs, bookmarkOnly: false });
+        setFilters({ ...pf, programs, bookmarkOnly: false, unattendedOnly: false });
       }
       prevStudiosRef.current = studios;
       fetchLessons(studios);
@@ -320,9 +333,10 @@ function LessonsPageInner() {
       }
       if (filters.ticketFilter === "NORMAL" && lesson.ticketType !== null) return false;
       if (filters.ticketFilter === "ADDITIONAL" && lesson.ticketType === null) return false;
+      if (filters.unattendedOnly && attendedPrograms.has(lesson.programName)) return false;
       return true;
     });
-  }, [allLessons, studioSet, programSet, instructorSet, filters.ticketFilter]);
+  }, [allLessons, studioSet, programSet, instructorSet, filters.ticketFilter, filters.unattendedOnly, attendedPrograms]);
 
   // 固定行用: 予約済み（全スタジオ）
   const reservedLessons = useMemo(() =>
@@ -346,6 +360,7 @@ function LessonsPageInner() {
         ...pf,
         programs: pf.programs || [],
         bookmarkOnly: false,
+        unattendedOnly: false,
       });
     }
   }, [preset]);
@@ -353,7 +368,7 @@ function LessonsPageInner() {
   // プリセット削除
   const handleDeletePreset = useCallback(() => {
     deletePreset();
-    setFilters(f => ({ ...DEFAULT_FILTERS, studios: defaultStudios, bookmarkOnly: f.bookmarkOnly }));
+    setFilters(f => ({ ...DEFAULT_FILTERS, studios: defaultStudios, bookmarkOnly: f.bookmarkOnly, unattendedOnly: f.unattendedOnly }));
   }, [deletePreset, defaultStudios]);
 
   // プリセット保存（現在の条件で保存/上書き）
@@ -371,18 +386,34 @@ function LessonsPageInner() {
 
   // ツールバー要素（CalendarViewのスロットに渡す）
   const toolbarLeft = (
-    <Button
-      variant={filters.bookmarkOnly ? "default" : "outline"}
-      size="sm"
-      className={cn(
-        "h-8 text-xs gap-1.5 px-2 sm:px-3",
-        filters.bookmarkOnly && "bg-yellow-500 active:bg-yellow-600 text-white border-yellow-500"
+    <>
+      <Button
+        variant={filters.bookmarkOnly ? "default" : "outline"}
+        size="sm"
+        className={cn(
+          "h-8 text-xs gap-1.5 px-2 sm:px-3",
+          filters.bookmarkOnly && "bg-yellow-500 active:bg-yellow-600 text-white border-yellow-500"
+        )}
+        onClick={() => setFilters((f) => ({ ...f, bookmarkOnly: !f.bookmarkOnly }))}
+      >
+        <Star className={cn("h-3.5 w-3.5", filters.bookmarkOnly && "fill-white")} />
+        ブックマーク
+      </Button>
+      {user && (
+        <Button
+          variant={filters.unattendedOnly ? "default" : "outline"}
+          size="sm"
+          className={cn(
+            "h-8 text-xs gap-1.5 px-2 sm:px-3",
+            filters.unattendedOnly && "bg-emerald-500 active:bg-emerald-600 text-white border-emerald-500"
+          )}
+          onClick={() => setFilters((f) => ({ ...f, unattendedOnly: !f.unattendedOnly }))}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          未受講
+        </Button>
       )}
-      onClick={() => setFilters((f) => ({ ...f, bookmarkOnly: !f.bookmarkOnly }))}
-    >
-      <Star className={cn("h-3.5 w-3.5", filters.bookmarkOnly && "fill-white")} />
-      ブックマーク
-    </Button>
+    </>
   );
 
   const filterPanel = (

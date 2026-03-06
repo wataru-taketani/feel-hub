@@ -16,6 +16,7 @@ export interface FilterState {
   instructors: string[];
   ticketFilter: 'ALL' | 'NORMAL' | 'ADDITIONAL';
   bookmarkOnly: boolean;
+  unattendedOnly: boolean;
 }
 
 /** プリセットと現在のフィルタが一致するか比較 */
@@ -86,6 +87,7 @@ export default function FilterBar({
       instructors: [],
       ticketFilter: 'ALL',
       bookmarkOnly: false,
+      unattendedOnly: false,
     });
 
   // フィルタ件数（ブックマーク除外）
