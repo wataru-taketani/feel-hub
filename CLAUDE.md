@@ -156,3 +156,4 @@ npx serverless deploy --stage prod  # デプロイ
 - [x] 自動振替: 予約済みレッスンの席変更対応（`POST /api/reservation/sheet/change`）— 実機テスト済み
 - [ ] レッスン詳細モーダルにプログラム受講回数を表示（GROUP BY programで一括取得→キャッシュ方式）
 - [ ] LINE通知からキャンセル待ち再登録（Flex Message + postback or ワンタイムURL）
+- [x] レッスン一覧の絞り込みに「未受講」フィルタを追加（受講履歴にないプログラムで絞り込み）
