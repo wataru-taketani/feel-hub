@@ -6,7 +6,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { decrypt, login, getSeatMap, reserveLesson, reserveCompletion, changeSeat } from './fcClient';
+import { decrypt, login, getSeatMap, reserveLesson, reserveCompletion, changeSeat, FcAuthError } from './fcClient';
 
 interface AutoReserveEntry {
   id: string;
@@ -84,14 +84,19 @@ export async function autoReserveLesson(
     console.log(`${tag} FC login successful`);
   } catch (e) {
     console.error(`${tag} FC login failed:`, e);
-    // 認証無効フラグをセット → 以降のログイン試行を停止（アカウントロック防止）
-    await supabase
-      .from('feelcycle_credentials')
-      .update({ auth_valid: false })
-      .eq('user_id', entry.user_id);
-    console.log(`${tag} Marked credentials as invalid for user ${entry.user_id}`);
-    await notify(lineUserId, '【自動予約停止】\nFEELCYCLEへのログインに失敗しました。\nパスワードが変更された可能性があります。\n\nマイページからFC連携を再設定してください。\nhttps://feel-hub.vercel.app/mypage');
-    return 'auth_failed';
+    if (e instanceof FcAuthError) {
+      // パスワード不正等の恒久エラー → 認証無効フラグをセットして停止
+      await supabase
+        .from('feelcycle_credentials')
+        .update({ auth_valid: false })
+        .eq('user_id', entry.user_id);
+      console.log(`${tag} Marked credentials as invalid for user ${entry.user_id}`);
+      await notify(lineUserId, '【自動予約停止】\nFEELCYCLEへのログインに失敗しました。\nパスワードが変更された可能性があります。\n\nマイページからFC連携を再設定してください。\nhttps://feel-hub.vercel.app/mypage');
+      return 'auth_failed';
+    }
+    // CSRFトークン取得失敗・サーバーエラー等の一時エラー → 次サイクルでリトライ
+    console.log(`${tag} Temporary login error, will retry next cycle`);
+    return 'conflict';
   }
 
   // 3. 座席マップ取得 → 空席選択

@@ -26,6 +26,14 @@ export interface SeatMapBike {
   status: number; // 1=available, 2=reserved
 }
 
+/** パスワード不正など恒久的な認証エラー（auth_valid=falseにすべき） */
+export class FcAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FcAuthError';
+  }
+}
+
 // ── 暗号化 ──
 
 function getKey(): Buffer {
@@ -116,9 +124,11 @@ export async function login(email: string, password: string): Promise<FcSession>
     const body = await loginRes.json().catch(() => null);
     if (!body || body.result_code !== 0) {
       const msg = body?.message || 'IDもしくはパスワードが異なります。';
-      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      // パスワード不正 → 恒久エラー（auth_valid=falseにすべき）
+      throw new FcAuthError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     }
   } else if (loginRes.status !== 302) {
+    // サーバーエラー等 → 一時エラー（リトライ可能）
     throw new Error(`ログインに失敗しました (${loginRes.status})`);
   }
 
