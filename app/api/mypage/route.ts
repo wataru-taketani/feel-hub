@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
-import { decrypt } from '@/lib/crypto';
 import { getMypageWithReservations, getTickets } from '@/lib/feelcycle-api';
 import type { FeelcycleSession } from '@/lib/feelcycle-api';
+import { getFcSession, reauthSession } from '@/lib/fc-session';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+async function fetchMypageData(fcSession: FeelcycleSession) {
+  return Promise.allSettled([
+    getMypageWithReservations(fcSession),
+    getTickets(fcSession),
+  ]);
+}
 
 export async function GET() {
   const supabase = await createServerSupabase();
@@ -18,47 +19,30 @@ export async function GET() {
     return NextResponse.json({ error: '未認証' }, { status: 401 });
   }
 
-  // FEELCYCLEセッションを取得・復号
-  const { data: sessionRow } = await supabaseAdmin
-    .from('feelcycle_sessions')
-    .select('session_encrypted, expires_at')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!sessionRow || new Date(sessionRow.expires_at) < new Date()) {
-    // セッションなし or 期限切れ → credentials があれば自動再認証可能
-    const { data: creds } = await supabaseAdmin
-      .from('feelcycle_credentials')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (creds) {
-      return NextResponse.json({ error: 'セッションが期限切れです', code: 'FC_SESSION_EXPIRED' }, { status: 401 });
-    }
-    return NextResponse.json({ error: 'FEELCYCLE未連携', code: 'FC_NOT_LINKED' }, { status: 404 });
+  const sessionResult = await getFcSession(user.id);
+  if (!sessionResult.ok) {
+    const status = sessionResult.code === 'FC_NOT_LINKED' ? 404 : 401;
+    return NextResponse.json({ error: sessionResult.error, code: sessionResult.code }, { status });
   }
+  let fcSession = sessionResult.session;
 
-  let fcSession: FeelcycleSession;
-  try {
-    fcSession = JSON.parse(decrypt(sessionRow.session_encrypted));
-  } catch {
-    return NextResponse.json({ error: 'セッションの復号に失敗しました' }, { status: 500 });
-  }
+  let [mypageResult, ticketsResult] = await fetchMypageData(fcSession);
 
-  // マイページ情報 + チケット情報を並列取得
-  const [mypageResult, ticketsResult] = await Promise.allSettled([
-    getMypageWithReservations(fcSession),
-    getTickets(fcSession),
-  ]);
-
+  // FC APIセッション切れ → 自動再認証してリトライ
   if (mypageResult.status === 'rejected') {
     const msg = mypageResult.reason instanceof Error ? mypageResult.reason.message : String(mypageResult.reason);
     if (msg === 'SESSION_EXPIRED') {
-      return NextResponse.json({ error: 'FEELCYCLEセッションが期限切れです', code: 'FC_SESSION_EXPIRED' }, { status: 401 });
+      const reauth = await reauthSession(user.id);
+      if (!reauth.ok) {
+        return NextResponse.json({ error: reauth.error, code: reauth.code }, { status: 401 });
+      }
+      fcSession = reauth.session;
+      [mypageResult, ticketsResult] = await fetchMypageData(fcSession);
     }
-    console.error('Mypage API error:', mypageResult.reason);
-    return NextResponse.json({ error: 'マイページ情報の取得に失敗しました' }, { status: 500 });
+    if (mypageResult.status === 'rejected') {
+      console.error('Mypage API error:', mypageResult.reason);
+      return NextResponse.json({ error: 'マイページ情報の取得に失敗しました' }, { status: 500 });
+    }
   }
 
   const mypageData = mypageResult.value;
