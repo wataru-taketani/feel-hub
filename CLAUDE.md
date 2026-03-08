@@ -160,6 +160,13 @@ npx serverless deploy --stage prod  # デプロイ
   - `auth_invalid` → そのまま（FC再連携で auth_valid=true になれば自動再開）
   - `conflict` → そのまま（次サイクルで自動リトライ）
 
+## キャンセル待ち・自動予約の締切時刻ルール（未実装）
+- **キャンセル待ち通知（auto_reserve=false）**: レッスン開始 **2時間前** まで
+- **自動予約（auto_reserve=true）**: レッスン開始 **3時間前** まで
+- **自動振替（rc=1→changeSeat）**: レッスン開始 **2時間前** まで
+- 現状: 日付ベースでしか判定しておらず、レッスン当日の23:59まで動作してしまう
+- 実装箇所: `lambda/scraper/checkCancellation.ts` のループ内でレッスン開始時刻を見て判定
+
 ## 積み残し / TODO
 - [x] `LessonDetailModal.tsx`: `lesson.isFull` 条件 — 確認済み、正しく設定されている
 - [x] Phase 5-3 Step 2: rc=303 の自動処理 — Lambda/フロント両方で 1042/1143/1024 自動完了済み。10242（チケット購入）は自動化不可で手動案内
@@ -167,3 +174,4 @@ npx serverless deploy --stage prod  # デプロイ
 - [ ] レッスン詳細モーダルにプログラム受講回数を表示（GROUP BY programで一括取得→キャッシュ方式）
 - [ ] LINE通知からキャンセル待ち再登録（Flex Message + postback or ワンタイムURL）
 - [x] レッスン一覧の絞り込みに「未受講」フィルタを追加（受講履歴にないプログラムで絞り込み）
+- [ ] キャンセル待ち・自動予約の締切時刻制限（通知=2h前、自動予約=3h前、自動振替=2h前）
