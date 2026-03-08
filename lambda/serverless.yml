@@ -10,6 +10,7 @@ provider:
   memorySize: 256  # MB (OOM防止の安定性確保)
   timeout: 30  # 秒（API取得+DB保存で十分）
   environment:
+    TZ: Asia/Tokyo
     SUPABASE_URL: ${env:SUPABASE_URL}
     SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}
     ENCRYPTION_KEY: ${env:ENCRYPTION_KEY}

@@ -100,6 +100,14 @@ export const handler: Handler = async (event, context) => {
 
       console.log(`[Check] entry=${entry.id} lesson=${entry.lessons.program_name} ${entry.lessons.date} ${entry.lessons.time.slice(0, 5)} slots=${availableSlots} auto=${entry.auto_reserve}`);
 
+      // 締切時刻チェック: レッスン開始の2時間前まで（通知・自動予約共通）
+      const lessonStart = new Date(`${entry.lessons.date}T${entry.lessons.time}+09:00`);
+      const minutesUntilStart = (lessonStart.getTime() - Date.now()) / 60000;
+      if (minutesUntilStart < 120) {
+        console.log(`[Skip] entry=${entry.id} minutesUntilStart=${Math.round(minutesUntilStart)} < 120, deadline passed`);
+        continue;
+      }
+
       if (hasAvailability) {
         const lineUserId = entry.user_profiles?.line_user_id ?? null;
 

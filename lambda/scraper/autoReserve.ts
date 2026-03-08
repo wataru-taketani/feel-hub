@@ -47,6 +47,18 @@ export async function autoReserveLesson(
     return 'error';
   }
 
+  // 締切時刻チェック: 新規予約は3時間前まで、席変更は2時間前まで
+  const lessonStart = new Date(`${entry.lessons.date}T${entry.lessons.time}+09:00`);
+  const minutesUntilStart = (lessonStart.getTime() - Date.now()) / 60000;
+  if (minutesUntilStart < 120) {
+    console.log(`${tag} minutesUntilStart=${Math.round(minutesUntilStart)} < 120, deadline passed`);
+    return 'conflict';
+  }
+  const changeSeatOnly = minutesUntilStart < 180;
+  if (changeSeatOnly) {
+    console.log(`${tag} minutesUntilStart=${Math.round(minutesUntilStart)} < 180, changeSeatOnly mode`);
+  }
+
   // 1. FC認証情報を取得して復号
   const { data: cred, error: credError } = await supabase
     .from('feelcycle_credentials')
