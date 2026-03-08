@@ -79,7 +79,7 @@ export async function autoReserveLesson(
     password = decrypt(cred.password_encrypted);
   } catch (e) {
     console.error(`${tag} Failed to decrypt credentials:`, e);
-    await notify(lineUserId, '【自動予約失敗】\nFEELCYCLE認証情報の復号に失敗しました。マイページから再設定してください。');
+    await notify(lineUserId, '【自動予約失敗】\nFEELCYCLE連携情報が破損しています。マイページから再設定してください。\nhttps://feel-hub.vercel.app/mypage');
     return 'auth_failed';
   }
 
@@ -135,8 +135,9 @@ export async function autoReserveLesson(
   } catch (e) {
     console.error(`${tag} getSeatMap failed:`, e);
     if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
-      await notify(lineUserId, '【自動予約失敗】\nFEELCYCLEセッションが切れました。マイページから再設定してください。');
-      return 'auth_failed';
+      // 毎回新規ログインしているのでセッション切れはFC API側の一時障害 → リトライ
+      console.log(`${tag} SESSION_EXPIRED at getSeatMap, will retry next cycle`);
+      return 'conflict';
     }
     return 'error';
   }
@@ -218,8 +219,9 @@ export async function autoReserveLesson(
         } catch (e) {
           console.error(`${tag} changeSeat threw:`, e);
           if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
-            await notify(lineUserId, '【自動振替失敗】\nFEELCYCLEセッションが切れました。マイページから再設定してください。');
-            return 'auth_failed';
+            // 毎回新規ログインしているのでセッション切れはFC API側の一時障害 → リトライ
+            console.log(`${tag} SESSION_EXPIRED at changeSeat, will retry next cycle`);
+            return 'conflict';
           }
           // changeSeat のエンドポイントが不正 (404等) → 再試行しない
           await notify(lineUserId, formatErrorMessage(entry, '席変更に失敗しました。手動でFEELCYCLEサイトから変更してください。\nhttps://m.feelcycle.com/reserved/top'));
@@ -241,8 +243,9 @@ export async function autoReserveLesson(
   } catch (e) {
     console.error(`${tag} reserveLesson threw:`, e);
     if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
-      await notify(lineUserId, '【自動予約失敗】\nFEELCYCLEセッションが切れました。マイページから再設定してください。');
-      return 'auth_failed';
+      // 毎回新規ログインしているのでセッション切れはFC API側の一時障害 → リトライ
+      console.log(`${tag} SESSION_EXPIRED at reserveLesson, will retry next cycle`);
+      return 'conflict';
     }
     return 'error';
   }
