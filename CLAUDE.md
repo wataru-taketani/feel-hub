@@ -150,6 +150,16 @@ npx serverless deploy --stage prod  # デプロイ
 - `useSearchParams()` は `<Suspense>` 境界が必要（Next.js 15）
 - URL param でフィルタを受け取る場合、保存済みプリセットを上書きする（+ではなく置換）
 
+## Lambda エラーハンドリング設計原則（2026-03-08 確立）
+- **Supabase `.single()` は error も必ずチェック**: PGRST116="Row not found" のみ「該当なし」、それ以外は一時DB障害として `conflict`（リトライ）
+- **LINE通知後は `waitlist.notified=true`**: 通知済みなのに notified=false だと10分ごとにスパム送信される
+- **SESSION_EXPIRED は一時エラー**: Lambda は毎回新規ログインするため、API中の401/302/403はFC API一時障害。`conflict` で静かにリトライ
+- **エラー分類**: `FcAuthError`=恒久（auth_valid=false）、通常Error=一時（conflict でリトライ）。一時エラーで永久停止フラグを立てない
+- **autoReserveLesson の戻り値と waitlist 処理**:
+  - `success`, `needs_confirm`, `error`, `auth_failed` → `notified=true`（完了 or 通知済み）
+  - `auth_invalid` → そのまま（FC再連携で auth_valid=true になれば自動再開）
+  - `conflict` → そのまま（次サイクルで自動リトライ）
+
 ## 積み残し / TODO
 - [x] `LessonDetailModal.tsx`: `lesson.isFull` 条件 — 確認済み、正しく設定されている
 - [x] Phase 5-3 Step 2: rc=303 の自動処理 — Lambda/フロント両方で 1042/1143/1024 自動完了済み。10242（チケット購入）は自動化不可で手動案内
