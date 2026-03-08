@@ -11,17 +11,21 @@ import type { FilterPreset } from '@/types';
  * ログイン時: サーバーAPI経由でSupabase管理
  * 未ログイン時: localStorage管理
  */
+const CLOUD_CACHE_KEY = 'feelhub_presets_cloud';
+
 export function useFilterPresets() {
   const { user } = useAuthContext();
   const [localPreset, setLocalPreset, localLoaded] = useLocalStorage<FilterPreset | null>('feelhub_presets', null);
   const [cloudPreset, setCloudPreset] = useState<FilterPreset | null>(null);
   const [cloudLoaded, setCloudLoaded] = useState(false);
+  const [cacheRestored, setCacheRestored] = useState(false);
   const migrated = useRef(false);
   const loadingRef = useRef(false);
 
   const userId = user?.id;
   const preset = userId ? cloudPreset : localPreset;
-  const isLoaded = userId ? cloudLoaded : localLoaded;
+  // ログイン時: localStorageキャッシュ復元済みなら即座にtrue（クラウド取得はバックグラウンド）
+  const isLoaded = userId ? (cacheRestored || cloudLoaded) : localLoaded;
 
   // 旧配列データのマイグレーション（localStorage）
   useEffect(() => {
@@ -44,7 +48,23 @@ export function useFilterPresets() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localLoaded]);
 
-  // ログイン時: APIからプリセット読み込み
+  // ログイン時: まずlocalStorageキャッシュから即座に復元
+  useEffect(() => {
+    if (!userId) {
+      setCacheRestored(false);
+      return;
+    }
+    try {
+      const cached = window.localStorage.getItem(CLOUD_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as FilterPreset;
+        setCloudPreset(parsed);
+      }
+    } catch { /* ignore */ }
+    setCacheRestored(true);
+  }, [userId]);
+
+  // ログイン時: バックグラウンドでAPIからプリセット読み込み → 差分があれば更新
   useEffect(() => {
     if (!userId) {
       setCloudLoaded(false);
@@ -70,8 +90,17 @@ export function useFilterPresets() {
           throw new Error(data.error);
         }
 
-        setCloudPreset(data.preset || null);
+        const serverPreset = data.preset || null;
+        setCloudPreset(serverPreset);
         setCloudLoaded(true);
+        // localStorageキャッシュを更新
+        try {
+          if (serverPreset) {
+            window.localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(serverPreset));
+          } else {
+            window.localStorage.removeItem(CLOUD_CACHE_KEY);
+          }
+        } catch { /* ignore */ }
       } catch (err) {
         if (!active) return;
         console.error('[useFilterPresets] load error:', err);
@@ -152,8 +181,17 @@ export function useFilterPresets() {
         const prevPreset = cloudPreset;
         apiCall(
           { filters },
-          () => setCloudPreset(newPreset),
-          () => setCloudPreset(prevPreset),
+          () => {
+            setCloudPreset(newPreset);
+            try { window.localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(newPreset)); } catch { /* ignore */ }
+          },
+          () => {
+            setCloudPreset(prevPreset);
+            try {
+              if (prevPreset) window.localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(prevPreset));
+              else window.localStorage.removeItem(CLOUD_CACHE_KEY);
+            } catch { /* ignore */ }
+          },
         );
       } else {
         setLocalPreset(newPreset);
@@ -166,16 +204,19 @@ export function useFilterPresets() {
     if (userId) {
       const prevPreset = cloudPreset;
       setCloudPreset(null);
+      try { window.localStorage.removeItem(CLOUD_CACHE_KEY); } catch { /* ignore */ }
       (async () => {
         try {
           const res = await fetch('/api/filter-presets', { method: 'DELETE' });
           if (!res.ok) {
             console.error('[useFilterPresets] delete error:', res.status);
             setCloudPreset(prevPreset);
+            try { if (prevPreset) window.localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(prevPreset)); } catch { /* ignore */ }
           }
         } catch {
           console.error('[useFilterPresets] delete network error');
           setCloudPreset(prevPreset);
+          try { if (prevPreset) window.localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(prevPreset)); } catch { /* ignore */ }
         }
       })();
     } else {

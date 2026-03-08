@@ -48,7 +48,7 @@ export const handler: Handler = async (event, context) => {
     // 1. 未通知のウェイトリストエントリを取得（レッスン情報付き）
     const { data: waitlist, error: waitlistError } = await supabase
       .from('waitlist')
-      .select('*, lessons(*)')
+      .select('id, user_id, lesson_id, auto_reserve, preferred_seats, notified, lessons(id, date, time, end_time, program_name, instructor, studio, store_id, sid_hash, available_slots, is_full)')
       .eq('notified', false);
 
     if (waitlistError) {

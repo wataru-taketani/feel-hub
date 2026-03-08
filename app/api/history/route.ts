@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabaseAdmin
     .from('attendance_history')
-    .select('*')
+    .select('id, shift_date, start_time, end_time, store_name, instructor_name, program_name, sheet_no, ticket_name, playlist_url, cancel_flg')
     .eq('user_id', user.id)
     .eq('cancel_flg', 0)
     .order('shift_date', { ascending: false })

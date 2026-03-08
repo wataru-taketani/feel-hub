@@ -143,22 +143,22 @@ function LessonsPageInner() {
     }
     Promise.all([
       fetchWithRetry('/api/profile').then(res => res.ok ? res.json() : null).catch(() => null),
-      fetch('/api/dashboard').then(res => res.ok ? res.json() : null).catch(() => null), // FEELCYCLE API経由 — リトライ禁止
+      fetch('/api/reservations').then(res => res.ok ? res.json() : null).catch(() => null), // 予約一覧のみ取得（軽量API）— リトライ禁止
       fetchWithRetry('/api/groups').then(res => res.ok ? res.json() : null).catch(() => null),
-    ]).then(([profileData, dashboardData, groupsData]) => {
+    ]).then(([profileData, reservationsData, groupsData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);
       if (profileData?.profile?.homeStore) {
         profileHomeStore.current = parseHomeStoreToStudio(profileData.profile.homeStore);
       }
-      // dashboardのhomeStoreをフォールバック（profileにhome_storeがない場合）
-      if (!profileHomeStore.current && dashboardData?.memberSummary?.homeStore) {
-        profileHomeStore.current = parseHomeStoreToStudio(dashboardData.memberSummary.homeStore);
+      // reservationsのhomeStoreをフォールバック（profileにhome_storeがない場合）
+      if (!profileHomeStore.current && reservationsData?.homeStore) {
+        profileHomeStore.current = parseHomeStoreToStudio(reservationsData.homeStore);
       }
-      if (dashboardData?.reservations) setHasFcSession(true);
-      if (dashboardData?.reservations) {
+      if (reservationsData?.reservations) setHasFcSession(true);
+      if (reservationsData?.reservations) {
         const map = new Map<string, string>();
         const studioSet = new Set<string>();
-        for (const r of dashboardData.reservations as { date: string; startTime: string; programName: string; instructor: string; sheetNo: string; studio: string }[]) {
+        for (const r of reservationsData.reservations as { date: string; startTime: string; programName: string; instructor: string; sheetNo: string; studio: string }[]) {
           map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
           if (r.studio) {
             studioSet.add(parseHomeStoreToStudio(r.studio));

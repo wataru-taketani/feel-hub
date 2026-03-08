@@ -54,23 +54,19 @@ export async function GET() {
       .order('series')
       .order('program_name'),
     supabaseAdmin
-      .from('attendance_history')
-      .select('program_name')
-      .eq('user_id', user.id)
-      .eq('cancel_flg', 0)
-      .limit(10000),
+      .rpc('get_program_counts', { p_user_id: user.id }),
   ]);
 
   if (programsResult.status === 'rejected' || !programsResult.value.data) {
     return NextResponse.json({ error: 'プログラムデータの取得に失敗しました' }, { status: 500 });
   }
 
-  // 正規化済み受講回数マップ
+  // 正規化済み受講回数マップ（DB側で GROUP BY 集計済み）
   const countMap: Record<string, number> = {};
   if (countsResult.status === 'fulfilled' && countsResult.value.data) {
     for (const row of countsResult.value.data) {
       const key = normalizeProgram(row.program_name);
-      countMap[key] = (countMap[key] || 0) + 1;
+      countMap[key] = (countMap[key] || 0) + (row.count as number);
     }
   }
 
