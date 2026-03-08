@@ -108,14 +108,15 @@ export const handler: Handler = async (event, context) => {
           const result = await autoReserveLesson(entry, supabase, lineUserId);
           console.log(`AutoReserve entry ${entry.id}: result=${result}`);
 
-          if (result === 'success' || result === 'needs_confirm' || result === 'error') {
-            // 成功 or 非回復エラー → waitlist 完了
+          if (result === 'success' || result === 'needs_confirm' || result === 'error' || result === 'auth_failed') {
+            // 成功 or 非回復エラー or 認証失敗（通知済み） → waitlist 完了
+            // auth_failed: ユーザーに通知済み。FC再連携後にキャンセル待ちを再登録してもらう
             await supabase
               .from('waitlist')
               .update({ notified: true })
               .eq('id', entry.id);
           }
-          // auth_failed, auth_invalid, conflict → そのまま（再連携後 or 次サイクルで再試行）
+          // auth_invalid, conflict → そのまま（auth_invalid: FC再連携で auth_valid=true になれば自動再開）
 
           if (result === 'success') autoReservedCount++;
           continue;

@@ -48,13 +48,19 @@ export async function autoReserveLesson(
   }
 
   // 1. FC認証情報を取得して復号
-  const { data: cred } = await supabase
+  const { data: cred, error: credError } = await supabase
     .from('feelcycle_credentials')
     .select('email_encrypted, password_encrypted, auth_valid')
     .eq('user_id', entry.user_id)
     .single();
 
-  if (!cred) {
+  if (credError || !cred) {
+    // PGRST116 = "Row not found" → 本当に未設定
+    // それ以外 = 一時的なDB障害 → 次サイクルでリトライ
+    if (credError && credError.code !== 'PGRST116') {
+      console.error(`${tag} DB error fetching credentials (code=${credError.code}):`, credError.message);
+      return 'conflict';
+    }
     console.error(`${tag} No FC credentials for user ${entry.user_id}`);
     await notify(lineUserId, '【自動予約失敗】\nFEELCYCLE連携が未設定です。マイページから再設定してください。');
     return 'auth_failed';
