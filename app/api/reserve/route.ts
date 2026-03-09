@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { reserveLesson, reserveCompletion } from '@/lib/feelcycle-api';
 import { getFcSession, reauthSession } from '@/lib/fc-session';
 import type { FeelcycleSession } from '@/lib/feelcycle-api';
 
-async function executeReserve(fcSession: FeelcycleSession, sidHash: string, sheetNo: string) {
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+/** 予約成功後に fc_synced_at をリセット（次回アクセス時に同期を強制） */
+async function invalidateFcSync(userId: string) {
+  await supabaseAdmin
+    .from('user_profiles')
+    .update({ fc_synced_at: null })
+    .eq('user_id', userId);
+}
+
+async function executeReserve(fcSession: FeelcycleSession, sidHash: string, sheetNo: string, userId: string) {
   const result = await reserveLesson(fcSession, sidHash, String(sheetNo));
 
   switch (result.resultCode) {
     case 0:
+      // 予約成功 → 同期キャッシュを無効化
+      invalidateFcSync(userId).catch(e => console.warn('Failed to invalidate fc sync:', e));
       return NextResponse.json({
         success: true,
         resultCode: 0,
@@ -30,6 +46,8 @@ async function executeReserve(fcSession: FeelcycleSession, sidHash: string, shee
         const completion = await reserveCompletion(fcSession, tmpLessonId, ticketType);
 
         if (completion.resultCode === 0) {
+          // 予約確定成功 → 同期キャッシュを無効化
+          invalidateFcSync(userId).catch(e => console.warn('Failed to invalidate fc sync:', e));
           const extra = modalType === 1024 ? '（振替）' : modalType === 1143 ? '（チケット1枚使用）' : modalType === 1042 ? '（他店利用）' : '';
           return NextResponse.json({
             success: true,
@@ -98,7 +116,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return await executeReserve(sessionResult.session, sidHash, sheetNo);
+    return await executeReserve(sessionResult.session, sidHash, sheetNo, user.id);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg === 'SESSION_EXPIRED') {
@@ -108,7 +126,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: reauth.error, code: reauth.code }, { status: 401 });
       }
       try {
-        return await executeReserve(reauth.session, sidHash, sheetNo);
+        return await executeReserve(reauth.session, sidHash, sheetNo, user.id);
       } catch (retryErr) {
         console.error('Reserve retry after reauth failed:', retryErr);
         return NextResponse.json({ error: '予約処理でエラーが発生しました' }, { status: 500 });

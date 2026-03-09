@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
-import { getMypageWithReservations, getTickets, getLessonHistory } from '@/lib/feelcycle-api';
-import type { FeelcycleSession } from '@/lib/feelcycle-api';
-import { upsertHistory } from '@/lib/history-sync';
-import { getFcSession, reauthSession } from '@/lib/fc-session';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,16 +12,6 @@ function parsePlanLimit(membershipType: string): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
-/** FC APIからダッシュボードデータを並列取得 */
-async function fetchFcData(fcSession: FeelcycleSession, currentMonth: string) {
-  return Promise.allSettled([
-    getMypageWithReservations(fcSession),
-    getTickets(fcSession),
-    getLessonHistory(fcSession, currentMonth),
-    fetchRentalSubscription(fcSession),
-  ]);
-}
-
 export async function GET() {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -34,124 +20,120 @@ export async function GET() {
     return NextResponse.json({ error: '未認証' }, { status: 401 });
   }
 
-  // FEELCYCLEセッション取得（DB期限切れなら自動再認証）
-  const sessionResult = await getFcSession(user.id);
-  if (!sessionResult.ok) {
-    const status = sessionResult.code === 'FC_NOT_LINKED' ? 404 : 401;
-    return NextResponse.json({ error: sessionResult.error, code: sessionResult.code }, { status });
-  }
-  let fcSession = sessionResult.session;
+  // user_profiles から FC 会員情報を取得
+  const { data: profile } = await supabaseAdmin
+    .from('user_profiles')
+    .select('fc_member_name, fc_home_store, fc_plan_name, fc_monthly_fee, fc_long_plan, fc_rental_info, fc_synced_at')
+    .eq('user_id', user.id)
+    .single();
 
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  // FC APIデータ並列取得
-  let [mypageResult, ticketsResult, historyResult, rentalResult] = await fetchFcData(fcSession, currentMonth);
-
-  // FC APIセッション切れ → 自動再認証して全データ再取得
-  if (mypageResult.status === 'rejected') {
-    const msg = mypageResult.reason instanceof Error ? mypageResult.reason.message : String(mypageResult.reason);
-    if (msg === 'SESSION_EXPIRED') {
-      const reauth = await reauthSession(user.id);
-      if (!reauth.ok) {
-        return NextResponse.json({ error: reauth.error, code: reauth.code }, { status: 401 });
-      }
-      fcSession = reauth.session;
-      [mypageResult, ticketsResult, historyResult, rentalResult] = await fetchFcData(fcSession, currentMonth);
-    }
-    if (mypageResult.status === 'rejected') {
-      console.error('Dashboard mypage error:', mypageResult.reason);
-      return NextResponse.json({ error: 'データの取得に失敗しました' }, { status: 500 });
-    }
-  }
-
-  const mypageData = mypageResult.value;
-  const tickets = ticketsResult.status === 'fulfilled' ? ticketsResult.value : [];
-  if (ticketsResult.status === 'rejected') {
-    console.warn('Dashboard ticket fetch failed:', ticketsResult.reason instanceof Error ? ticketsResult.reason.message : ticketsResult.reason);
-  }
-
-  // 今月の受講回数
-  let totalMonthly = 0;
-  let subscriptionUsed = 0;
-
-  if (historyResult.status === 'fulfilled') {
-    const records = historyResult.value.filter(r => r.cancelFlg === 0);
-    totalMonthly = records.length;
-    subscriptionUsed = records.filter(r => {
-      const t = r.ticketName;
-      return !t || t === '-' || t === '' || t === '他店利用チケット';
-    }).length;
-
-    upsertHistory(supabaseAdmin, user.id, historyResult.value, currentMonth).catch(e =>
-      console.warn('Dashboard history sync failed:', e)
-    );
-  } else {
-    console.warn('Dashboard history fetch failed:', historyResult.reason instanceof Error ? historyResult.reason.message : historyResult.reason);
-    const monthStart = `${currentMonth}-01`;
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const monthEndStr = `${currentMonth}-${String(monthEnd.getDate()).padStart(2, '0')}`;
-
-    const { data: historyRows } = await supabaseAdmin
-      .from('attendance_history')
-      .select('ticket_name')
+  // FC未同期の場合は FC_NOT_LINKED ではなく空データを返す
+  // （フロント側で fc_synced_at=null を見て同期を開始する）
+  if (!profile || !profile.fc_synced_at) {
+    // FC連携済みか確認
+    const { data: creds } = await supabaseAdmin
+      .from('feelcycle_credentials')
+      .select('user_id')
       .eq('user_id', user.id)
-      .eq('cancel_flg', 0)
-      .gte('shift_date', monthStart)
-      .lte('shift_date', monthEndStr);
+      .single();
 
-    totalMonthly = (historyRows || []).length;
-    subscriptionUsed = (historyRows || []).filter(r => {
-      const t = r.ticket_name;
-      return !t || t === '-' || t === '' || t === '他店利用チケット';
-    }).length;
+    if (!creds) {
+      return NextResponse.json({ error: 'FEELCYCLE未連携', code: 'FC_NOT_LINKED' }, { status: 404 });
+    }
+
+    // FC連携済みだがまだ同期されていない → 空データ + fc_synced_at=null
+    return NextResponse.json({
+      reservations: [],
+      memberSummary: {
+        displayName: '',
+        membershipType: '',
+        totalAttendance: 0,
+        homeStore: '',
+      },
+      monthlySubscription: {
+        used: 0,
+        total: 0,
+        limit: null,
+        currentMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+      },
+      tickets: [],
+      rentalSubscriptions: [],
+      fcSyncedAt: null,
+    });
   }
 
-  const planLimit = parsePlanLimit(mypageData.mypage.membershipType);
+  // user_reservations から予約一覧を取得
+  const { data: reservationRows } = await supabaseAdmin
+    .from('user_reservations')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('date', { ascending: true })
+    .order('start_time', { ascending: true });
 
-  // 予約データにlessonId, sidHashを付与
-  const reservationKeys = mypageData.reservations.map(r => ({
+  const reservations = (reservationRows || []).map(r => ({
     date: r.date,
-    time: r.startTime + ':00',
-    programName: r.programName,
-    studio: r.studio.replace(/（.*）/, ''),
+    startTime: r.start_time,
+    endTime: r.end_time,
+    programName: r.program_name,
+    instructor: r.instructor,
+    studio: r.studio,
+    sheetNo: r.sheet_no || '',
+    ticketName: r.ticket_name || '',
+    bgColor: r.bg_color || '',
+    textColor: r.text_color || '',
+    playlistUrl: r.playlist_url || '',
+    cancelWaitTotal: r.cancel_wait_total || 0,
+    cancelWaitPosition: r.cancel_wait_position || 0,
+    paymentMethod: r.payment_method || 0,
+    lessonId: r.lesson_id,
+    sidHash: r.sid_hash,
   }));
 
-  const { data: allLessonRows } = await supabaseAdmin
-    .from('lessons')
-    .select('id, sid_hash, date, time, program_name, studio')
-    .in('date', [...new Set(reservationKeys.map(k => k.date))])
-    .in('time', [...new Set(reservationKeys.map(k => k.time))]);
+  // user_tickets からチケット情報を取得
+  const { data: ticketRows } = await supabaseAdmin
+    .from('user_tickets')
+    .select('*')
+    .eq('user_id', user.id);
 
-  const lessonMap = new Map<string, { id: string; sidHash: string | null }>();
-  for (const row of (allLessonRows || [])) {
-    const key = `${row.date}_${row.time}_${row.program_name}_${row.studio}`;
-    lessonMap.set(key, { id: row.id, sidHash: row.sid_hash });
-  }
+  const tickets = (ticketRows || []).map(t => ({
+    name: t.ticket_name,
+    totalCount: t.total_lot || 0,
+    details: t.details || [],
+  }));
 
-  const enrichedReservations = mypageData.reservations.map(r => {
-    const studioNormalized = r.studio.replace(/（.*）/, '');
-    const key = `${r.date}_${r.startTime}:00_${r.programName}_${studioNormalized}`;
-    const lesson = lessonMap.get(key);
-    return {
-      ...r,
-      lessonId: lesson?.id ?? null,
-      sidHash: lesson?.sidHash ?? null,
-    };
-  });
+  // 今月の受講回数（attendance_history から）
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthStart = `${currentMonth}-01`;
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const monthEndStr = `${currentMonth}-${String(monthEnd.getDate()).padStart(2, '0')}`;
 
-  let rentalSubscriptions: { name: string; availableCount: number; availableCountFlg: boolean }[] = [];
-  if (rentalResult.status === 'fulfilled' && rentalResult.value) {
-    rentalSubscriptions = rentalResult.value;
-  }
+  const { data: historyRows } = await supabaseAdmin
+    .from('attendance_history')
+    .select('ticket_name')
+    .eq('user_id', user.id)
+    .eq('cancel_flg', 0)
+    .gte('shift_date', monthStart)
+    .lte('shift_date', monthEndStr);
+
+  const totalMonthly = (historyRows || []).length;
+  const subscriptionUsed = (historyRows || []).filter(r => {
+    const t = r.ticket_name;
+    return !t || t === '-' || t === '' || t === '他店利用チケット';
+  }).length;
+
+  const planLimit = parsePlanLimit(profile.fc_plan_name || '');
+
+  // レンタル情報
+  const rentalInfo = profile.fc_rental_info as { name: string; availableCount: number; availableCountFlg: boolean }[] | null;
 
   return NextResponse.json({
-    reservations: enrichedReservations,
+    reservations,
     memberSummary: {
-      displayName: mypageData.mypage.displayName,
-      membershipType: mypageData.mypage.membershipType,
-      totalAttendance: mypageData.mypage.totalAttendance,
-      homeStore: mypageData.mypage.homeStore,
+      displayName: profile.fc_member_name || '',
+      membershipType: profile.fc_plan_name || '',
+      totalAttendance: 0, // DB キャッシュには totalAttendance がないが、フロントでは未使用
+      homeStore: profile.fc_home_store || '',
     },
     monthlySubscription: {
       used: subscriptionUsed,
@@ -160,41 +142,7 @@ export async function GET() {
       currentMonth,
     },
     tickets,
-    rentalSubscriptions,
+    rentalSubscriptions: rentalInfo || [],
+    fcSyncedAt: profile.fc_synced_at,
   });
-}
-
-const BASE_URL = 'https://m.feelcycle.com';
-
-async function fetchRentalSubscription(
-  session: FeelcycleSession
-): Promise<{ name: string; availableCount: number; availableCountFlg: boolean }[]> {
-  const res = await fetch(`${BASE_URL}/api/rental_item/select`, {
-    method: 'POST',
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-XSRF-TOKEN': session.xsrfToken,
-      'X-CSRF-TOKEN': session.csrfToken,
-      'Cookie': `XSRF-TOKEN=${encodeURIComponent(session.xsrfToken)}; laravel_session=${session.laravelSession}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({}),
-  });
-
-  if (!res.ok) return [];
-
-  const data = await res.json();
-  const list = (data.current_contract_rental_item_list || []) as {
-    name: string;
-    available_count: number;
-    available_count_flg: number;
-  }[];
-
-  return list.map((item) => ({
-    name: item.name,
-    availableCount: item.available_count,
-    availableCountFlg: item.available_count_flg === 1,
-  }));
 }

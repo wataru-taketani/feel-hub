@@ -16,6 +16,7 @@ import type { Lesson } from '@/types';
 import { fetchWithRetry } from '@/lib/fetchWithRetry';
 import LessonDetailModal from '@/components/lessons/LessonDetailModal';
 import type { ReserveApiResult } from '@/components/lessons/LessonDetailModal';
+import { useFcSync } from '@/hooks/useFcSync';
 
 interface DashboardReservation extends ReservationInfo {
   lessonId?: string | null;
@@ -37,6 +38,7 @@ interface DashboardData {
   };
   tickets: TicketInfo[];
   rentalSubscriptions: { name: string; availableCount: number; availableCountFlg: boolean }[];
+  fcSyncedAt: string | null;
 }
 
 function formatDateWithDay(dateStr: string): string {
@@ -250,26 +252,29 @@ function Dashboard() {
   // 共有: キャンセル待ち解除ダイアログ
   const [removeTarget, setRemoveTarget] = useState<WaitlistItem | null>(null);
 
-  useEffect(() => {
-    async function fetchDashboard(retried = false): Promise<DashboardData> {
-      const res = await fetch('/api/dashboard'); // FEELCYCLE API経由 — リトライ禁止
-      const body = await res.json();
-      if (!res.ok) {
-        if (body.code === 'FC_SESSION_EXPIRED' && !retried) {
-          const reauthRes = await fetch('/api/auth/feelcycle-reauth', { method: 'POST' });
-          if (reauthRes.ok) return fetchDashboard(true);
-          throw new Error('FC_NOT_LINKED');
-        }
-        if (body.code === 'FC_NOT_LINKED') throw new Error('FC_NOT_LINKED');
-        throw new Error(body.error || 'データの取得に失敗しました');
-      }
-      return body;
+  const fetchDashboardData = useCallback(async () => {
+    const res = await fetchWithRetry('/api/dashboard');
+    const body = await res.json();
+    if (!res.ok) {
+      if (body.code === 'FC_NOT_LINKED') throw new Error('FC_NOT_LINKED');
+      throw new Error(body.error || 'データの取得に失敗しました');
     }
+    return body as DashboardData;
+  }, []);
 
+  // FC同期フック
+  const { syncing, checkAndSync } = useFcSync({
+    onSynced: () => {
+      // 同期完了後にデータを再取得
+      fetchDashboardData().then(d => setData(d)).catch(() => {});
+    },
+  });
+
+  useEffect(() => {
     Promise.all([
       fetchWithRetry('/api/profile').then(r => r.ok ? r.json() : null),
       fetchWithRetry('/api/groups').then(r => r.ok ? r.json() : null),
-      fetchDashboard(),
+      fetchDashboardData(),
     ]).then(([profileData, groupsData, dashboardData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);
       if (groupsData?.groups) {
@@ -278,6 +283,8 @@ function Dashboard() {
         })));
       }
       setData(dashboardData);
+      // DB読み取り後に同期が必要かチェック
+      checkAndSync(dashboardData.fcSyncedAt);
     }).catch((e) => {
       if (e.message === 'FC_NOT_LINKED') {
         window.location.href = '/mypage';
@@ -285,7 +292,7 @@ function Dashboard() {
         setError(e.message);
       }
     }).finally(() => setLoading(false));
-  }, []);
+  }, [fetchDashboardData, checkAndSync]);
 
   const handleReserve = useCallback(async (sidHash: string, sheetNo: string): Promise<ReserveApiResult> => {
     const res = await fetch('/api/reserve', {

@@ -16,6 +16,7 @@ import { LinkIcon, Ticket, User, Loader2, Save, Bell, BellOff, Plus, Users, Crow
 import type { MypageInfo, ReservationInfo, TicketInfo } from '@/lib/feelcycle-api';
 import type { Group } from '@/types';
 import StudioTab from '@/components/mypage/StudioTab';
+import { useFcSync } from '@/hooks/useFcSync';
 
 type ProgramColorMap = Record<string, { colorCode: string; textColor: string }>;
 
@@ -23,6 +24,7 @@ interface MypageData {
   mypage: MypageInfo;
   reservations: ReservationInfo[];
   tickets: TicketInfo[];
+  fcSyncedAt?: string | null;
 }
 
 export default function MypagePage() {
@@ -82,21 +84,12 @@ function MypageContent() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // マイページデータ取得（自動再認証対応）
-  const fetchMypage = useCallback(async (retried = false): Promise<MypageData> => {
+  // マイページデータ取得（DB読み取り — FC APIは呼ばない）
+  const fetchMypage = useCallback(async (): Promise<MypageData> => {
     const res = await fetch('/api/mypage');
     const body = await res.json();
 
     if (!res.ok) {
-      // セッション期限切れ → 自動再認証を試みる
-      if (body.code === 'FC_SESSION_EXPIRED' && !retried) {
-        const reauthRes = await fetch('/api/auth/feelcycle-reauth', { method: 'POST' });
-        if (reauthRes.ok) {
-          return fetchMypage(true);
-        }
-        // 再認証失敗 → 再連携が必要
-        throw new Error('FC_NOT_LINKED');
-      }
       if (body.code === 'FC_NOT_LINKED') {
         throw new Error('FC_NOT_LINKED');
       }
@@ -105,6 +98,13 @@ function MypageContent() {
 
     return body;
   }, []);
+
+  // FC同期フック
+  const { checkAndSync } = useFcSync({
+    onSynced: () => {
+      fetchMypage().then(d => { setData(d); }).catch(() => {});
+    },
+  });
 
   useEffect(() => {
     const profileFetch = fetch('/api/profile').then((res) => res.json()).catch(() => null);
@@ -115,6 +115,9 @@ function MypageContent() {
         setData(mypageData);
         setError(null);
         setFcNotLinked(false);
+
+        // DB読み取り後に同期が必要かチェック
+        checkAndSync(mypageData.fcSyncedAt ?? null);
 
         if (profileData?.profile?.joinedAt) {
           const [y, m] = profileData.profile.joinedAt.split('-');
@@ -135,7 +138,7 @@ function MypageContent() {
         }
       })
       .finally(() => setLoading(false));
-  }, [fetchMypage]);
+  }, [fetchMypage, checkAndSync]);
 
   // FEELCYCLE連携
   const handleFcLink = async (e: React.FormEvent) => {

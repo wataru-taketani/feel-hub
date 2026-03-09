@@ -11,6 +11,7 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 import { useFilterPresets } from "@/hooks/useFilterPresets";
 import { useWaitlist } from "@/hooks/useWaitlist";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { useFcSync } from "@/hooks/useFcSync";
 import { Button } from "@/components/ui/button";
 import FilterBar, { type FilterState } from "@/components/lessons/FilterBar";
 import CalendarView from "@/components/lessons/CalendarView";
@@ -134,7 +135,40 @@ function LessonsPageInner() {
     }
   }, []);
 
-  // ログイン済み: profile + dashboard を並列取得
+  // FC同期フック
+  const fetchReservationsData = useCallback(async () => {
+    const res = await fetchWithRetry('/api/reservations');
+    return res.ok ? res.json() : null;
+  }, []);
+
+  const processReservationsData = useCallback((reservationsData: { homeStore?: string; reservations?: { date: string; startTime: string; programName: string; instructor: string; sheetNo: string; studio: string }[]; fcSyncedAt?: string | null } | null) => {
+    if (!reservationsData) return;
+    if (!profileHomeStore.current && reservationsData.homeStore) {
+      profileHomeStore.current = parseHomeStoreToStudio(reservationsData.homeStore);
+    }
+    if (reservationsData.reservations) {
+      setHasFcSession(true);
+      const map = new Map<string, string>();
+      const studioSet = new Set<string>();
+      for (const r of reservationsData.reservations) {
+        map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
+        if (r.studio) {
+          studioSet.add(parseHomeStoreToStudio(r.studio));
+        }
+      }
+      setReservedMap(map);
+      reservedStudiosRef.current = [...studioSet];
+    }
+  }, []);
+
+  const { checkAndSync } = useFcSync({
+    onSynced: () => {
+      // 同期完了後に予約データを再取得
+      fetchReservationsData().then(data => processReservationsData(data)).catch(() => {});
+    },
+  });
+
+  // ログイン済み: profile + reservations + groups を並列取得
   const [reservedMap, setReservedMap] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     if (!user) {
@@ -143,29 +177,17 @@ function LessonsPageInner() {
     }
     Promise.all([
       fetchWithRetry('/api/profile').then(res => res.ok ? res.json() : null).catch(() => null),
-      fetch('/api/reservations').then(res => res.ok ? res.json() : null).catch(() => null), // 予約一覧のみ取得（軽量API）— リトライ禁止
+      fetchReservationsData().catch(() => null),
       fetchWithRetry('/api/groups').then(res => res.ok ? res.json() : null).catch(() => null),
     ]).then(([profileData, reservationsData, groupsData]) => {
       if (profileData?.profile?.lineUserId) setHasLineUserId(true);
       if (profileData?.profile?.homeStore) {
         profileHomeStore.current = parseHomeStoreToStudio(profileData.profile.homeStore);
       }
-      // reservationsのhomeStoreをフォールバック（profileにhome_storeがない場合）
-      if (!profileHomeStore.current && reservationsData?.homeStore) {
-        profileHomeStore.current = parseHomeStoreToStudio(reservationsData.homeStore);
-      }
-      if (reservationsData?.reservations) setHasFcSession(true);
-      if (reservationsData?.reservations) {
-        const map = new Map<string, string>();
-        const studioSet = new Set<string>();
-        for (const r of reservationsData.reservations as { date: string; startTime: string; programName: string; instructor: string; sheetNo: string; studio: string }[]) {
-          map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
-          if (r.studio) {
-            studioSet.add(parseHomeStoreToStudio(r.studio));
-          }
-        }
-        setReservedMap(map);
-        reservedStudiosRef.current = [...studioSet];
+      processReservationsData(reservationsData);
+      // DB読み取り後に同期が必要かチェック
+      if (reservationsData?.fcSyncedAt !== undefined) {
+        checkAndSync(reservationsData.fcSyncedAt);
       }
       if (groupsData?.groups) {
         setGroups(groupsData.groups.map((g: { id: string; name: string; memberCount: number }) => ({
@@ -174,7 +196,7 @@ function LessonsPageInner() {
       }
       setProfileLoaded(true);
     });
-  }, [user]);
+  }, [user, fetchReservationsData, processReservationsData, checkAndSync]);
 
   const isReserved = useCallback(
     (lesson: Lesson) => reservedMap.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
