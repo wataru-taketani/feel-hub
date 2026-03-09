@@ -19,7 +19,7 @@ export async function GET() {
   const { data: profile } = await supabaseAdmin
     .from('user_profiles')
     .select('fc_member_name, fc_home_store, fc_plan_name, fc_monthly_fee, fc_long_plan, fc_rental_info, fc_synced_at')
-    .eq('user_id', user.id)
+    .eq('id', user.id)
     .single();
 
   if (!profile || !profile.fc_synced_at) {

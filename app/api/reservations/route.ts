@@ -19,7 +19,7 @@ export async function GET() {
   const { data: profile } = await supabaseAdmin
     .from('user_profiles')
     .select('fc_home_store, fc_synced_at')
-    .eq('user_id', user.id)
+    .eq('id', user.id)
     .single();
 
   // user_reservations から予約一覧を取得

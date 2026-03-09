@@ -15,7 +15,7 @@ async function invalidateFcSync(userId: string) {
   await supabaseAdmin
     .from('user_profiles')
     .update({ fc_synced_at: null })
-    .eq('user_id', userId);
+    .eq('id', userId);
 }
 
 async function executeReserve(fcSession: FeelcycleSession, sidHash: string, sheetNo: string, userId: string) {

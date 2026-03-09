@@ -165,7 +165,7 @@ async function saveProfileFcData(
       fc_rental_info: rentalInfo.length > 0 ? rentalInfo : null,
       fc_synced_at: new Date().toISOString(),
     })
-    .eq('user_id', userId);
+    .eq('id', userId);
 }
 
 export async function POST() {
