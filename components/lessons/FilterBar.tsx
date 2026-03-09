@@ -82,7 +82,7 @@ export default function FilterBar({
 
   const reset = () =>
     onChange({
-      studios: [],
+      studios: filters.studios, // スタジオは維持（最低1つ必要）
       programs: [],
       instructors: [],
       ticketFilter: 'ALL',
@@ -90,9 +90,8 @@ export default function FilterBar({
       unattendedOnly: false,
     });
 
-  // フィルタ件数（ブックマーク除外）
+  // フィルタ件数（スタジオは常に1つ以上選択されるのでカウント対象外）
   const activeCount =
-    (filters.studios.length > 0 ? 1 : 0) +
     (filters.programs.length > 0 ? 1 : 0) +
     (filters.instructors.length > 0 ? 1 : 0) +
     (filters.ticketFilter !== 'ALL' ? 1 : 0);
@@ -106,12 +105,14 @@ export default function FilterBar({
         <Badge key={`s-${s}`} variant="outline" className="gap-1 pr-1 text-xs h-6 shrink-0">
           <MapPin className="h-3 w-3 text-muted-foreground" />
           {s}
-          <button
-            onClick={() => update({ studios: filters.studios.filter((x) => x !== s) })}
-            className="rounded-full active:bg-muted p-1"
-          >
-            <X className="h-3 w-3" />
-          </button>
+          {filters.studios.length > 1 && (
+            <button
+              onClick={() => update({ studios: filters.studios.filter((x) => x !== s) })}
+              className="rounded-full active:bg-muted p-1"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </Badge>
       ))}
       {filters.studios.length > 0 && (filters.programs.length > 0 || filters.instructors.length > 0) && (

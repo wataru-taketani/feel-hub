@@ -26,8 +26,8 @@ export default function StudioSelectDialog({ open, onSelect }: StudioSelectDialo
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => onSelect(null)}>
-      <DialogContent className="max-w-sm">
+    <Dialog open={open} onOpenChange={() => { /* スタジオ選択必須 — 閉じない */ }}>
+      <DialogContent className="max-w-sm [&>button.absolute]:hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -80,13 +80,9 @@ export default function StudioSelectDialog({ open, onSelect }: StudioSelectDialo
           ))}
         </div>
 
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => onSelect(null)}
-        >
-          全店舗を表示
-        </Button>
+        <p className="text-xs text-muted-foreground text-center">
+          スタジオを1つ選択してください
+        </p>
       </DialogContent>
     </Dialog>
   );

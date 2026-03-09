@@ -230,20 +230,25 @@ function LessonsPageInner() {
 
     // ① 保存済みプリセット
     if (preset) {
-      const studios = preset.filters.studios || [];
-      setDefaultStudios(studios);
-      if (programParam) {
-        // URL指定時: スタジオだけ維持し、他はリセット
-        setFilters({ ...DEFAULT_FILTERS, studios, programs: [programParam] });
-      } else {
-        // 旧形式 programSearch → 新形式 programs に変換
-        const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
-        const programs = pf.programs || [];
-        setFilters({ ...pf, programs, bookmarkOnly: false, unattendedOnly: false });
+      let studios = preset.filters.studios || [];
+      // プリセットのスタジオが空の場合、ホームストアにフォールバック
+      if (studios.length === 0 && profileHomeStore.current) {
+        studios = [profileHomeStore.current];
       }
-      prevStudiosRef.current = studios;
-      fetchLessons(studios);
-      return;
+      if (studios.length > 0) {
+        setDefaultStudios(studios);
+        if (programParam) {
+          setFilters({ ...DEFAULT_FILTERS, studios, programs: [programParam] });
+        } else {
+          const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
+          const programs = pf.programs || [];
+          setFilters({ ...pf, studios, programs, bookmarkOnly: false, unattendedOnly: false });
+        }
+        prevStudiosRef.current = studios;
+        fetchLessons(studios);
+        return;
+      }
+      // studios が空かつ homeStore もない → ② 以降にフォールスルー
     }
 
     // ② homeStore（FC連携）
@@ -256,24 +261,20 @@ function LessonsPageInner() {
       return;
     }
 
-    // ③ localStorage
+    // ③ localStorage（__all__ は廃止 → ダイアログ表示にフォールスルー）
     try {
       const saved = localStorage.getItem(LOCALSTORAGE_KEY);
       if (saved !== null) {
         const val = JSON.parse(saved) as string;
-        if (val === '__all__') {
-          setDefaultStudios([]);
-          if (programParam) setFilters(f => ({ ...f, programs: [programParam] }));
-          prevStudiosRef.current = [];
-          fetchLessons([]);
-        } else {
+        if (val && val !== '__all__') {
           const studios = [val];
           setDefaultStudios(studios);
           setFilters(f => ({ ...f, studios, ...(programParam ? { programs: [programParam] } : {}) }));
           prevStudiosRef.current = studios;
           fetchLessons(studios);
+          return;
         }
-        return;
+        // __all__ の場合はフォールスルー（ダイアログ表示）
       }
     } catch { /* ignore parse error */ }
 
@@ -294,21 +295,15 @@ function LessonsPageInner() {
     }
   }, [filters.studios, fetchLessons]);
 
-  // ダイアログ選択時
+  // ダイアログ選択時（必ず1つのスタジオが選択される）
   const handleStudioSelect = useCallback((studio: string | null) => {
+    if (!studio) return; // 選択必須 — null は無視
     setShowStudioDialog(false);
-    if (studio) {
-      localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(studio));
-      setDefaultStudios([studio]);
-      setFilters(f => ({ ...f, studios: [studio] }));
-      prevStudiosRef.current = [studio];
-      fetchLessons([studio]);
-    } else {
-      localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify('__all__'));
-      setDefaultStudios([]);
-      prevStudiosRef.current = [];
-      fetchLessons([]);
-    }
+    localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(studio));
+    setDefaultStudios([studio]);
+    setFilters(f => ({ ...f, studios: [studio] }));
+    prevStudiosRef.current = [studio];
+    fetchLessons([studio]);
   }, [fetchLessons]);
 
   // 全日付を全レッスンから抽出（フィルタ後もカレンダー列を維持）
@@ -378,20 +373,23 @@ function LessonsPageInner() {
   const handleLoadPreset = useCallback(() => {
     if (preset) {
       const pf = preset.filters as FilterPreset['filters'] & { programSearch?: string };
+      const studios = (pf.studios?.length > 0) ? pf.studios : defaultStudios;
       setFilters({
         ...pf,
+        studios,
         programs: pf.programs || [],
         bookmarkOnly: false,
         unattendedOnly: false,
       });
     }
-  }, [preset]);
+  }, [preset, defaultStudios]);
 
   // プリセット削除
   const handleDeletePreset = useCallback(() => {
     deletePreset();
-    setFilters(f => ({ ...DEFAULT_FILTERS, studios: defaultStudios, bookmarkOnly: f.bookmarkOnly, unattendedOnly: f.unattendedOnly }));
-  }, [deletePreset, defaultStudios]);
+    const studios = defaultStudios.length > 0 ? defaultStudios : filters.studios;
+    setFilters(f => ({ ...DEFAULT_FILTERS, studios, bookmarkOnly: f.bookmarkOnly, unattendedOnly: f.unattendedOnly }));
+  }, [deletePreset, defaultStudios, filters.studios]);
 
   // プリセット保存（現在の条件で保存/上書き）
   const handleSavePreset = useCallback(() => {

@@ -24,11 +24,15 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
     if (isOpen) {
       setDraft(selected);
     } else {
-      // 閉じるときに変更があれば反映
-      const draftKey = [...draft].sort().join(',');
-      const selectedKey = [...selected].sort().join(',');
-      if (draftKey !== selectedKey) {
-        onChange(draft);
+      // 0件では確定しない（元の選択に戻す）
+      if (draft.length === 0) {
+        setDraft(selected);
+      } else {
+        const draftKey = [...draft].sort().join(',');
+        const selectedKey = [...selected].sort().join(',');
+        if (draftKey !== selectedKey) {
+          onChange(draft);
+        }
       }
     }
     setOpen(isOpen);
@@ -151,8 +155,11 @@ export default function StudioMultiSelect({ selected, onChange }: StudioMultiSel
           </div>
 
           {/* 決定ボタン */}
-          <div className="border-t px-3 py-2 shrink-0">
-            <Button className="w-full" onClick={() => handleOpen(false)}>
+          <div className="border-t px-3 py-2 shrink-0 space-y-1">
+            {draft.length === 0 && (
+              <p className="text-xs text-destructive text-center">1つ以上のスタジオを選択してください</p>
+            )}
+            <Button className="w-full" onClick={() => handleOpen(false)} disabled={draft.length === 0}>
               {draft.length > 0 ? `${draft.length}店舗で決定` : '決定'}
             </Button>
           </div>
