@@ -261,7 +261,7 @@ function LessonsPageInner() {
       return;
     }
 
-    // ③ localStorage（__all__ は廃止 → ダイアログ表示にフォールスルー）
+    // ③ localStorage
     try {
       const saved = localStorage.getItem(LOCALSTORAGE_KEY);
       if (saved !== null) {
@@ -274,12 +274,13 @@ function LessonsPageInner() {
           fetchLessons(studios);
           return;
         }
-        // __all__ の場合はフォールスルー（ダイアログ表示）
+        // __all__ → ホームストアにフォールバック（②で未解決の場合のみここに到達）
       }
     } catch { /* ignore parse error */ }
 
-    // ④ ダイアログ表示
+    // ④ フォールバック: ダイアログ表示（FC未連携かつ設定なしの場合のみ）
     setShowStudioDialog(true);
+    setLoading(false);
   }, [presetsLoaded, profileLoaded, preset, fetchLessons, searchParams]);
 
   // スタジオフィルタ変更検知 → API再取得
@@ -295,15 +296,30 @@ function LessonsPageInner() {
     }
   }, [filters.studios, fetchLessons]);
 
-  // ダイアログ選択時（必ず1つのスタジオが選択される）
+  // ダイアログ選択時
   const handleStudioSelect = useCallback((studio: string | null) => {
-    if (!studio) return; // 選択必須 — null は無視
     setShowStudioDialog(false);
-    localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(studio));
-    setDefaultStudios([studio]);
-    setFilters(f => ({ ...f, studios: [studio] }));
-    prevStudiosRef.current = [studio];
-    fetchLessons([studio]);
+    if (studio) {
+      localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(studio));
+      setDefaultStudios([studio]);
+      setFilters(f => ({ ...f, studios: [studio] }));
+      prevStudiosRef.current = [studio];
+      fetchLessons([studio]);
+    } else {
+      // 「全店舗を表示」— ホームストアがあればそちらを使用
+      if (profileHomeStore.current) {
+        const hs = profileHomeStore.current;
+        localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(hs));
+        setDefaultStudios([hs]);
+        setFilters(f => ({ ...f, studios: [hs] }));
+        prevStudiosRef.current = [hs];
+        fetchLessons([hs]);
+      } else {
+        // FC未連携: 全スタジオ表示（エッジケース）
+        prevStudiosRef.current = [];
+        fetchLessons([]);
+      }
+    }
   }, [fetchLessons]);
 
   // 全日付を全レッスンから抽出（フィルタ後もカレンダー列を維持）
