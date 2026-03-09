@@ -148,6 +148,35 @@ async function saveTickets(userId: string, tickets: TicketInfo[]) {
     .insert(rows);
 }
 
+/** キャンセルされた予約の自動振替 waitlist エントリを停止する
+ *  旧予約にあったが新予約から消えたレッスン = ユーザーがキャンセルした
+ *  そのレッスンの auto_reserve waitlist を停止して、自動予約化を防ぐ */
+async function stopCancelledAutoSwapEntries(
+  userId: string,
+  oldLessonIds: Set<string>,
+  newLessonIds: Set<string>
+) {
+  // 旧予約にあって新予約から消えたlesson_id = キャンセルされた
+  const cancelledIds = [...oldLessonIds].filter(id => !newLessonIds.has(id));
+  if (cancelledIds.length === 0) return;
+
+  // キャンセルされたレッスンの auto_reserve=true かつ notified=false のエントリを停止
+  const { data: entries } = await supabaseAdmin
+    .from('waitlist')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('auto_reserve', true)
+    .eq('notified', false)
+    .in('lesson_id', cancelledIds);
+
+  if (!entries || entries.length === 0) return;
+
+  await supabaseAdmin
+    .from('waitlist')
+    .update({ notified: true })
+    .in('id', entries.map(e => e.id));
+}
+
 /** user_profiles に FC 会員情報を保存 */
 async function saveProfileFcData(
   userId: string,
@@ -211,12 +240,29 @@ export async function POST() {
   // 予約データにlessonId, sidHashを付与
   const enrichedReservations = await enrichReservations(mypageData.reservations);
 
+  // 旧予約の lesson_id を取得（キャンセル検出用）
+  const { data: oldReservations } = await supabaseAdmin
+    .from('user_reservations')
+    .select('lesson_id')
+    .eq('user_id', user.id)
+    .not('lesson_id', 'is', null);
+
+  const oldLessonIds = new Set(
+    (oldReservations || []).map(r => r.lesson_id as string)
+  );
+
   // DB に保存（並列）
   await Promise.all([
     saveProfileFcData(user.id, mypageData.mypage, rentalInfo),
     saveReservations(user.id, enrichedReservations),
     saveTickets(user.id, tickets),
   ]);
+
+  // キャンセルされた予約の自動振替 waitlist を停止
+  const newLessonIds = new Set(
+    enrichedReservations.map(r => r.lessonId).filter((id): id is string => !!id)
+  );
+  await stopCancelledAutoSwapEntries(user.id, oldLessonIds, newLessonIds);
 
   return NextResponse.json({ synced: true });
 }
