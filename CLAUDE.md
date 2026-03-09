@@ -145,6 +145,9 @@ npx serverless deploy --stage prod  # デプロイ
 - `ENCRYPTION_KEY`
 
 ## 注意事項
+- **`user_profiles` のPKは `id`（`user_id` ではない）**: 他テーブル（user_reservations, user_tickets等）は `user_id`。混同注意
+- **DB操作コードを書く前に対象テーブルのカラム名を確認する**: `information_schema.columns` で検証
+- **API変更デプロイ後はDB応答を確認**: `SELECT count(*)` でデータが返ることを検証
 - DB columns: snake_case, TypeScript: camelCase（API routeで変換）
 - FEELCYCLE API の日付は `YYYY/MM/DD` → DB保存時に `YYYY-MM-DD` に正規化
 - `waitlist` と `user_profiles` に直接FKがない → join不可、分離クエリで対応
