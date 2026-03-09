@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarDays, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap, ChevronRight, RefreshCw } from 'lucide-react';
+import { CalendarDays, MapPin, Ticket, AlertTriangle, Bell, RotateCcw, X, Zap, ChevronRight, RefreshCw, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useWaitlist } from '@/hooks/useWaitlist';
 import type { WaitlistItem } from '@/hooks/useWaitlist';
@@ -337,6 +337,10 @@ function Dashboard() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <div className="rounded-lg border bg-card shadow-sm p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="mt-3 text-sm text-muted-foreground">読み込み中...</p>
+        </div>
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" />
         <div className="grid grid-cols-2 gap-4">
@@ -592,6 +596,10 @@ export default function Home() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <div className="rounded-lg border bg-card shadow-sm p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="mt-3 text-sm text-muted-foreground">読み込み中...</p>
+        </div>
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" />
       </div>

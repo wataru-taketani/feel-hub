@@ -29,6 +29,10 @@ export default function MypagePage() {
   return (
     <Suspense fallback={
       <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <div className="rounded-lg border bg-card shadow-sm p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="mt-3 text-sm text-muted-foreground">読み込み中...</p>
+        </div>
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />
@@ -268,6 +272,10 @@ function MypageContent() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto p-4 space-y-4">
+        <div className="rounded-lg border bg-card shadow-sm p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="mt-3 text-sm text-muted-foreground">読み込み中...</p>
+        </div>
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-48 w-full" />

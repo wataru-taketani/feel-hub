@@ -285,6 +285,10 @@ export default function HistoryPage() {
             {/* 履歴リスト */}
             {loading ? (
               <div className="space-y-3">
+                <div className="rounded-lg border bg-card shadow-sm p-12 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+                  <p className="mt-3 text-sm text-muted-foreground">読み込み中...</p>
+                </div>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Skeleton key={i} className="h-20 w-full" />
                 ))}
