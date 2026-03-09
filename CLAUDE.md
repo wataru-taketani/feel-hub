@@ -118,6 +118,8 @@ supabase/migrations/    # DBマイグレーション
 - LessonCard/CalendarDateColumn: `React.memo`化
 - Studios API: `Cache-Control: s-maxage=3600, stale-while-revalidate=86400`
 - Lessons API: `select('*')` → 必要カラムのみ
+- **FC同期アーキテクチャ**: 全ページDB-firstレンダリング + バックグラウンドFC API同期（10分TTL）
+- 全ページにLoader2スピナー追加（スケルトン + くるくる）
 
 ## 開発コマンド
 ```bash
@@ -160,12 +162,11 @@ npx serverless deploy --stage prod  # デプロイ
   - `auth_invalid` → そのまま（FC再連携で auth_valid=true になれば自動再開）
   - `conflict` → そのまま（次サイクルで自動リトライ）
 
-## キャンセル待ち・自動予約の締切時刻ルール（未実装）
+## キャンセル待ち・自動予約の締切時刻ルール（実装済み 2026-03-09）
 - **キャンセル待ち通知（auto_reserve=false）**: レッスン開始 **2時間前** まで
-- **自動予約（auto_reserve=true）**: レッスン開始 **3時間前** まで
+- **自動予約（auto_reserve=true）**: レッスン開始 **3時間前** まで（2-3h間はchangeSeatのみ許可）
 - **自動振替（rc=1→changeSeat）**: レッスン開始 **2時間前** まで
-- 現状: 日付ベースでしか判定しておらず、レッスン当日の23:59まで動作してしまう
-- 実装箇所: `lambda/scraper/checkCancellation.ts` のループ内でレッスン開始時刻を見て判定
+- `lambda/serverless.yml` に `TZ: Asia/Tokyo` 設定済み
 
 ## 積み残し / TODO
 - [x] `LessonDetailModal.tsx`: `lesson.isFull` 条件 — 確認済み、正しく設定されている
