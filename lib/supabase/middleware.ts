@@ -44,6 +44,21 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // 認証必須APIへの未認証リクエストをEdgeで早期リターン（Serverless Function invocation削減）
+  const pathname = request.nextUrl.pathname;
+  const isApiRoute = pathname.startsWith('/api/');
+  const publicApiPrefixes = ['/api/auth/', '/api/lessons', '/api/studios', '/api/programs', '/api/filter-presets'];
+  const isPublicApi = publicApiPrefixes.some((prefix) => pathname.startsWith(prefix));
+
+  if (!user && isApiRoute && !isPublicApi) {
+    const res = NextResponse.json({ error: '未認証' }, { status: 401 });
+    // セッションリフレッシュで更新された可能性のあるCookieをコピー
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      res.cookies.set(cookie.name, cookie.value);
+    });
+    return res;
+  }
+
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
