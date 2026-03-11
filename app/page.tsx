@@ -379,7 +379,7 @@ function Dashboard() {
   const upcoming = data.reservations
     .filter(r => r.date >= today)
     .sort((a, b) => `${a.date}_${a.startTime}`.localeCompare(`${b.date}_${b.startTime}`))
-    .slice(0, 5);
+;
 
   // 予約済みlessonIdセット（自動振替バッジ判定用）
   const reservedLessonIds = new Set(
