@@ -59,7 +59,14 @@ export async function updateSession(request: NextRequest) {
   // セッションの更新（重要: getUser()を呼び出してセッションを更新）
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  // Supabase API障害等でエラーの場合、ログアウトさせずにそのまま通す
+  // （Cookieは存在するので正規ユーザーの可能性が高い）
+  if (error && !user) {
+    return supabaseResponse;
+  }
 
   if (!user && pathname.startsWith('/api/')) {
     // Cookieはあるがセッション切れ → 401（Cookieクリア込み）
