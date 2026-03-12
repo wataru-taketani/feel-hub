@@ -7,6 +7,24 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // 認証必須ページ
+    '/mypage/:path*',
+    '/history/:path*',
+    '/groups/:path*',
+    // ログイン済み→TOPリダイレクト
+    '/login',
+    // 認証必須API（公開APIは除外: /api/auth/, /api/lessons, /api/studios, /api/programs, /api/filter-presets）
+    '/api/dashboard',
+    '/api/profile/:path*',
+    '/api/reservations',
+    '/api/groups/:path*',
+    '/api/mypage',
+    '/api/waitlist/:path*',
+    '/api/bookmarks/:path*',
+    '/api/reserve',
+    '/api/fc-sync',
+    '/api/history/:path*',
+    '/api/seatmap/:path*',
+    '/api/seat-preferences/:path*',
   ],
 };
