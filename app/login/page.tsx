@@ -37,12 +37,6 @@ function LoginContent() {
               LINEでログイン
             </a>
           </Button>
-
-          <div className="text-center">
-            <Link href="/lessons" className="text-sm text-muted-foreground active:text-foreground">
-              ログインせずにレッスン一覧を見る
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>
