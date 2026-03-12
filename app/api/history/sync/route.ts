@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
-import { decrypt } from '@/lib/crypto';
 import { getLessonHistory } from '@/lib/feelcycle-api';
 import { upsertHistory } from '@/lib/history-sync';
+import { getFcSession, reauthSession } from '@/lib/fc-session';
 import type { FeelcycleSession } from '@/lib/feelcycle-api';
 
 const supabaseAdmin = createSupabaseAdmin(
@@ -19,23 +19,12 @@ export async function POST() {
     return NextResponse.json({ error: '未認証' }, { status: 401 });
   }
 
-  // FEELCYCLEセッション取得
-  const { data: sessionRow } = await supabaseAdmin
-    .from('feelcycle_sessions')
-    .select('session_encrypted, expires_at')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!sessionRow || new Date(sessionRow.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'セッション期限切れ。再ログインしてください。' }, { status: 401 });
+  // FEELCYCLEセッション取得（期限切れなら自動再認証）
+  const sessionResult = await getFcSession(user.id);
+  if (!sessionResult.ok) {
+    return NextResponse.json({ error: sessionResult.error, code: sessionResult.code }, { status: 401 });
   }
-
-  let fcSession: FeelcycleSession;
-  try {
-    fcSession = JSON.parse(decrypt(sessionRow.session_encrypted));
-  } catch {
-    return NextResponse.json({ error: 'セッション復号失敗' }, { status: 500 });
-  }
+  let fcSession: FeelcycleSession = sessionResult.session;
 
   // 開始月を決定（joined_atまたは2年前）
   const { data: profile } = await supabaseAdmin
@@ -90,7 +79,24 @@ export async function POST() {
       }
     } catch (e) {
       if (e instanceof Error && e.message === 'SESSION_EXPIRED') {
-        return NextResponse.json({ error: 'セッション期限切れ。再ログインしてください。' }, { status: 401 });
+        // FC API側でセッション切れ → 再認証してリトライ
+        const reauth = await reauthSession(user.id);
+        if (!reauth.ok) {
+          return NextResponse.json({ error: reauth.error, code: reauth.code }, { status: 401 });
+        }
+        fcSession = reauth.session;
+        try {
+          const records = await getLessonHistory(fcSession, ym);
+          const result = await upsertHistory(supabaseAdmin, user.id, records, ym);
+          if (result.error) {
+            errors.push(`${ym}: ${result.error}`);
+          } else {
+            totalSynced += result.synced;
+          }
+        } catch (retryErr) {
+          errors.push(`${ym}: ${retryErr instanceof Error ? retryErr.message : 'Unknown error'}`);
+        }
+        continue;
       }
       errors.push(`${ym}: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
