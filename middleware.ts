@@ -7,7 +7,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // 認証必須ページ
+    // 認証必須ページ（/login以外の全ページ）
+    '/',
+    '/lessons',
     '/mypage/:path*',
     '/history/:path*',
     '/groups/:path*',

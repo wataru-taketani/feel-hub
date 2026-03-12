@@ -25,14 +25,12 @@ export async function updateSession(request: NextRequest) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: '未認証' }, { status: 401 });
     }
-    // 認証必須ページ → /loginにリダイレクト
-    const protectedPaths = ['/mypage', '/history', '/settings', '/groups'];
-    if (protectedPaths.some((p) => pathname.startsWith(p))) {
+    // /login以外の全ページ → /loginにリダイレクト
+    if (pathname !== '/login') {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       return NextResponse.redirect(url);
     }
-    // /login → そのまま通す
     return NextResponse.next({ request });
   }
 
@@ -71,8 +69,7 @@ export async function updateSession(request: NextRequest) {
     return res;
   }
 
-  const protectedPaths = ['/mypage', '/history', '/settings', '/groups'];
-  if (!user && protectedPaths.some((p) => pathname.startsWith(p))) {
+  if (!user && pathname !== '/login') {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
