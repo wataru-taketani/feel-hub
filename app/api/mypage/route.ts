@@ -89,12 +89,19 @@ export async function GET() {
     details: t.details || [],
   }));
 
+  // 累計受講回数を取得
+  const { count: totalAttendance } = await supabaseAdmin
+    .from('attendance_history')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('cancel_flg', 0);
+
   return NextResponse.json({
     mypage: {
       displayName: profile.fc_member_name || '',
       homeStore: profile.fc_home_store || '',
       membershipType: profile.fc_plan_name || '',
-      totalAttendance: 0,
+      totalAttendance: totalAttendance ?? 0,
       reservationCount: reservations.length,
       ownedTicketCount: tickets.reduce((sum, t) => sum + (t.totalCount || 0), 0),
       monthlyClubFee: profile.fc_monthly_fee,

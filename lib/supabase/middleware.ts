@@ -16,8 +16,9 @@ export async function updateSession(request: NextRequest) {
 
   // Supabase Auth Cookieが存在しない場合、getUser()をスキップして即座に返す
   // ボット/クローラーはCookieを持たないため、Supabaseへの無駄なHTTP通信を回避
+  // チャンク分割対応: sb-xxx-auth-token または sb-xxx-auth-token.0 等にマッチ
   const hasAuthCookie = request.cookies.getAll().some(
-    (c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token')
+    (c) => c.name.startsWith('sb-') && /\-auth-token(\.\d+)?$/.test(c.name)
   );
 
   if (!hasAuthCookie) {
