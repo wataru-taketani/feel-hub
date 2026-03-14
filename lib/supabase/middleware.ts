@@ -62,10 +62,18 @@ export async function updateSession(request: NextRequest) {
     error,
   } = await supabase.auth.getUser();
 
-  // Supabase API障害等でエラーの場合、ログアウトさせずにそのまま通す
-  // （Cookieは存在するので正規ユーザーの可能性が高い）
+  // エラー発生時の分岐:
+  // - 認証エラー（セッション期限切れ等）→ ログインにリダイレクト
+  // - Supabase API障害（ネットワーク等）→ ログアウトさせずそのまま通す
   if (error && !user) {
-    return supabaseResponse;
+    const isAuthError = error.status === 401 || error.status === 403
+      || error.name === 'AuthSessionMissingError'
+      || error.name === 'AuthApiError';
+    if (!isAuthError) {
+      // API障害 → Cookieがあるのでそのまま通す
+      return supabaseResponse;
+    }
+    // 認証エラー → セッション切れとして処理（下のリダイレクト/401ロジックに進む）
   }
 
   if (!user && pathname.startsWith('/api/')) {
