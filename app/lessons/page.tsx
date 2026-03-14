@@ -154,9 +154,10 @@ function LessonsPageInner() {
         // lesson_id があれば UUID で一意判定（最も確実）
         if (r.lessonId) {
           map.set(r.lessonId, r.sheetNo || '');
+        } else {
+          // フォールバック: lessonId がない場合のみ従来キー
+          map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
         }
-        // フォールバック: lessonId がない場合は従来キー
-        map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
         if (r.studio) {
           studioSet.add(parseHomeStoreToStudio(r.studio));
         }
