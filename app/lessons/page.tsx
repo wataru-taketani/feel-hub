@@ -141,7 +141,7 @@ function LessonsPageInner() {
     return res.ok ? res.json() : null;
   }, []);
 
-  const processReservationsData = useCallback((reservationsData: { homeStore?: string; reservations?: { date: string; startTime: string; programName: string; instructor: string; sheetNo: string; studio: string }[]; fcSyncedAt?: string | null } | null) => {
+  const processReservationsData = useCallback((reservationsData: { homeStore?: string; reservations?: { date: string; startTime: string; programName: string; instructor: string; sheetNo: string; studio: string; lessonId?: string | null }[]; fcSyncedAt?: string | null } | null) => {
     if (!reservationsData) return;
     if (!profileHomeStore.current && reservationsData.homeStore) {
       profileHomeStore.current = parseHomeStoreToStudio(reservationsData.homeStore);
@@ -151,6 +151,11 @@ function LessonsPageInner() {
       const map = new Map<string, string>();
       const studioSet = new Set<string>();
       for (const r of reservationsData.reservations) {
+        // lesson_id があれば UUID で一意判定（最も確実）
+        if (r.lessonId) {
+          map.set(r.lessonId, r.sheetNo || '');
+        }
+        // フォールバック: lessonId がない場合は従来キー
         map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
         if (r.studio) {
           studioSet.add(parseHomeStoreToStudio(r.studio));
@@ -199,12 +204,12 @@ function LessonsPageInner() {
   }, [user, fetchReservationsData, processReservationsData, checkAndSync]);
 
   const isReserved = useCallback(
-    (lesson: Lesson) => reservedMap.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
+    (lesson: Lesson) => reservedMap.has(lesson.id) || reservedMap.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
     [reservedMap]
   );
 
   const getSheetNo = useCallback(
-    (lesson: Lesson) => reservedMap.get(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`) || null,
+    (lesson: Lesson) => reservedMap.get(lesson.id) || reservedMap.get(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`) || null,
     [reservedMap]
   );
 
