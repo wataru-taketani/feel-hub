@@ -151,7 +151,7 @@ function LessonsPageInner() {
       const map = new Map<string, string>();
       const studioSet = new Set<string>();
       for (const r of reservationsData.reservations) {
-        map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}`, r.sheetNo || '');
+        map.set(`${r.date}_${r.startTime}_${r.programName}_${r.instructor}_${r.studio}`, r.sheetNo || '');
         if (r.studio) {
           studioSet.add(parseHomeStoreToStudio(r.studio));
         }
@@ -199,12 +199,12 @@ function LessonsPageInner() {
   }, [user, fetchReservationsData, processReservationsData, checkAndSync]);
 
   const isReserved = useCallback(
-    (lesson: Lesson) => reservedMap.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`),
+    (lesson: Lesson) => reservedMap.has(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}_${lesson.studio}`),
     [reservedMap]
   );
 
   const getSheetNo = useCallback(
-    (lesson: Lesson) => reservedMap.get(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}`) || null,
+    (lesson: Lesson) => reservedMap.get(`${lesson.date}_${lesson.startTime}_${lesson.programName}_${lesson.instructor}_${lesson.studio}`) || null,
     [reservedMap]
   );
 
