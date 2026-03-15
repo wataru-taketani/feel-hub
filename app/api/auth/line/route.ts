@@ -11,7 +11,9 @@ export async function GET(request: NextRequest) {
   }
 
   const state = randomBytes(32).toString('hex');
-  const origin = request.nextUrl.origin;
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host;
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  const origin = `${protocol}://${host}`;
   const redirectUri = `${origin}/api/auth/line/callback`;
   const redirectTo = request.nextUrl.searchParams.get('redirect_to') || '';
 

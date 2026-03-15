@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const state = searchParams.get('state');
   const error = searchParams.get('error');
-  const origin = request.nextUrl.origin;
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host;
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  const origin = `${protocol}://${host}`;
 
   // User denied or LINE returned error
   if (error) {
