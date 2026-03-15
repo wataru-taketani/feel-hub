@@ -15,7 +15,7 @@ export const config = {
     '/groups/:path*',
     // ログイン済み→TOPリダイレクト
     '/login',
-    // 認証必須API（公開APIは除外: /api/auth/, /api/lessons, /api/studios, /api/programs, /api/filter-presets）
+    // 認証必須API（/api/auth/* のみ除外）
     '/api/dashboard',
     '/api/profile/:path*',
     '/api/reservations',
@@ -28,5 +28,9 @@ export const config = {
     '/api/history/:path*',
     '/api/seatmap/:path*',
     '/api/seat-preferences/:path*',
+    '/api/lessons/:path*',
+    '/api/studios',
+    '/api/programs',
+    '/api/filter-presets',
   ],
 };
