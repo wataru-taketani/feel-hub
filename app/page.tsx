@@ -577,25 +577,6 @@ function Dashboard() {
   );
 }
 
-// --- 未ログインランディング ---
-function Landing() {
-  return (
-    <div className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center px-4">
-      <h1 className="text-4xl font-bold mb-3">FEEL hub</h1>
-      <p className="text-muted-foreground mb-8">FEELCYCLEライフをもっと快適に</p>
-
-      <div className="flex flex-col gap-3 w-full max-w-xs">
-        <Button size="lg" asChild>
-          <Link href="/login">ログイン</Link>
-        </Button>
-        <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
-          <Link href="/lessons">ログインせずに使う</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // --- メイン ---
 export default function Home() {
   const { user, loading } = useAuthContext();
@@ -613,5 +594,10 @@ export default function Home() {
     );
   }
 
-  return user ? <Dashboard /> : <Landing />;
+  if (!user) {
+    window.location.href = '/login';
+    return null;
+  }
+
+  return <Dashboard />;
 }
